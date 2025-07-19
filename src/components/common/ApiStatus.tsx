@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Wifi, WifiOff, AlertCircle, CheckCircle } from 'lucide-react';
+import { Wifi, WifiOff, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import { SupabaseIntegrationService, ChatService, ApiError } from '../../utils/apiService';
 
 interface ApiStatusProps {
