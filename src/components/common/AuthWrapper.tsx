@@ -140,7 +140,7 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
         <div className="container mx-auto px-4 py-8 relative z-10 flex items-center justify-center min-h-screen">
           <div className="max-w-md mx-auto w-full">
             {!showAuth ? (
-              <div className="card text-center bg-bg-primary/90 backdrop-blur-sm">
+              <div className="card text-center bg-bg-primary/90 backdrop-blur-sm shadow-xl border-2 border-gray-300 dark:border-gray-700">
                 <div className="mb-6">
                   {/* Ball style logo with letter N */}
                   <div className="flex items-center justify-center mb-4">
@@ -208,7 +208,7 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
                 </div>
               </div>
             ) : (
-              <div className="card bg-bg-primary/90 backdrop-blur-sm">
+              <div className="card bg-bg-primary/90 backdrop-blur-sm shadow-xl border-2 border-gray-300 dark:border-gray-700">
                 <h2 className="text-xl font-semibold mb-4">
                   {isSignUp ? 'Registrazione' : 'Accesso'}
                 </h2>
