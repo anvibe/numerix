@@ -51,6 +51,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
   }, [savedCombinations, selectedGame, selectedWheel, savedCombinationsLength]);
 
   // Get relevant extractions - access directly from extractionsData
+  // Use length as dependency to avoid object reference issues
   const relevantExtractions = useMemo(() => {
     const extractions = extractionsData[selectedGame] || [];
     if (!extractions || extractions.length === 0) {
@@ -60,7 +61,8 @@ const SavedCombinationsAnalysis: React.FC = () => {
     return [...extractions].sort((a, b) => 
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
-  }, [extractionsData, selectedGame, currentGameExtractionsLength]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedGame, currentGameExtractionsLength]);
 
   // Analyze matches between saved combinations and extractions
   const analysisResults = useMemo(() => {
