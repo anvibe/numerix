@@ -52,6 +52,12 @@ const SavedCombinationsAnalysis: React.FC = () => {
 
   // Analyze matches between saved combinations and extractions
   const analysisResults = useMemo(() => {
+    // Early return if we don't have gameConfig or it's invalid
+    if (!gameConfig || !gameConfig.numbersToSelect) {
+      return [];
+    }
+
+    const numbersToSelect = gameConfig.numbersToSelect;
     const results: MatchAnalysis[] = [];
 
     relevantCombinations.forEach(combo => {
@@ -71,7 +77,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
         const matches = combo.numbers.filter(num => winningNumbers.includes(num));
         const matchCount = matches.length;
         const missingNumbers = winningNumbers.filter(num => !combo.numbers.includes(num));
-        const difference = gameConfig.numbersToSelect - matchCount;
+        const difference = numbersToSelect - matchCount;
 
         // Include if matches are close (within 2 numbers) or if matchCount >= 2
         // This helps identify combinations that were "almost winning" (i-2 numbers away)
@@ -79,7 +85,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
           // Generate suggestions
           let suggestions: MatchAnalysis['suggestions'] = null;
           
-          if (matchCount >= 2 && matchCount < gameConfig.numbersToSelect) {
+          if (matchCount >= 2 && matchCount < numbersToSelect && relevantExtractions.length > 0) {
             // Find numbers that appear frequently in winning but not in saved combination
             const numbersToRemove: number[] = [];
             const numbersToAdd: number[] = [];
@@ -96,7 +102,9 @@ const SavedCombinationsAnalysis: React.FC = () => {
                 return winNums.includes(savedNum);
               }).length;
               
-              const frequency = appearsInWins / relevantExtractions.length;
+              const frequency = relevantExtractions.length > 0 
+                ? appearsInWins / relevantExtractions.length 
+                : 0;
               
               // If number appears in less than 15% of wins and didn't match, consider removing
               if (frequency < 0.15) {
@@ -179,7 +187,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
       }
       return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
     });
-  }, [relevantCombinations, relevantExtractions, selectedGame, selectedWheel, gameConfig]);
+  }, [relevantCombinations, relevantExtractions, selectedGame, selectedWheel, gameConfig?.numbersToSelect]);
 
   // Filter by difference if selected
   const filteredResults = useMemo(() => {
@@ -217,10 +225,21 @@ const SavedCombinationsAnalysis: React.FC = () => {
 
   // Calculate statistics
   const stats = useMemo(() => {
+    if (!gameConfig || !gameConfig.numbersToSelect || analysisResults.length === 0) {
+      return {
+        totalMatches: 0,
+        bestMatch: undefined,
+        nearMisses: 0,
+        exactWins: 0,
+        averageMatches: 0
+      };
+    }
+
+    const numbersToSelect = gameConfig.numbersToSelect;
     const totalMatches = analysisResults.reduce((sum, r) => sum + r.matchCount, 0);
     const bestMatch = analysisResults[0];
     const nearMisses = analysisResults.filter(r => r.difference <= 2).length;
-    const exactWins = analysisResults.filter(r => r.matchCount === gameConfig.numbersToSelect).length;
+    const exactWins = analysisResults.filter(r => r.matchCount === numbersToSelect).length;
 
     return {
       totalMatches,
@@ -229,7 +248,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
       exactWins,
       averageMatches: totalMatches / analysisResults.length || 0
     };
-  }, [analysisResults, gameConfig]);
+  }, [analysisResults, gameConfig?.numbersToSelect]);
 
   return (
     <div className="card mb-8">
@@ -247,7 +266,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
         </button>
       </div>
 
-      {selectedGame === 'lotto' && gameConfig.wheels && (
+      {selectedGame === 'lotto' && gameConfig?.wheels && (
         <div className="mb-6">
           <label className="block text-sm font-medium text-text-secondary mb-2">
             Filtra per Ruota
@@ -343,7 +362,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <div className="flex items-center gap-2 mb-2">
-                      {matchCount === gameConfig.numbersToSelect ? (
+                      {matchCount === gameConfig?.numbersToSelect ? (
                         <CheckCircle2 className="h-5 w-5 text-success" />
                       ) : difference <= 2 ? (
                         <AlertCircle className="h-5 w-5 text-warning" />
@@ -351,7 +370,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
                         <XCircle className="h-5 w-5 text-text-secondary" />
                       )}
                       <span className="font-semibold">
-                        {matchCount === gameConfig.numbersToSelect 
+                        {matchCount === gameConfig?.numbersToSelect 
                           ? '🎉 VINCITA!' 
                           : difference === 0 
                           ? '✅ Quasi vincita perfetta!' 
@@ -367,7 +386,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
                   </div>
                   <div className="text-right">
                     <div className="text-lg font-bold text-primary">
-                      {matchCount}/{gameConfig.numbersToSelect}
+                      {matchCount}/{gameConfig?.numbersToSelect ?? '?'}
                     </div>
                     <div className="text-xs text-text-secondary">Match</div>
                   </div>
