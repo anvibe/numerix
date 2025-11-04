@@ -142,11 +142,18 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
             {!showAuth ? (
               <div className="card text-center bg-bg-primary/90 backdrop-blur-sm">
                 <div className="mb-6">
-                  <img 
-                    src="/favicon.svg" 
-                    alt="Numerix Logo" 
-                    className="h-20 w-20 mx-auto mb-4"
-                  />
+                  {/* Circle with numbers icon */}
+                  <div className="flex items-center justify-center mb-4">
+                    <svg width="80" height="80" viewBox="0 0 64 64" className="mx-auto">
+                      <circle cx="32" cy="32" r="30" fill="#3b82f6" stroke="#1e40af" strokeWidth="2"/>
+                      <circle cx="32" cy="32" r="22" fill="#ffffff" opacity="0.9"/>
+                      <text x="32" y="28" fontFamily="system-ui, -apple-system, sans-serif" fontSize="18" fontWeight="bold" fill="#3b82f6" textAnchor="middle">98</text>
+                      <circle cx="20" cy="20" r="2" fill="#3b82f6" opacity="0.6"/>
+                      <circle cx="44" cy="20" r="2" fill="#3b82f6" opacity="0.6"/>
+                      <circle cx="20" cy="44" r="2" fill="#3b82f6" opacity="0.6"/>
+                      <circle cx="44" cy="44" r="2" fill="#3b82f6" opacity="0.6"/>
+                    </svg>
+                  </div>
                   <h2 className="text-xl font-semibold mb-2">Benvenuto in Numerix</h2>
                   <p className="text-text-secondary text-sm">
                     Per utilizzare l'applicazione e salvare i tuoi dati, effettua l'accesso o registrati.

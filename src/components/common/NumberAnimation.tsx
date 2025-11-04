@@ -26,7 +26,7 @@ const NumberAnimation: React.FC = () => {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       mouseX = W / 2;
       mouseY = H / 2;
-      if (balls.length === 90) {
+      if (balls.length === 98) {
         layoutGrid();
       }
     }
@@ -39,7 +39,7 @@ const NumberAnimation: React.FC = () => {
     }
 
     function layoutGrid() {
-      const totalBalls = 90;
+      const totalBalls = 98;
       if (balls.length !== totalBalls) return;
       
       // Calculate optimal grid dimensions
@@ -223,7 +223,7 @@ const NumberAnimation: React.FC = () => {
       return shade(hex, amt);
     }
 
-    for (let n = 1; n <= 90; n++) {
+    for (let n = 1; n <= 98; n++) {
       const color = COLORS[(n - 1) % COLORS.length];
       balls.push(new Ball(n, color));
     }
