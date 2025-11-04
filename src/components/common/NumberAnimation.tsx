@@ -42,9 +42,8 @@ const NumberAnimation: React.FC = () => {
       const totalBalls = 98;
       if (balls.length !== totalBalls) return;
       
-      // Calculate optimal grid dimensions
-      const aspectRatio = W / H;
-      const cols = Math.ceil(Math.sqrt(totalBalls * aspectRatio));
+      // Fixed 14 columns layout
+      const cols = 14;
       const rows = Math.ceil(totalBalls / cols);
       
       const gridW = W - 2 * R - 20;

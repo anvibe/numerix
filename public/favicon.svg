@@ -1,16 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
-  <!-- Circle background -->
-  <circle cx="32" cy="32" r="30" fill="#3b82f6" stroke="#1e40af" stroke-width="2"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Ball style with gradient -->
+  <defs>
+    <radialGradient id="ballGradient" cx="0.3" cy="0.35">
+      <stop offset="0%" stop-color="#60a5fa" />
+      <stop offset="50%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#1e40af" />
+    </radialGradient>
+    <filter id="shadow">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="0" dy="4" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.35"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
   
-  <!-- Inner circle -->
-  <circle cx="32" cy="32" r="22" fill="#ffffff" opacity="0.9"/>
+  <!-- Ball circle -->
+  <circle cx="32" cy="32" r="28" fill="url(#ballGradient)" filter="url(#shadow)"/>
   
-  <!-- Numbers inside circle -->
-  <text x="32" y="28" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="bold" fill="#3b82f6" text-anchor="middle">98</text>
+  <!-- Highlight ellipse -->
+  <ellipse cx="24" cy="24" rx="22" ry="14" fill="#ffffff" opacity="0.18" transform="rotate(-35 32 32)"/>
   
-  <!-- Decorative dots -->
-  <circle cx="20" cy="20" r="2" fill="#3b82f6" opacity="0.6"/>
-  <circle cx="44" cy="20" r="2" fill="#3b82f6" opacity="0.6"/>
-  <circle cx="20" cy="44" r="2" fill="#3b82f6" opacity="0.6"/>
-  <circle cx="44" cy="44" r="2" fill="#3b82f6" opacity="0.6"/>
+  <!-- White border -->
+  <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="2"/>
+  
+  <!-- Letter N -->
+  <text x="32" y="42" font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="bold" fill="#ffffff" text-anchor="middle" filter="url(#shadow)">N</text>
 </svg>

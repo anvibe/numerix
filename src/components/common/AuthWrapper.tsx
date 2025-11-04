@@ -142,16 +142,39 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
             {!showAuth ? (
               <div className="card text-center bg-bg-primary/90 backdrop-blur-sm">
                 <div className="mb-6">
-                  {/* Circle with numbers icon */}
+                  {/* Ball style logo with letter N */}
                   <div className="flex items-center justify-center mb-4">
                     <svg width="80" height="80" viewBox="0 0 64 64" className="mx-auto">
-                      <circle cx="32" cy="32" r="30" fill="#3b82f6" stroke="#1e40af" strokeWidth="2"/>
-                      <circle cx="32" cy="32" r="22" fill="#ffffff" opacity="0.9"/>
-                      <text x="32" y="28" fontFamily="system-ui, -apple-system, sans-serif" fontSize="18" fontWeight="bold" fill="#3b82f6" textAnchor="middle">98</text>
-                      <circle cx="20" cy="20" r="2" fill="#3b82f6" opacity="0.6"/>
-                      <circle cx="44" cy="20" r="2" fill="#3b82f6" opacity="0.6"/>
-                      <circle cx="20" cy="44" r="2" fill="#3b82f6" opacity="0.6"/>
-                      <circle cx="44" cy="44" r="2" fill="#3b82f6" opacity="0.6"/>
+                      <defs>
+                        <radialGradient id="logoGradient" cx="0.3" cy="0.35">
+                          <stop offset="0%" stopColor="#60a5fa" />
+                          <stop offset="50%" stopColor="#3b82f6" />
+                          <stop offset="100%" stopColor="#1e40af" />
+                        </radialGradient>
+                        <filter id="logoShadow">
+                          <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+                          <feOffset dx="0" dy="4" result="offsetblur"/>
+                          <feComponentTransfer>
+                            <feFuncA type="linear" slope="0.35"/>
+                          </feComponentTransfer>
+                          <feMerge>
+                            <feMergeNode/>
+                            <feMergeNode in="SourceGraphic"/>
+                          </feMerge>
+                        </filter>
+                      </defs>
+                      
+                      {/* Ball circle */}
+                      <circle cx="32" cy="32" r="28" fill="url(#logoGradient)" filter="url(#logoShadow)"/>
+                      
+                      {/* Highlight ellipse */}
+                      <ellipse cx="24" cy="24" rx="22" ry="14" fill="#ffffff" opacity="0.18" transform="rotate(-35 32 32)"/>
+                      
+                      {/* White border */}
+                      <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth="2"/>
+                      
+                      {/* Letter N */}
+                      <text x="32" y="42" fontFamily="system-ui, -apple-system, sans-serif" fontSize="32" fontWeight="bold" fill="#ffffff" textAnchor="middle" filter="url(#logoShadow)">N</text>
                     </svg>
                   </div>
                   <h2 className="text-xl font-semibold mb-2">Benvenuto in Numerix</h2>
