@@ -13,12 +13,9 @@ const NumberAnimation: React.FC = () => {
 
     let W: number, H: number, dpr: number;
     const balls: Ball[] = [];
-    const dice: Die[] = [];
     const R = 18;
-    const DIE_SIZE = 24;
-    let GRAVITY = 0.0;
-    const DRAG = 0.999;
-    const BOUNCE = 0.96;
+    let mouseX = W / 2;
+    let mouseY = H / 2;
 
     function resize() {
       dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -27,6 +24,11 @@ const NumberAnimation: React.FC = () => {
       canvas.width = Math.floor(W * dpr);
       canvas.height = Math.floor(H * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      mouseX = W / 2;
+      mouseY = H / 2;
+      if (balls.length === 90) {
+        layoutGrid();
+      }
     }
 
     window.addEventListener('resize', resize);
@@ -37,32 +39,27 @@ const NumberAnimation: React.FC = () => {
     }
 
     function layoutGrid() {
-      const cols = Math.ceil(Math.sqrt(90 * (W / H)));
-      const rows = Math.ceil(90 / cols);
+      const totalBalls = 90;
+      if (balls.length !== totalBalls) return;
+      
+      const cols = Math.ceil(Math.sqrt(totalBalls * (W / H)));
+      const rows = Math.ceil(totalBalls / cols);
       const gridW = W - 2 * R - 20;
       const gridH = H - 2 * R - 20;
-      const cellW = gridW / Math.max(1, cols - 1);
-      const cellH = gridH / Math.max(1, rows - 1);
+      const cellW = cols > 1 ? gridW / (cols - 1) : 0;
+      const cellH = rows > 1 ? gridH / (rows - 1) : 0;
+      
       let i = 0;
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols && i < balls.length; c++, i++) {
+      for (let r = 0; r < rows && i < totalBalls; r++) {
+        for (let c = 0; c < cols && i < totalBalls; c++, i++) {
           const b = balls[i];
-          b.x = R + 10 + c * cellW;
-          b.y = R + 10 + r * cellH;
+          b.baseX = R + 10 + (cols > 1 ? c * cellW : gridW / 2);
+          b.baseY = R + 10 + (rows > 1 ? r * cellH : gridH / 2);
+          b.x = b.baseX;
+          b.y = b.baseY;
           b.vx = 0;
           b.vy = 0;
         }
-      }
-      
-      // Layout dice randomly
-      for (let d = 0; d < dice.length; d++) {
-        const die = dice[d];
-        die.x = rand(DIE_SIZE + 10, W - DIE_SIZE - 10);
-        die.y = rand(DIE_SIZE + 10, H - DIE_SIZE - 10);
-        die.vx = 0;
-        die.vy = 0;
-        die.rotation = rand(0, Math.PI * 2);
-        die.rotationSpeed = rand(-0.05, 0.05);
       }
     }
 
@@ -71,6 +68,8 @@ const NumberAnimation: React.FC = () => {
       color: string;
       x: number;
       y: number;
+      baseX: number;
+      baseY: number;
       vx: number;
       vy: number;
       r: number;
@@ -78,35 +77,37 @@ const NumberAnimation: React.FC = () => {
       constructor(n: number, color: string) {
         this.n = n;
         this.color = color;
-        this.x = rand(R + 10, W - R - 10);
-        this.y = rand(R + 10, H - R - 10);
+        this.baseX = 0;
+        this.baseY = 0;
+        this.x = 0;
+        this.y = 0;
         this.vx = 0;
         this.vy = 0;
         this.r = R + rand(-2, 2);
       }
 
       update() {
-        this.vy += GRAVITY;
-        this.vx *= DRAG;
-        this.vy *= DRAG;
-        this.x += this.vx;
-        this.y += this.vy;
-        if (this.x < this.r) {
-          this.x = this.r;
-          this.vx = -this.vx * BOUNCE;
+        // Calculate distance from mouse
+        const dx = mouseX - this.baseX;
+        const dy = mouseY - this.baseY;
+        const dist = Math.hypot(dx, dy);
+        const maxDist = 200; // Maximum distance for interaction
+        
+        if (dist < maxDist) {
+          // Calculate attraction strength (stronger when closer)
+          const strength = (1 - dist / maxDist) * 8;
+          const angle = Math.atan2(dy, dx);
+          
+          // Apply slight movement towards mouse
+          this.vx += Math.cos(angle) * strength * 0.01;
+          this.vy += Math.sin(angle) * strength * 0.01;
         }
-        if (this.x > W - this.r) {
-          this.x = W - this.r;
-          this.vx = -this.vx * BOUNCE;
-        }
-        if (this.y < this.r) {
-          this.y = this.r;
-          this.vy = -this.vy * BOUNCE;
-        }
-        if (this.y > H - this.r) {
-          this.y = H - this.r;
-          this.vy = -this.vy * BOUNCE;
-        }
+        
+        // Apply velocity with damping
+        this.vx *= 0.9;
+        this.vy *= 0.9;
+        this.x = this.baseX + this.vx;
+        this.y = this.baseY + this.vy;
       }
 
       draw(g: CanvasRenderingContext2D) {
@@ -152,143 +153,6 @@ const NumberAnimation: React.FC = () => {
         g.shadowOffsetY = 2;
         g.fillText(this.n.toString(), this.x, this.y + 1);
         g.restore();
-
-        g.restore();
-      }
-    }
-
-    class Die {
-      x: number;
-      y: number;
-      vx: number;
-      vy: number;
-      size: number;
-      value: number;
-      rotation: number;
-      rotationSpeed: number;
-      color: string;
-
-      constructor(x: number, y: number, color: string) {
-        this.x = x;
-        this.y = y;
-        this.vx = 0;
-        this.vy = 0;
-        this.size = DIE_SIZE + rand(-2, 2);
-        this.value = Math.floor(rand(1, 7));
-        this.rotation = rand(0, Math.PI * 2);
-        this.rotationSpeed = rand(-0.05, 0.05);
-        this.color = color;
-      }
-
-      update() {
-        this.vy += GRAVITY;
-        this.vx *= DRAG;
-        this.vy *= DRAG;
-        this.x += this.vx;
-        this.y += this.vy;
-        this.rotation += this.rotationSpeed;
-        
-        const halfSize = this.size / 2;
-        if (this.x < halfSize) {
-          this.x = halfSize;
-          this.vx = -this.vx * BOUNCE;
-          this.rotationSpeed *= -1;
-        }
-        if (this.x > W - halfSize) {
-          this.x = W - halfSize;
-          this.vx = -this.vx * BOUNCE;
-          this.rotationSpeed *= -1;
-        }
-        if (this.y < halfSize) {
-          this.y = halfSize;
-          this.vy = -this.vy * BOUNCE;
-          this.rotationSpeed *= -1;
-        }
-        if (this.y > H - halfSize) {
-          this.y = H - halfSize;
-          this.vy = -this.vy * BOUNCE;
-          this.rotationSpeed *= -1;
-        }
-      }
-
-      draw(g: CanvasRenderingContext2D) {
-        const s = this.size;
-        const halfS = s / 2;
-        
-        g.save();
-        g.translate(this.x, this.y);
-        g.rotate(this.rotation);
-
-        // Draw 3D cube faces
-        const depth = s * 0.3;
-        const lightColor = lighten(this.color, 0.3);
-        const darkColor = shade(this.color, -0.4);
-
-        // Top face
-        g.fillStyle = lightColor;
-        g.beginPath();
-        g.moveTo(-halfS, -halfS);
-        g.lineTo(halfS, -halfS);
-        g.lineTo(halfS + depth, -halfS - depth);
-        g.lineTo(-halfS + depth, -halfS - depth);
-        g.closePath();
-        g.fill();
-
-        // Right face
-        g.fillStyle = this.color;
-        g.beginPath();
-        g.moveTo(halfS, -halfS);
-        g.lineTo(halfS, halfS);
-        g.lineTo(halfS + depth, halfS - depth);
-        g.lineTo(halfS + depth, -halfS - depth);
-        g.closePath();
-        g.fill();
-
-        // Front face
-        g.fillStyle = lighten(this.color, 0.1);
-        g.shadowColor = 'rgba(0,0,0,0.35)';
-        g.shadowBlur = 8;
-        g.shadowOffsetY = 3;
-        g.fillRect(-halfS, -halfS, s, s);
-
-        // Draw dots
-        g.fillStyle = '#fff';
-        g.shadowBlur = 0;
-        const dotRadius = s * 0.08;
-        const spacing = s * 0.25;
-
-        const dots: [number, number][] = [];
-        switch (this.value) {
-          case 1:
-            dots.push([0, 0]);
-            break;
-          case 2:
-            dots.push([-spacing, -spacing], [spacing, spacing]);
-            break;
-          case 3:
-            dots.push([-spacing, -spacing], [0, 0], [spacing, spacing]);
-            break;
-          case 4:
-            dots.push([-spacing, -spacing], [spacing, -spacing], [-spacing, spacing], [spacing, spacing]);
-            break;
-          case 5:
-            dots.push([-spacing, -spacing], [spacing, -spacing], [0, 0], [-spacing, spacing], [spacing, spacing]);
-            break;
-          case 6:
-            dots.push([-spacing, -spacing], [spacing, -spacing], [-spacing, 0], [spacing, 0], [-spacing, spacing], [spacing, spacing]);
-            break;
-        }
-
-        dots.forEach(([x, y]) => {
-          g.beginPath();
-          g.arc(x, y, dotRadius, 0, Math.PI * 2);
-          g.fill();
-        });
-
-        // Draw border
-        g.strokeStyle = 'rgba(255,255,255,0.6)';
-        g.lineWidth = 1.5;
-        g.strokeRect(-halfS, -halfS, s, s);
 
         g.restore();
       }
@@ -344,124 +208,34 @@ const NumberAnimation: React.FC = () => {
       const color = COLORS[(n - 1) % COLORS.length];
       balls.push(new Ball(n, color));
     }
-
-    // Add 15 dice
-    for (let i = 0; i < 15; i++) {
-      const color = COLORS[i % COLORS.length];
-      dice.push(new Die(rand(DIE_SIZE + 10, W - DIE_SIZE - 10), rand(DIE_SIZE + 10, H - DIE_SIZE - 10), color));
-    }
     
+    // Layout grid after all balls are created
     layoutGrid();
 
-    function repel() {
-      // Repel balls
-      for (let i = 0; i < balls.length; i++) {
-        for (let j = i + 1; j < balls.length; j++) {
-          const a = balls[i];
-          const b = balls[j];
-          const dx = b.x - a.x;
-          const dy = b.y - a.y;
-          const dist = Math.hypot(dx, dy);
-          const min = (a.r + b.r) * 0.94;
-
-          if (dist > 0 && dist < min) {
-            const overlap = (min - dist) * 0.5;
-            const ux = dx / dist;
-            const uy = dy / dist;
-            a.x -= ux * overlap;
-            a.y -= uy * overlap;
-            b.x += ux * overlap;
-            b.y += uy * overlap;
-            const vproj = (b.vx - a.vx) * ux + (b.vy - a.vy) * uy;
-            a.vx += vproj * ux * 0.25;
-            a.vy += vproj * uy * 0.25;
-            b.vx -= vproj * ux * 0.25;
-            b.vy -= vproj * uy * 0.25;
-          }
-        }
-      }
-      
-      // Repel dice
-      for (let i = 0; i < dice.length; i++) {
-        for (let j = i + 1; j < dice.length; j++) {
-          const a = dice[i];
-          const b = dice[j];
-          const dx = b.x - a.x;
-          const dy = b.y - a.y;
-          const dist = Math.hypot(dx, dy);
-          const min = (a.size + b.size) * 0.9;
-
-          if (dist > 0 && dist < min) {
-            const overlap = (min - dist) * 0.5;
-            const ux = dx / dist;
-            const uy = dy / dist;
-            a.x -= ux * overlap;
-            a.y -= uy * overlap;
-            b.x += ux * overlap;
-            b.y += uy * overlap;
-            const vproj = (b.vx - a.vx) * ux + (b.vy - a.vy) * uy;
-            a.vx += vproj * ux * 0.25;
-            a.vy += vproj * uy * 0.25;
-            b.vx -= vproj * ux * 0.25;
-            b.vy -= vproj * uy * 0.25;
-          }
-        }
-      }
-      
-      // Repel balls and dice
-      for (let i = 0; i < balls.length; i++) {
-        for (let j = 0; j < dice.length; j++) {
-          const a = balls[i];
-          const b = dice[j];
-          const dx = b.x - a.x;
-          const dy = b.y - a.y;
-          const dist = Math.hypot(dx, dy);
-          const min = (a.r + b.size / 2) * 0.9;
-
-          if (dist > 0 && dist < min) {
-            const overlap = (min - dist) * 0.5;
-            const ux = dx / dist;
-            const uy = dy / dist;
-            a.x -= ux * overlap;
-            a.y -= uy * overlap;
-            b.x += ux * overlap;
-            b.y += uy * overlap;
-            const vproj = (b.vx - a.vx) * ux + (b.vy - a.vy) * uy;
-            a.vx += vproj * ux * 0.25;
-            a.vy += vproj * uy * 0.25;
-            b.vx -= vproj * ux * 0.25;
-            b.vy -= vproj * uy * 0.25;
-          }
-        }
-      }
+    // Mouse interaction
+    function handleMouseMove(e: MouseEvent) {
+      const rect = canvas.getBoundingClientRect();
+      mouseX = (e.clientX - rect.left) * (canvas.width / rect.width) / dpr;
+      mouseY = (e.clientY - rect.top) * (canvas.height / rect.height) / dpr;
     }
+
+    canvas.addEventListener('mousemove', handleMouseMove);
 
     let animationId: number;
 
     function tick() {
       ctx.clearRect(0, 0, W, H);
-      for (const b of balls) b.update();
-      for (const d of dice) d.update();
-      repel();
-      for (const b of balls) b.draw(ctx);
-      for (const d of dice) d.draw(ctx);
+      for (const b of balls) {
+        b.update();
+        b.draw(ctx);
+      }
       animationId = requestAnimationFrame(tick);
     }
     tick();
 
-    setTimeout(() => {
-      GRAVITY = 0.04;
-      balls.forEach((b) => {
-        b.vx = rand(-0.4, 0.4);
-      });
-      dice.forEach((d) => {
-        d.vx = rand(-0.5, 0.5);
-        d.rotationSpeed = rand(-0.08, 0.08);
-      });
-    }, 1200);
-
     return () => {
       window.removeEventListener('resize', resize);
+      canvas.removeEventListener('mousemove', handleMouseMove);
       cancelAnimationFrame(animationId);
     };
   }, []);
@@ -469,8 +243,8 @@ const NumberAnimation: React.FC = () => {
   return (
     <canvas
       ref={canvasRef}
-      className="fixed inset-0 w-full h-full pointer-events-none z-0"
-      style={{ background: 'transparent' }}
+      className="fixed inset-0 w-full h-full z-0"
+      style={{ background: 'transparent', pointerEvents: 'auto' }}
     />
   );
 };
