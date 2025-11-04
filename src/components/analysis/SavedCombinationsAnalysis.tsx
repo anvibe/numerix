@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { Target, TrendingUp, AlertCircle, Lightbulb, ArrowRight, CheckCircle2, XCircle } from 'lucide-react';
+import { Target, AlertCircle, Lightbulb, CheckCircle2, XCircle } from 'lucide-react';
 import { useGame } from '../../context/GameContext';
 import { GeneratedCombination, ExtractedNumbers, LottoWheel } from '../../types';
 import NumberBubble from '../common/NumberBubble';
-import { getGameByType } from '../../utils/generators';
 
 interface MatchAnalysis {
   savedCombination: GeneratedCombination;
