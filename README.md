@@ -56,30 +56,30 @@ npm run dev
 npm run build
 ```
 
-## Deployment su Netlify
+## Deployment su Vercel
 
-L'applicazione è pronta per essere deployata su Netlify. Vedi [DEPLOY_NETLIFY.md](DEPLOY_NETLIFY.md) per istruzioni dettagliate.
+L'applicazione è pronta per essere deployata su Vercel. Vedi [DEPLOY_VERCEL.md](DEPLOY_VERCEL.md) per istruzioni dettagliate.
 
 ### Quick Start
 
-1. **Via Dashboard** (Consigliato):
-   - Vai su https://app.netlify.com
-   - Connetti il tuo repository Git
-   - Netlify rileverà automaticamente le impostazioni
-
-2. **Via CLI**:
+1. **Push to GitHub**:
    ```bash
-   npm install -g netlify-cli
-   netlify login
-   netlify deploy --prod
+   git push -u origin main
    ```
+
+2. **Deploy via Vercel Dashboard**:
+   - Vai su https://vercel.com
+   - Import your Git repository
+   - Vercel auto-detecterà le impostazioni
+   - Set environment variables
+   - Deploy!
 
 3. **Environment Variables** (Richiesti):
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
    - `VITE_OPENAI_API_KEY` (opzionale)
 
-Vedi `DEPLOY_NETLIFY.md` per dettagli completi.
+Vedi `DEPLOY_VERCEL.md` per dettagli completi.
 
 ## Tecnologie Utilizzate
 
