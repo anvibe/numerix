@@ -31,199 +31,173 @@ const SavedCombinationsAnalysis: React.FC = () => {
   const [filterDifference, setFilterDifference] = useState<number | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(true);
 
-  // Get current game extractions - access directly but memoize processing
+  // Calculate combinations and extractions directly (no memoization to avoid React error #310)
+  const relevantCombinations = savedCombinations.filter(combo => {
+    if (combo.gameType !== selectedGame) return false;
+    if (selectedGame === 'lotto' && combo.wheel) {
+      return combo.wheel === selectedWheel;
+    }
+    return true;
+  });
+
   const currentGameExtractions = extractionsData[selectedGame] || [];
-  const currentGameExtractionsLength = currentGameExtractions.length;
-  const savedCombinationsLength = savedCombinations.length;
-
-  // Filter combinations for current game
-  // Access savedCombinations directly inside useMemo to avoid object reference issues
-  const relevantCombinations = useMemo(() => {
-    if (!savedCombinations || savedCombinations.length === 0) {
-      return [];
-    }
-    return savedCombinations.filter(combo => {
-      if (combo.gameType !== selectedGame) return false;
-      if (selectedGame === 'lotto' && combo.wheel) {
-        return combo.wheel === selectedWheel;
-      }
-      return true;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedGame, selectedWheel, savedCombinationsLength]);
-
-  // Get relevant extractions - access directly from extractionsData
-  // Use length as dependency to avoid object reference issues
-  const relevantExtractions = useMemo(() => {
-    const extractions = extractionsData[selectedGame] || [];
-    if (!extractions || extractions.length === 0) {
-      return [];
-    }
-    // Create a copy before sorting to avoid mutating the original array
-    return [...extractions].sort((a, b) => 
-      new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedGame, currentGameExtractionsLength]);
+  const relevantExtractions = currentGameExtractions.length === 0 
+    ? [] 
+    : [...currentGameExtractions].sort((a, b) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
 
   // Analyze matches between saved combinations and extractions
-  // Recalculate relevantCombinations and relevantExtractions inside to avoid dependency issues
-  const analysisResults = useMemo(() => {
-    // Early return if we don't have gameConfig or it's invalid
-    if (!gameConfig || !gameConfig.numbersToSelect) {
-      return [];
-    }
+  // Calculate directly without useMemo to avoid React error #310
+  // Early return if we don't have gameConfig or it's invalid
+  if (!gameConfig || !gameConfig.numbersToSelect) {
+    return (
+      <div className="card mb-8">
+        <div className="text-center py-8">
+          <AlertCircle className="h-12 w-12 text-text-secondary mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Configurazione mancante</h3>
+          <p className="text-text-secondary">
+            Configurazione del gioco non disponibile.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
-    // Recalculate relevant combinations and extractions directly here
-    const combos = savedCombinations.filter(combo => {
-      if (combo.gameType !== selectedGame) return false;
-      if (selectedGame === 'lotto' && combo.wheel) {
-        return combo.wheel === selectedWheel;
+  // Use already calculated combinations and extractions
+  const combos = relevantCombinations;
+  const sortedExtractions = relevantExtractions;
+
+  const numbersToSelect = gameConfig.numbersToSelect;
+  const results: MatchAnalysis[] = [];
+
+  combos.forEach(combo => {
+    sortedExtractions.forEach(extraction => {
+      // Get winning numbers based on game type and wheel
+      let winningNumbers: number[];
+      
+      if (selectedGame === 'lotto' && extraction.wheels && selectedWheel) {
+        winningNumbers = extraction.wheels[selectedWheel] || [];
+      } else {
+        winningNumbers = extraction.numbers;
       }
-      return true;
-    });
 
-    const extractions = (extractionsData[selectedGame] || []);
-    const sortedExtractions = extractions.length === 0 
-      ? [] 
-      : [...extractions].sort((a, b) => 
-          new Date(b.date).getTime() - new Date(a.date).getTime()
-        );
+      if (winningNumbers.length === 0) return;
 
-    const numbersToSelect = gameConfig.numbersToSelect;
-    const results: MatchAnalysis[] = [];
+      // Find matches
+      const matches = combo.numbers.filter(num => winningNumbers.includes(num));
+      const matchCount = matches.length;
+      const missingNumbers = winningNumbers.filter(num => !combo.numbers.includes(num));
+      const difference = numbersToSelect - matchCount;
 
-    combos.forEach(combo => {
-      sortedExtractions.forEach(extraction => {
-        // Get winning numbers based on game type and wheel
-        let winningNumbers: number[];
+      // Include if matches are close (within 2 numbers) or if matchCount >= 2
+      // This helps identify combinations that were "almost winning" (i-2 numbers away)
+      if (matchCount >= 2 || difference <= 2) {
+        // Generate suggestions
+        let suggestions: MatchAnalysis['suggestions'] = null;
         
-        if (selectedGame === 'lotto' && extraction.wheels && selectedWheel) {
-          winningNumbers = extraction.wheels[selectedWheel] || [];
-        } else {
-          winningNumbers = extraction.numbers;
-        }
+        if (matchCount >= 2 && matchCount < numbersToSelect && sortedExtractions.length > 0) {
+          // Find numbers that appear frequently in winning but not in saved combination
+          const numbersToRemove: number[] = [];
+          const numbersToAdd: number[] = [];
 
-        if (winningNumbers.length === 0) return;
-
-        // Find matches
-        const matches = combo.numbers.filter(num => winningNumbers.includes(num));
-        const matchCount = matches.length;
-        const missingNumbers = winningNumbers.filter(num => !combo.numbers.includes(num));
-        const difference = numbersToSelect - matchCount;
-
-        // Include if matches are close (within 2 numbers) or if matchCount >= 2
-        // This helps identify combinations that were "almost winning" (i-2 numbers away)
-        if (matchCount >= 2 || difference <= 2) {
-          // Generate suggestions
-          let suggestions: MatchAnalysis['suggestions'] = null;
+          // Analyze which numbers from saved combo are least likely to win
+          // Focus on numbers that are NOT in the matches (the ones that didn't hit)
+          const nonMatchingNumbers = combo.numbers.filter(num => !matches.includes(num));
           
-            if (matchCount >= 2 && matchCount < numbersToSelect && sortedExtractions.length > 0) {
-              // Find numbers that appear frequently in winning but not in saved combination
-              const numbersToRemove: number[] = [];
-              const numbersToAdd: number[] = [];
-
-              // Analyze which numbers from saved combo are least likely to win
-              // Focus on numbers that are NOT in the matches (the ones that didn't hit)
-              const nonMatchingNumbers = combo.numbers.filter(num => !matches.includes(num));
-              
-              nonMatchingNumbers.forEach(savedNum => {
-                const appearsInWins = sortedExtractions.filter(ext => {
-                const winNums = selectedGame === 'lotto' && ext.wheels && selectedWheel
-                  ? ext.wheels[selectedWheel] || []
-                  : ext.numbers;
-                return winNums.includes(savedNum);
-              }).length;
-              
-              const frequency = sortedExtractions.length > 0 
-                ? appearsInWins / sortedExtractions.length 
-                : 0;
-              
-              // If number appears in less than 15% of wins and didn't match, consider removing
-              if (frequency < 0.15) {
-                numbersToRemove.push(savedNum);
-              }
-            });
-
-            // Prioritize adding the missing numbers from this specific extraction
-            // These are the exact numbers that would have made this a win
-            missingNumbers.forEach(num => {
-              if (!numbersToAdd.includes(num) && numbersToAdd.length < difference) {
-                numbersToAdd.push(num);
-              }
-            });
-
-            // Also find numbers that appear frequently in wins but aren't in saved combo
-            const allWinningNumbers: number[] = [];
-            sortedExtractions.forEach(ext => {
+          nonMatchingNumbers.forEach(savedNum => {
+            const appearsInWins = sortedExtractions.filter(ext => {
               const winNums = selectedGame === 'lotto' && ext.wheels && selectedWheel
                 ? ext.wheels[selectedWheel] || []
                 : ext.numbers;
-              allWinningNumbers.push(...winNums);
-            });
-
-            const numberFrequency: Record<number, number> = {};
-            allWinningNumbers.forEach(num => {
-              numberFrequency[num] = (numberFrequency[num] || 0) + 1;
-            });
-
-            // Find additional numbers that win often but aren't in saved combination
-            Object.entries(numberFrequency)
-              .sort(([,a], [,b]) => b - a)
-              .forEach(([numStr, count]) => {
-                const num = parseInt(numStr);
-                if (!combo.numbers.includes(num) && 
-                    !numbersToAdd.includes(num) &&
-                    count > sortedExtractions.length * 0.15) {
-                  if (numbersToAdd.length < difference) {
-                    numbersToAdd.push(num);
-                  }
-                }
-              });
-
-            if (numbersToRemove.length > 0 || numbersToAdd.length > 0) {
-              // Provide specific suggestions based on how close they were
-              let reason = '';
-              if (difference === 1) {
-                reason = `🎯 Quasi perfetto! Mancava solo 1 numero: ${missingNumbers[0]}. Considera di sostituire uno dei numeri non vincenti.`;
-              } else if (difference === 2) {
-                reason = `🔥 Quasi vincita! Mancavano solo 2 numeri. Ecco come potresti modificare la combinazione per essere più vicino alla vincita.`;
-              } else {
-                reason = `Per migliorare questa combinazione, considera di sostituire alcuni numeri con frequenza di vincita più alta.`;
-              }
-
-              suggestions = {
-                remove: numbersToRemove.slice(0, Math.min(2, difference)),
-                add: numbersToAdd.slice(0, difference),
-                reason
-              };
+              return winNums.includes(savedNum);
+            }).length;
+            
+            const frequency = sortedExtractions.length > 0 
+              ? appearsInWins / sortedExtractions.length 
+              : 0;
+            
+            // If number appears in less than 15% of wins and didn't match, consider removing
+            if (frequency < 0.15) {
+              numbersToRemove.push(savedNum);
             }
-          }
-
-          results.push({
-            savedCombination: combo,
-            extraction,
-            matches,
-            matchCount,
-            missingNumbers,
-            difference,
-            suggestions
           });
-        }
-      });
-    });
 
-    // Sort by match count (best matches first), then by date
-    return results.sort((a, b) => {
-      if (b.matchCount !== a.matchCount) {
-        return b.matchCount - a.matchCount;
+          // Prioritize adding the missing numbers from this specific extraction
+          // These are the exact numbers that would have made this a win
+          missingNumbers.forEach(num => {
+            if (!numbersToAdd.includes(num) && numbersToAdd.length < difference) {
+              numbersToAdd.push(num);
+            }
+          });
+
+          // Also find numbers that appear frequently in wins but aren't in saved combo
+          const allWinningNumbers: number[] = [];
+          sortedExtractions.forEach(ext => {
+            const winNums = selectedGame === 'lotto' && ext.wheels && selectedWheel
+              ? ext.wheels[selectedWheel] || []
+              : ext.numbers;
+            allWinningNumbers.push(...winNums);
+          });
+
+          const numberFrequency: Record<number, number> = {};
+          allWinningNumbers.forEach(num => {
+            numberFrequency[num] = (numberFrequency[num] || 0) + 1;
+          });
+
+          // Find additional numbers that win often but aren't in saved combination
+          Object.entries(numberFrequency)
+            .sort(([,a], [,b]) => b - a)
+            .forEach(([numStr, count]) => {
+              const num = parseInt(numStr);
+              if (!combo.numbers.includes(num) && 
+                  !numbersToAdd.includes(num) &&
+                  count > sortedExtractions.length * 0.15) {
+                if (numbersToAdd.length < difference) {
+                  numbersToAdd.push(num);
+                }
+              }
+            });
+
+          if (numbersToRemove.length > 0 || numbersToAdd.length > 0) {
+            // Provide specific suggestions based on how close they were
+            let reason = '';
+            if (difference === 1) {
+              reason = `🎯 Quasi perfetto! Mancava solo 1 numero: ${missingNumbers[0]}. Considera di sostituire uno dei numeri non vincenti.`;
+            } else if (difference === 2) {
+              reason = `🔥 Quasi vincita! Mancavano solo 2 numeri. Ecco come potresti modificare la combinazione per essere più vicino alla vincita.`;
+            } else {
+              reason = `Per migliorare questa combinazione, considera di sostituire alcuni numeri con frequenza di vincita più alta.`;
+            }
+
+            suggestions = {
+              remove: numbersToRemove.slice(0, Math.min(2, difference)),
+              add: numbersToAdd.slice(0, difference),
+              reason
+            };
+          }
+        }
+
+        results.push({
+          savedCombination: combo,
+          extraction,
+          matches,
+          matchCount,
+          missingNumbers,
+          difference,
+          suggestions
+        });
       }
-      return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
     });
-    // Access relevantCombinations and relevantExtractions directly inside useMemo
-    // Use only primitive values as dependencies to avoid object reference issues
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedGame, selectedWheel, gameConfig?.numbersToSelect, savedCombinationsLength, currentGameExtractionsLength]);
+  });
+
+  // Sort by match count (best matches first), then by date
+  const analysisResults = results.sort((a, b) => {
+    if (b.matchCount !== a.matchCount) {
+      return b.matchCount - a.matchCount;
+    }
+    return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
+  });
 
   // Filter by difference if selected
   const filteredResults = useMemo(() => {
