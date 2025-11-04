@@ -1,4 +1,4 @@
-import { UnsuccessfulCombination, ExtractedNumbers, WinningAnalysis, GameType, LottoWheel, Frequency } from '../types';
+import { UnsuccessfulCombination, ExtractedNumbers, WinningAnalysis, GameType, LottoWheel, Frequency, GeneratedCombination, NearMissAnalysis, NearMissResult, NearMissMatch } from '../types';
 
 // Calculate how many numbers match between two arrays
 const calculateMatches = (numbers1: number[], numbers2: number[]): number[] => {

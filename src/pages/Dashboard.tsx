@@ -6,6 +6,7 @@ import AIRecommendation from '../components/ai/AIRecommendation';
 import ExtractionHistory from '../components/history/ExtractionHistory';
 import SavedCombinations from '../components/saved/SavedCombinations';
 import UnsuccessfulCombinations from '../components/feedback/UnsuccessfulCombinations';
+import SavedCombinationsAnalysis from '../components/analysis/SavedCombinationsAnalysis';
 
 const Dashboard: React.FC = () => {
   return (
@@ -21,6 +22,7 @@ const Dashboard: React.FC = () => {
       </div>
       
       <ExtractionHistory />
+      <SavedCombinationsAnalysis />
       <UnsuccessfulCombinations />
       <SavedCombinations />
     </div>

@@ -65,9 +65,6 @@ const AddExtractionForm: React.FC = () => {
         wheels
       };
       
-      addExtraction(selectedGame, newExtraction);
-      
-      // Reset form
       addExtraction(selectedGame, newExtraction).then(() => {
         showToast.success('Estrazione aggiunta con successo!');
         // Reset form
@@ -88,9 +85,6 @@ const AddExtractionForm: React.FC = () => {
         numbers: validatedNumbers
       };
       
-      addExtraction(selectedGame, newExtraction);
-      
-      // Reset form
       addExtraction(selectedGame, newExtraction).then(() => {
         showToast.success('Estrazione aggiunta con successo!');
         // Reset form
