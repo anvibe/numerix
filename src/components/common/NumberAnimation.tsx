@@ -42,24 +42,33 @@ const NumberAnimation: React.FC = () => {
       const totalBalls = 90;
       if (balls.length !== totalBalls) return;
       
-      const cols = Math.ceil(Math.sqrt(totalBalls * (W / H)));
+      // Calculate optimal grid dimensions
+      const aspectRatio = W / H;
+      const cols = Math.ceil(Math.sqrt(totalBalls * aspectRatio));
       const rows = Math.ceil(totalBalls / cols);
+      
       const gridW = W - 2 * R - 20;
       const gridH = H - 2 * R - 20;
       const cellW = cols > 1 ? gridW / (cols - 1) : 0;
       const cellH = rows > 1 ? gridH / (rows - 1) : 0;
       
+      // Position all balls in grid
       let i = 0;
-      for (let r = 0; r < rows && i < totalBalls; r++) {
-        for (let c = 0; c < cols && i < totalBalls; c++, i++) {
-          const b = balls[i];
-          b.baseX = R + 10 + (cols > 1 ? c * cellW : gridW / 2);
-          b.baseY = R + 10 + (rows > 1 ? r * cellH : gridH / 2);
-          b.x = b.baseX;
-          b.y = b.baseY;
-          b.vx = 0;
-          b.vy = 0;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          if (i >= totalBalls) break;
+          if (i < balls.length) {
+            const b = balls[i];
+            b.baseX = R + 10 + (cols > 1 ? c * cellW : gridW / 2);
+            b.baseY = R + 10 + (rows > 1 ? r * cellH : gridH / 2);
+            b.x = b.baseX;
+            b.y = b.baseY;
+            b.vx = 0;
+            b.vy = 0;
+          }
+          i++;
         }
+        if (i >= totalBalls) break;
       }
     }
 
@@ -87,27 +96,37 @@ const NumberAnimation: React.FC = () => {
       }
 
       update() {
-        // Calculate distance from mouse
-        const dx = mouseX - this.baseX;
-        const dy = mouseY - this.baseY;
+        // Calculate distance from mouse to current position
+        const dx = mouseX - this.x;
+        const dy = mouseY - this.y;
         const dist = Math.hypot(dx, dy);
-        const maxDist = 200; // Maximum distance for interaction
+        const maxDist = 120; // Maximum distance for interaction
         
-        if (dist < maxDist) {
+        if (dist < maxDist && dist > 5) {
           // Calculate attraction strength (stronger when closer)
-          const strength = (1 - dist / maxDist) * 8;
+          const strength = (1 - dist / maxDist) * 0.6;
           const angle = Math.atan2(dy, dx);
           
-          // Apply slight movement towards mouse
-          this.vx += Math.cos(angle) * strength * 0.01;
-          this.vy += Math.sin(angle) * strength * 0.01;
+          // Move towards mouse position
+          const moveDistance = dist * strength * 0.3;
+          const targetX = this.x + Math.cos(angle) * moveDistance;
+          const targetY = this.y + Math.sin(angle) * moveDistance;
+          
+          // Smooth interpolation towards target
+          this.vx = (targetX - this.x) * 0.2;
+          this.vy = (targetY - this.y) * 0.2;
+        } else {
+          // Return to base position smoothly
+          const returnSpeed = 0.12;
+          this.vx = (this.baseX - this.x) * returnSpeed;
+          this.vy = (this.baseY - this.y) * returnSpeed;
         }
         
         // Apply velocity with damping
-        this.vx *= 0.9;
-        this.vy *= 0.9;
-        this.x = this.baseX + this.vx;
-        this.y = this.baseY + this.vy;
+        this.vx *= 0.88;
+        this.vy *= 0.88;
+        this.x += this.vx;
+        this.y += this.vy;
       }
 
       draw(g: CanvasRenderingContext2D) {
