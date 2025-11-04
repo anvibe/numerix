@@ -31,11 +31,8 @@ const SavedCombinationsAnalysis: React.FC = () => {
   const [filterDifference, setFilterDifference] = useState<number | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(true);
 
-  // Memoize the current game's extractions array to stabilize its reference
-  const currentGameExtractions = useMemo(() => {
-    return extractionsData[selectedGame] || [];
-  }, [extractionsData, selectedGame]);
-  
+  // Get current game extractions - access directly but memoize processing
+  const currentGameExtractions = extractionsData[selectedGame] || [];
   const currentGameExtractionsLength = currentGameExtractions.length;
   const savedCombinationsLength = savedCombinations.length;
 
@@ -53,16 +50,17 @@ const SavedCombinationsAnalysis: React.FC = () => {
     });
   }, [savedCombinations, selectedGame, selectedWheel, savedCombinationsLength]);
 
-  // Get relevant extractions - use the memoized array directly
+  // Get relevant extractions - access directly from extractionsData
   const relevantExtractions = useMemo(() => {
-    if (!currentGameExtractions || currentGameExtractions.length === 0) {
+    const extractions = extractionsData[selectedGame] || [];
+    if (!extractions || extractions.length === 0) {
       return [];
     }
     // Create a copy before sorting to avoid mutating the original array
-    return [...currentGameExtractions].sort((a, b) => 
+    return [...extractions].sort((a, b) => 
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
-  }, [currentGameExtractions, currentGameExtractionsLength]);
+  }, [extractionsData, selectedGame, currentGameExtractionsLength]);
 
   // Analyze matches between saved combinations and extractions
   const analysisResults = useMemo(() => {
