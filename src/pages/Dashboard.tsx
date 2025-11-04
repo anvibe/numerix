@@ -5,7 +5,6 @@ import GeneratorPanel from '../components/generator/GeneratorPanel';
 import AIRecommendation from '../components/ai/AIRecommendation';
 import ExtractionHistory from '../components/history/ExtractionHistory';
 import SavedCombinations from '../components/saved/SavedCombinations';
-import AIFeedbackInfo from '../components/feedback/AIFeedbackInfo';
 import SavedCombinationsAnalysis from '../components/analysis/SavedCombinationsAnalysis';
 
 const Dashboard: React.FC = () => {
@@ -23,7 +22,6 @@ const Dashboard: React.FC = () => {
       
       <ExtractionHistory />
       <SavedCombinationsAnalysis />
-      <AIFeedbackInfo />
       <SavedCombinations />
     </div>
   );
