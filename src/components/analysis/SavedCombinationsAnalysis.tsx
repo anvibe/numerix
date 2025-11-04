@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Target, TrendingUp, AlertCircle, Lightbulb, ArrowRight, CheckCircle2, XCircle } from 'lucide-react';
 import { useGame } from '../../context/GameContext';
 import { GeneratedCombination, ExtractedNumbers, LottoWheel } from '../../types';
@@ -199,11 +199,10 @@ const SavedCombinationsAnalysis: React.FC = () => {
     return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
   });
 
-  // Filter by difference if selected
-  const filteredResults = useMemo(() => {
-    if (filterDifference === null) return analysisResults;
-    return analysisResults.filter(result => result.difference === filterDifference);
-  }, [analysisResults, filterDifference]);
+  // Filter by difference if selected (calculate directly without useMemo)
+  const filteredResults = filterDifference === null 
+    ? analysisResults 
+    : analysisResults.filter(result => result.difference === filterDifference);
 
   if (relevantCombinations.length === 0) {
     return (
@@ -233,8 +232,8 @@ const SavedCombinationsAnalysis: React.FC = () => {
     );
   }
 
-  // Calculate statistics
-  const stats = useMemo(() => {
+  // Calculate statistics (calculate directly without useMemo)
+  const stats = (() => {
     if (!gameConfig || !gameConfig.numbersToSelect || analysisResults.length === 0) {
       return {
         totalMatches: 0,
@@ -258,7 +257,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
       exactWins,
       averageMatches: totalMatches / analysisResults.length || 0
     };
-  }, [analysisResults, gameConfig?.numbersToSelect]);
+  })();
 
   return (
     <div className="card mb-8">
