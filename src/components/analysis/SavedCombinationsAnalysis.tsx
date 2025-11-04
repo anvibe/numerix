@@ -37,6 +37,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
   const savedCombinationsLength = savedCombinations.length;
 
   // Filter combinations for current game
+  // Access savedCombinations directly inside useMemo to avoid object reference issues
   const relevantCombinations = useMemo(() => {
     if (!savedCombinations || savedCombinations.length === 0) {
       return [];
@@ -48,7 +49,8 @@ const SavedCombinationsAnalysis: React.FC = () => {
       }
       return true;
     });
-  }, [savedCombinations, selectedGame, selectedWheel, savedCombinationsLength]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedGame, selectedWheel, savedCombinationsLength]);
 
   // Get relevant extractions - access directly from extractionsData
   // Use length as dependency to avoid object reference issues
@@ -65,17 +67,34 @@ const SavedCombinationsAnalysis: React.FC = () => {
   }, [selectedGame, currentGameExtractionsLength]);
 
   // Analyze matches between saved combinations and extractions
+  // Recalculate relevantCombinations and relevantExtractions inside to avoid dependency issues
   const analysisResults = useMemo(() => {
     // Early return if we don't have gameConfig or it's invalid
     if (!gameConfig || !gameConfig.numbersToSelect) {
       return [];
     }
 
+    // Recalculate relevant combinations and extractions directly here
+    const combos = savedCombinations.filter(combo => {
+      if (combo.gameType !== selectedGame) return false;
+      if (selectedGame === 'lotto' && combo.wheel) {
+        return combo.wheel === selectedWheel;
+      }
+      return true;
+    });
+
+    const extractions = (extractionsData[selectedGame] || []);
+    const sortedExtractions = extractions.length === 0 
+      ? [] 
+      : [...extractions].sort((a, b) => 
+          new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
+
     const numbersToSelect = gameConfig.numbersToSelect;
     const results: MatchAnalysis[] = [];
 
-    relevantCombinations.forEach(combo => {
-      relevantExtractions.forEach(extraction => {
+    combos.forEach(combo => {
+      sortedExtractions.forEach(extraction => {
         // Get winning numbers based on game type and wheel
         let winningNumbers: number[];
         
@@ -99,25 +118,25 @@ const SavedCombinationsAnalysis: React.FC = () => {
           // Generate suggestions
           let suggestions: MatchAnalysis['suggestions'] = null;
           
-          if (matchCount >= 2 && matchCount < numbersToSelect && relevantExtractions.length > 0) {
-            // Find numbers that appear frequently in winning but not in saved combination
-            const numbersToRemove: number[] = [];
-            const numbersToAdd: number[] = [];
+            if (matchCount >= 2 && matchCount < numbersToSelect && sortedExtractions.length > 0) {
+              // Find numbers that appear frequently in winning but not in saved combination
+              const numbersToRemove: number[] = [];
+              const numbersToAdd: number[] = [];
 
-            // Analyze which numbers from saved combo are least likely to win
-            // Focus on numbers that are NOT in the matches (the ones that didn't hit)
-            const nonMatchingNumbers = combo.numbers.filter(num => !matches.includes(num));
-            
-            nonMatchingNumbers.forEach(savedNum => {
-              const appearsInWins = relevantExtractions.filter(ext => {
+              // Analyze which numbers from saved combo are least likely to win
+              // Focus on numbers that are NOT in the matches (the ones that didn't hit)
+              const nonMatchingNumbers = combo.numbers.filter(num => !matches.includes(num));
+              
+              nonMatchingNumbers.forEach(savedNum => {
+                const appearsInWins = sortedExtractions.filter(ext => {
                 const winNums = selectedGame === 'lotto' && ext.wheels && selectedWheel
                   ? ext.wheels[selectedWheel] || []
                   : ext.numbers;
                 return winNums.includes(savedNum);
               }).length;
               
-              const frequency = relevantExtractions.length > 0 
-                ? appearsInWins / relevantExtractions.length 
+              const frequency = sortedExtractions.length > 0 
+                ? appearsInWins / sortedExtractions.length 
                 : 0;
               
               // If number appears in less than 15% of wins and didn't match, consider removing
@@ -136,7 +155,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
 
             // Also find numbers that appear frequently in wins but aren't in saved combo
             const allWinningNumbers: number[] = [];
-            relevantExtractions.forEach(ext => {
+            sortedExtractions.forEach(ext => {
               const winNums = selectedGame === 'lotto' && ext.wheels && selectedWheel
                 ? ext.wheels[selectedWheel] || []
                 : ext.numbers;
@@ -155,7 +174,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
                 const num = parseInt(numStr);
                 if (!combo.numbers.includes(num) && 
                     !numbersToAdd.includes(num) &&
-                    count > relevantExtractions.length * 0.15) {
+                    count > sortedExtractions.length * 0.15) {
                   if (numbersToAdd.length < difference) {
                     numbersToAdd.push(num);
                   }
@@ -201,7 +220,10 @@ const SavedCombinationsAnalysis: React.FC = () => {
       }
       return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
     });
-  }, [relevantCombinations, relevantExtractions, selectedGame, selectedWheel, gameConfig?.numbersToSelect]);
+    // Access relevantCombinations and relevantExtractions directly inside useMemo
+    // Use only primitive values as dependencies to avoid object reference issues
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedGame, selectedWheel, gameConfig?.numbersToSelect, savedCombinationsLength, currentGameExtractionsLength]);
 
   // Filter by difference if selected
   const filteredResults = useMemo(() => {
