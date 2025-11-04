@@ -30,6 +30,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
   const [selectedWheel, setSelectedWheel] = useState<LottoWheel>('Bari');
   const [filterDifference, setFilterDifference] = useState<number | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(true);
+  const [selectedCombinationId, setSelectedCombinationId] = useState<string | null>(null);
 
   // Calculate combinations and extractions directly (no memoization to avoid React error #310)
   const relevantCombinations = savedCombinations.filter(combo => {
@@ -199,10 +200,15 @@ const SavedCombinationsAnalysis: React.FC = () => {
     return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
   });
 
-  // Filter by difference if selected (calculate directly without useMemo)
-  const filteredResults = filterDifference === null 
+  // Filter by difference and combination (calculate directly without useMemo)
+  let filteredResults = filterDifference === null 
     ? analysisResults 
     : analysisResults.filter(result => result.difference === filterDifference);
+  
+  // Filter by selected combination if specified
+  if (selectedCombinationId !== null) {
+    filteredResults = filteredResults.filter(result => result.savedCombination.id === selectedCombinationId);
+  }
 
   if (relevantCombinations.length === 0) {
     return (
@@ -232,9 +238,19 @@ const SavedCombinationsAnalysis: React.FC = () => {
     );
   }
 
-  // Calculate statistics (calculate directly without useMemo)
+  // Filter by difference and combination (calculate directly without useMemo)
+  let filteredResults = filterDifference === null 
+    ? analysisResults 
+    : analysisResults.filter(result => result.difference === filterDifference);
+  
+  // Filter by selected combination if specified
+  if (selectedCombinationId !== null) {
+    filteredResults = filteredResults.filter(result => result.savedCombination.id === selectedCombinationId);
+  }
+
+  // Calculate statistics based on filtered results (calculate directly without useMemo)
   const stats = (() => {
-    if (!gameConfig || !gameConfig.numbersToSelect || analysisResults.length === 0) {
+    if (!gameConfig || !gameConfig.numbersToSelect || filteredResults.length === 0) {
       return {
         totalMatches: 0,
         bestMatch: undefined,
@@ -245,17 +261,17 @@ const SavedCombinationsAnalysis: React.FC = () => {
     }
 
     const numbersToSelect = gameConfig.numbersToSelect;
-    const totalMatches = analysisResults.reduce((sum, r) => sum + r.matchCount, 0);
-    const bestMatch = analysisResults[0];
-    const nearMisses = analysisResults.filter(r => r.difference <= 2).length;
-    const exactWins = analysisResults.filter(r => r.matchCount === numbersToSelect).length;
+    const totalMatches = filteredResults.reduce((sum, r) => sum + r.matchCount, 0);
+    const bestMatch = filteredResults[0];
+    const nearMisses = filteredResults.filter(r => r.difference <= 2).length;
+    const exactWins = filteredResults.filter(r => r.matchCount === numbersToSelect).length;
 
     return {
       totalMatches,
       bestMatch,
       nearMisses,
       exactWins,
-      averageMatches: totalMatches / analysisResults.length || 0
+      averageMatches: totalMatches / filteredResults.length || 0
     };
   })();
 
@@ -275,24 +291,50 @@ const SavedCombinationsAnalysis: React.FC = () => {
         </button>
       </div>
 
-      {selectedGame === 'lotto' && gameConfig?.wheels && (
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-text-secondary mb-2">
-            Filtra per Ruota
-          </label>
-          <select
-            value={selectedWheel}
-            onChange={(e) => setSelectedWheel(e.target.value as LottoWheel)}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-bg-primary"
-          >
-            {gameConfig.wheels.map((wheel) => (
-              <option key={wheel} value={wheel}>
-                {wheel}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        {selectedGame === 'lotto' && gameConfig?.wheels && (
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-2">
+              Filtra per Ruota
+            </label>
+            <select
+              value={selectedWheel}
+              onChange={(e) => setSelectedWheel(e.target.value as LottoWheel)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-bg-primary"
+            >
+              {gameConfig.wheels.map((wheel) => (
+                <option key={wheel} value={wheel}>
+                  {wheel}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Filter by combination dropdown */}
+        {relevantCombinations.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-2">
+              Filtra per Combinazione Salvata
+            </label>
+            <select
+              value={selectedCombinationId || ''}
+              onChange={(e) => setSelectedCombinationId(e.target.value === '' ? null : e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-bg-primary"
+            >
+              <option value="">Tutte le combinazioni</option>
+              {relevantCombinations.map((combo) => (
+                <option key={combo.id} value={combo.id}>
+                  {combo.numbers.join(', ')}
+                  {combo.wheel && ` (${combo.wheel})`}
+                  {combo.jolly && ` - Jolly: ${combo.jolly}`}
+                  {combo.superstar && ` - Superstar: ${combo.superstar}`}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
 
       {/* Statistics Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
