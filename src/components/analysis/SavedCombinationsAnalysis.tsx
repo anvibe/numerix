@@ -238,16 +238,6 @@ const SavedCombinationsAnalysis: React.FC = () => {
     );
   }
 
-  // Filter by difference and combination (calculate directly without useMemo)
-  let filteredResults = filterDifference === null 
-    ? analysisResults 
-    : analysisResults.filter(result => result.difference === filterDifference);
-  
-  // Filter by selected combination if specified
-  if (selectedCombinationId !== null) {
-    filteredResults = filteredResults.filter(result => result.savedCombination.id === selectedCombinationId);
-  }
-
   // Calculate statistics based on filtered results (calculate directly without useMemo)
   const stats = (() => {
     if (!gameConfig || !gameConfig.numbersToSelect || filteredResults.length === 0) {
