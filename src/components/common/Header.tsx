@@ -5,9 +5,9 @@ const Header: React.FC = () => {
   return (
     <header className="bg-bg-primary border-b border-gray-200 dark:border-gray-800 py-4">
       <div className="container mx-auto px-4 flex justify-between items-center">
-        {/* Logo */}
-        <div className="flex items-center">
-          <svg width="40" height="40" viewBox="0 0 64 64" className="mr-2">
+        {/* Logo and Numerix text */}
+        <div className="flex items-center space-x-2">
+          <svg width="40" height="40" viewBox="0 0 64 64">
             <defs>
               <radialGradient id="headerLogoGradient" cx="0.3" cy="0.35">
                 <stop offset="0%" stopColor="#60a5fa" />
@@ -39,13 +39,11 @@ const Header: React.FC = () => {
             {/* Letter N */}
             <text x="32" y="42" fontFamily="system-ui, -apple-system, sans-serif" fontSize="32" fontWeight="bold" fill="#ffffff" textAnchor="middle" filter="url(#headerLogoShadow)">N</text>
           </svg>
+          <h1 className="text-2xl font-bold text-primary">Numerix</h1>
         </div>
         
-        {/* Numerix text on the right */}
-        <div className="flex items-center space-x-4">
-          <h1 className="text-2xl font-bold text-primary">Numerix</h1>
-          <ThemeToggle />
-        </div>
+        {/* Theme toggle on the right */}
+        <ThemeToggle />
       </div>
     </header>
   );
