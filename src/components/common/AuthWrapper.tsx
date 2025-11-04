@@ -3,6 +3,7 @@ import { User, LogIn, LogOut, UserPlus } from 'lucide-react';
 import { supabase } from '../../utils/supabaseClient';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { showToast } from '../../utils/toast';
+import NumberAnimation from './NumberAnimation';
 
 interface AuthWrapperProps {
   children: React.ReactNode;
@@ -134,20 +135,18 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-bg-primary">
-        <div className="container mx-auto px-4 py-8">
-          <div className="max-w-md mx-auto">
-            <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold text-primary mb-2">Numerix</h1>
-              <p className="text-text-secondary">
-                Accedi per salvare le tue combinazioni e utilizzare tutte le funzionalità
-              </p>
-            </div>
-
+      <div className="min-h-screen bg-bg-primary relative overflow-hidden">
+        <NumberAnimation />
+        <div className="container mx-auto px-4 py-8 relative z-10 flex items-center justify-center min-h-screen">
+          <div className="max-w-md mx-auto w-full">
             {!showAuth ? (
-              <div className="card text-center">
+              <div className="card text-center bg-bg-primary/90 backdrop-blur-sm">
                 <div className="mb-6">
-                  <User className="h-16 w-16 text-text-secondary mx-auto mb-4" />
+                  <img 
+                    src="/favicon.svg" 
+                    alt="Numerix Logo" 
+                    className="h-20 w-20 mx-auto mb-4"
+                  />
                   <h2 className="text-xl font-semibold mb-2">Benvenuto in Numerix</h2>
                   <p className="text-text-secondary text-sm">
                     Per utilizzare l'applicazione e salvare i tuoi dati, effettua l'accesso o registrati.
@@ -179,7 +178,7 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
                 </div>
               </div>
             ) : (
-              <div className="card">
+              <div className="card bg-bg-primary/90 backdrop-blur-sm">
                 <h2 className="text-xl font-semibold mb-4">
                   {isSignUp ? 'Registrazione' : 'Accesso'}
                 </h2>
@@ -195,7 +194,7 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-bg-primary"
                       placeholder="tua@email.com"
                     />
                   </div>
@@ -210,7 +209,7 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-bg-primary"
                       placeholder="Password"
                       minLength={6}
                     />
