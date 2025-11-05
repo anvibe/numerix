@@ -214,6 +214,7 @@ export const combinationService = {
       // For each game type, find duplicates
       groups.forEach((combos, gameType) => {
         const seen = new Map<string, string>(); // numbersKey -> id to keep
+        const duplicatesFound: Array<{ numbers: string, ids: string[] }> = [];
         
         combos.forEach(combo => {
           const sortedNumbers = [...combo.numbers].sort((a, b) => a - b);
@@ -224,6 +225,14 @@ export const combinationService = {
             const existingId = seen.get(numbersKey)!;
             const existingCombo = combos.find(c => c.id === existingId);
             const currentCombo = combo;
+            
+            // Track duplicates for logging
+            const existingDuplicate = duplicatesFound.find(d => d.numbers === numbersKey);
+            if (existingDuplicate) {
+              existingDuplicate.ids.push(currentCombo.id);
+            } else {
+              duplicatesFound.push({ numbers: numbersKey, ids: [existingId, currentCombo.id] });
+            }
             
             // Keep the most recent one
             if (existingCombo && new Date(existingCombo.created_at) < new Date(currentCombo.created_at)) {
@@ -236,6 +245,12 @@ export const combinationService = {
             seen.set(numbersKey, combo.id);
           }
         });
+        
+        if (duplicatesFound.length > 0) {
+          console.log(`🔍 Found ${duplicatesFound.length} duplicate number sets for ${gameType}:`, duplicatesFound.slice(0, 5));
+        } else {
+          console.log(`✅ No duplicates found for ${gameType} - all ${combos.length} combinations are unique by numbers`);
+        }
       });
       
       // Delete duplicates
