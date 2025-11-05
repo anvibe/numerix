@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Target, AlertCircle, Lightbulb, CheckCircle2, XCircle } from 'lucide-react';
+import { Target, AlertCircle, Lightbulb, CheckCircle2, XCircle, Calendar } from 'lucide-react';
 import { useGame } from '../../context/GameContext';
 import { GeneratedCombination, ExtractedNumbers, LottoWheel } from '../../types';
 import NumberBubble from '../common/NumberBubble';
@@ -30,6 +30,9 @@ const SavedCombinationsAnalysis: React.FC = () => {
   const [filterDifference, setFilterDifference] = useState<number | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [selectedCombinationId, setSelectedCombinationId] = useState<string | null>(null);
+  const [selectedExtractionDate, setSelectedExtractionDate] = useState<string | null>(null);
+  const [filterStartDate, setFilterStartDate] = useState<string>('');
+  const [filterEndDate, setFilterEndDate] = useState<string>('');
 
   // Calculate combinations and extractions directly (no memoization to avoid React error #310)
   const relevantCombinations = savedCombinations.filter(combo => {
@@ -41,11 +44,23 @@ const SavedCombinationsAnalysis: React.FC = () => {
   });
 
   const currentGameExtractions = extractionsData[selectedGame] || [];
-  const relevantExtractions = currentGameExtractions.length === 0 
+  let relevantExtractions = currentGameExtractions.length === 0 
     ? [] 
     : [...currentGameExtractions].sort((a, b) => 
         new Date(b.date).getTime() - new Date(a.date).getTime()
       );
+
+  // Apply date filters
+  if (filterStartDate) {
+    relevantExtractions = relevantExtractions.filter(ext => 
+      new Date(ext.date) >= new Date(filterStartDate)
+    );
+  }
+  if (filterEndDate) {
+    relevantExtractions = relevantExtractions.filter(ext => 
+      new Date(ext.date) <= new Date(filterEndDate)
+    );
+  }
 
   // Analyze matches between saved combinations and extractions
   // Calculate directly without useMemo to avoid React error #310
@@ -66,7 +81,12 @@ const SavedCombinationsAnalysis: React.FC = () => {
 
   // Use already calculated combinations and extractions
   const combos = relevantCombinations;
-  const sortedExtractions = relevantExtractions;
+  let sortedExtractions = relevantExtractions;
+
+  // Filter by selected extraction if specified
+  if (selectedExtractionDate) {
+    sortedExtractions = sortedExtractions.filter(ext => ext.date === selectedExtractionDate);
+  }
 
   const numbersToSelect = gameConfig.numbersToSelect;
   const results: MatchAnalysis[] = [];
@@ -90,104 +110,101 @@ const SavedCombinationsAnalysis: React.FC = () => {
       const missingNumbers = winningNumbers.filter(num => !combo.numbers.includes(num));
       const difference = numbersToSelect - matchCount;
 
-      // Include if matches are close (within 2 numbers) or if matchCount >= 2
-      // This helps identify combinations that were "almost winning" (i-2 numbers away)
-      if (matchCount >= 2 || difference <= 2) {
-        // Generate suggestions
-        let suggestions: MatchAnalysis['suggestions'] = null;
+      // Include ALL combinations, even those with 0 matches
+      // Generate suggestions
+      let suggestions: MatchAnalysis['suggestions'] = null;
+      
+      if (matchCount >= 2 && matchCount < numbersToSelect && sortedExtractions.length > 0) {
+        // Find numbers that appear frequently in winning but not in saved combination
+        const numbersToRemove: number[] = [];
+        const numbersToAdd: number[] = [];
+
+        // Analyze which numbers from saved combo are least likely to win
+        // Focus on numbers that are NOT in the matches (the ones that didn't hit)
+        const nonMatchingNumbers = combo.numbers.filter(num => !matches.includes(num));
         
-        if (matchCount >= 2 && matchCount < numbersToSelect && sortedExtractions.length > 0) {
-          // Find numbers that appear frequently in winning but not in saved combination
-          const numbersToRemove: number[] = [];
-          const numbersToAdd: number[] = [];
-
-          // Analyze which numbers from saved combo are least likely to win
-          // Focus on numbers that are NOT in the matches (the ones that didn't hit)
-          const nonMatchingNumbers = combo.numbers.filter(num => !matches.includes(num));
-          
-          nonMatchingNumbers.forEach(savedNum => {
-            const appearsInWins = sortedExtractions.filter(ext => {
-              const winNums = selectedGame === 'lotto' && ext.wheels && selectedWheel
-                ? ext.wheels[selectedWheel] || []
-                : ext.numbers;
-              return winNums.includes(savedNum);
-            }).length;
-            
-            const frequency = sortedExtractions.length > 0 
-              ? appearsInWins / sortedExtractions.length 
-              : 0;
-            
-            // If number appears in less than 15% of wins and didn't match, consider removing
-            if (frequency < 0.15) {
-              numbersToRemove.push(savedNum);
-            }
-          });
-
-          // Prioritize adding the missing numbers from this specific extraction
-          // These are the exact numbers that would have made this a win
-          missingNumbers.forEach(num => {
-            if (!numbersToAdd.includes(num) && numbersToAdd.length < difference) {
-              numbersToAdd.push(num);
-            }
-          });
-
-          // Also find numbers that appear frequently in wins but aren't in saved combo
-          const allWinningNumbers: number[] = [];
-          sortedExtractions.forEach(ext => {
+        nonMatchingNumbers.forEach(savedNum => {
+          const appearsInWins = sortedExtractions.filter(ext => {
             const winNums = selectedGame === 'lotto' && ext.wheels && selectedWheel
               ? ext.wheels[selectedWheel] || []
               : ext.numbers;
-            allWinningNumbers.push(...winNums);
-          });
-
-          const numberFrequency: Record<number, number> = {};
-          allWinningNumbers.forEach(num => {
-            numberFrequency[num] = (numberFrequency[num] || 0) + 1;
-          });
-
-          // Find additional numbers that win often but aren't in saved combination
-          Object.entries(numberFrequency)
-            .sort(([,a], [,b]) => b - a)
-            .forEach(([numStr, count]) => {
-              const num = parseInt(numStr);
-              if (!combo.numbers.includes(num) && 
-                  !numbersToAdd.includes(num) &&
-                  count > sortedExtractions.length * 0.15) {
-                if (numbersToAdd.length < difference) {
-                  numbersToAdd.push(num);
-                }
-              }
-            });
-
-          if (numbersToRemove.length > 0 || numbersToAdd.length > 0) {
-            // Provide specific suggestions based on how close they were
-            let reason = '';
-            if (difference === 1) {
-              reason = `🎯 Quasi perfetto! Mancava solo 1 numero: ${missingNumbers[0]}. Considera di sostituire uno dei numeri non vincenti.`;
-            } else if (difference === 2) {
-              reason = `🔥 Quasi vincita! Mancavano solo 2 numeri. Ecco come potresti modificare la combinazione per essere più vicino alla vincita.`;
-            } else {
-              reason = `Per migliorare questa combinazione, considera di sostituire alcuni numeri con frequenza di vincita più alta.`;
-            }
-
-            suggestions = {
-              remove: numbersToRemove.slice(0, Math.min(2, difference)),
-              add: numbersToAdd.slice(0, difference),
-              reason
-            };
+            return winNums.includes(savedNum);
+          }).length;
+          
+          const frequency = sortedExtractions.length > 0 
+            ? appearsInWins / sortedExtractions.length 
+            : 0;
+          
+          // If number appears in less than 15% of wins and didn't match, consider removing
+          if (frequency < 0.15) {
+            numbersToRemove.push(savedNum);
           }
-        }
-
-        results.push({
-          savedCombination: combo,
-          extraction,
-          matches,
-          matchCount,
-          missingNumbers,
-          difference,
-          suggestions
         });
+
+        // Prioritize adding the missing numbers from this specific extraction
+        // These are the exact numbers that would have made this a win
+        missingNumbers.forEach(num => {
+          if (!numbersToAdd.includes(num) && numbersToAdd.length < difference) {
+            numbersToAdd.push(num);
+          }
+        });
+
+        // Also find numbers that appear frequently in wins but aren't in saved combo
+        const allWinningNumbers: number[] = [];
+        sortedExtractions.forEach(ext => {
+          const winNums = selectedGame === 'lotto' && ext.wheels && selectedWheel
+            ? ext.wheels[selectedWheel] || []
+            : ext.numbers;
+          allWinningNumbers.push(...winNums);
+        });
+
+        const numberFrequency: Record<number, number> = {};
+        allWinningNumbers.forEach(num => {
+          numberFrequency[num] = (numberFrequency[num] || 0) + 1;
+        });
+
+        // Find additional numbers that win often but aren't in saved combination
+        Object.entries(numberFrequency)
+          .sort(([,a], [,b]) => b - a)
+          .forEach(([numStr, count]) => {
+            const num = parseInt(numStr);
+            if (!combo.numbers.includes(num) && 
+                !numbersToAdd.includes(num) &&
+                count > sortedExtractions.length * 0.15) {
+              if (numbersToAdd.length < difference) {
+                numbersToAdd.push(num);
+              }
+            }
+          });
+
+        if (numbersToRemove.length > 0 || numbersToAdd.length > 0) {
+          // Provide specific suggestions based on how close they were
+          let reason = '';
+          if (difference === 1) {
+            reason = `🎯 Quasi perfetto! Mancava solo 1 numero: ${missingNumbers[0]}. Considera di sostituire uno dei numeri non vincenti.`;
+          } else if (difference === 2) {
+            reason = `🔥 Quasi vincita! Mancavano solo 2 numeri. Ecco come potresti modificare la combinazione per essere più vicino alla vincita.`;
+          } else {
+            reason = `Per migliorare questa combinazione, considera di sostituire alcuni numeri con frequenza di vincita più alta.`;
+          }
+
+          suggestions = {
+            remove: numbersToRemove.slice(0, Math.min(2, difference)),
+            add: numbersToAdd.slice(0, difference),
+            reason
+          };
+        }
       }
+
+      results.push({
+        savedCombination: combo,
+        extraction,
+        matches,
+        matchCount,
+        missingNumbers,
+        difference,
+        suggestions
+      });
     });
   });
 
@@ -325,6 +342,57 @@ const SavedCombinationsAnalysis: React.FC = () => {
         )}
       </div>
 
+      {/* Date Filters and Extraction Selector */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        {/* Filter by Extraction Date */}
+        {relevantExtractions.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-2">
+              <Calendar className="h-4 w-4 inline mr-1" />
+              Seleziona Estrazione
+            </label>
+            <select
+              value={selectedExtractionDate || ''}
+              onChange={(e) => setSelectedExtractionDate(e.target.value === '' ? null : e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-bg-primary"
+            >
+              <option value="">Tutte le estrazioni</option>
+              {relevantExtractions.map((ext) => (
+                <option key={ext.date} value={ext.date}>
+                  {new Date(ext.date).toLocaleDateString('it-IT')}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Start Date Filter */}
+        <div>
+          <label className="block text-sm font-medium text-text-secondary mb-2">
+            Data Inizio
+          </label>
+          <input
+            type="date"
+            value={filterStartDate}
+            onChange={(e) => setFilterStartDate(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-bg-primary"
+          />
+        </div>
+
+        {/* End Date Filter */}
+        <div>
+          <label className="block text-sm font-medium text-text-secondary mb-2">
+            Data Fine
+          </label>
+          <input
+            type="date"
+            value={filterEndDate}
+            onChange={(e) => setFilterEndDate(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-bg-primary"
+          />
+        </div>
+      </div>
+
       {/* Statistics Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-bg-secondary rounded-lg p-4">
@@ -371,12 +439,23 @@ const SavedCombinationsAnalysis: React.FC = () => {
 
       {/* Results */}
       <div className="space-y-6">
+        {selectedExtractionDate && filteredResults.length > 0 && (
+          <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-md">
+            <div className="font-medium text-primary mb-1">
+              📅 Estrazione selezionata: {new Date(selectedExtractionDate).toLocaleDateString('it-IT')}
+            </div>
+            <div className="text-sm text-text-secondary">
+              Mostrate tutte le {filteredResults.length} combinazioni salvate per questa estrazione
+            </div>
+          </div>
+        )}
+        
         {filteredResults.length === 0 ? (
           <div className="text-center py-8 text-text-secondary">
             Nessun risultato trovato con i filtri selezionati.
           </div>
         ) : (
-          filteredResults.slice(0, 10).map((result, index) => {
+          filteredResults.slice(0, selectedExtractionDate ? filteredResults.length : 10).map((result, index) => {
             const { savedCombination, extraction, matches, matchCount, missingNumbers, difference, suggestions } = result;
             
             // Highlight very recent extractions (last 7 days)
@@ -555,9 +634,24 @@ const SavedCombinationsAnalysis: React.FC = () => {
         )}
       </div>
 
-      {filteredResults.length > 10 && (
+      {filteredResults.length > 10 && !selectedExtractionDate && (
         <div className="mt-4 text-center text-sm text-text-secondary">
           Mostrati i primi 10 risultati su {filteredResults.length} totali
+        </div>
+      )}
+      
+      {/* Clear Date Filters Button */}
+      {(filterStartDate || filterEndDate) && (
+        <div className="mt-4 text-center">
+          <button
+            onClick={() => {
+              setFilterStartDate('');
+              setFilterEndDate('');
+            }}
+            className="btn btn-outline btn-sm"
+          >
+            Cancella filtri data
+          </button>
         </div>
       )}
     </div>
