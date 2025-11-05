@@ -177,19 +177,8 @@ const SavedCombinationsAnalysis: React.FC = () => {
   const combos = relevantCombinations;
   let sortedExtractions = relevantExtractions;
 
-  // CRITICAL: When a specific combination is selected, only analyze extractions on or after the combination's save date
-  // This ensures we only show results for extractions that happened after the combination was saved
-  if (selectedCombinationId !== null) {
-    const selectedCombo = relevantCombinations.find(c => c.id === selectedCombinationId);
-    if (selectedCombo) {
-      const comboDate = new Date(selectedCombo.date);
-      sortedExtractions = relevantExtractions.filter(ext => {
-        const extDate = new Date(ext.date);
-        // Only include extractions on or after the combination's save date
-        return extDate >= comboDate;
-      });
-    }
-  }
+  // When a specific combination is selected, show ALL extractions (not filtered by save date)
+  // This allows users to see how their combination would have performed against all historical extractions
 
   const numbersToSelect = gameConfig.numbersToSelect;
   const results: MatchAnalysis[] = [];
@@ -641,7 +630,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
                 {selectedCombo && (
                   <span className="block mt-1 text-xs">
                     📅 Combinazione salvata il: {comboDate} | 
-                    Mostrate solo estrazioni dal {comboDate} in poi
+                    Confronto con tutte le estrazioni disponibili
                   </span>
                 )}
                 <span className="block mt-1 text-xs text-info">
@@ -670,9 +659,9 @@ const SavedCombinationsAnalysis: React.FC = () => {
               <div>
                 <div className="text-lg font-semibold mb-2">Nessun risultato trovato per questa combinazione</div>
                 <div className="text-sm">
-                  Non ci sono estrazioni disponibili dopo la data di salvataggio di questa combinazione.
+                  Non ci sono estrazioni disponibili per il confronto.
                   <br />
-                  La combinazione verrà confrontata con le estrazioni future quando saranno disponibili.
+                  Assicurati che ci siano estrazioni caricate per questo gioco.
                 </div>
               </div>
             ) : (
