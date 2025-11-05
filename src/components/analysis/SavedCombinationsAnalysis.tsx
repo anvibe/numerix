@@ -684,9 +684,16 @@ const SavedCombinationsAnalysis: React.FC = () => {
                 )}
               </div>
               <div className="text-xs text-text-secondary mt-1">
-                Combinazioni salvate per {selectedGame}: {relevantCombinations.length}
+                Combinazioni salvate per {selectedGame}: {relevantUniqueSet.size} uniche
+                {relevantCombinations.length !== relevantUniqueSet.size && (
+                  <span className="text-warning ml-2">
+                    ({relevantCombinations.length} totali, {relevantCombinations.length - relevantUniqueSet.size} duplicati rilevati)
+                  </span>
+                )}
                 {hasDuplicates && (
-                  <span className="text-warning ml-2">⚠️ {relevantCombinations.length - relevantUniqueSet.size} duplicati rilevati! Usa "Rimuovi Duplicati" in Combinazioni Salvate</span>
+                  <span className="text-warning ml-2 block mt-1">
+                    ⚠️ Usa il pulsante "Rimuovi Duplicati" nella sezione "Combinazioni Salvate" per pulire il database
+                  </span>
                 )}
                 {filterDifference !== null && (
                   <span> | Filtro attivo: differenza = {filterDifference}</span>
