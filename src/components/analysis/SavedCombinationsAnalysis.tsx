@@ -92,6 +92,24 @@ const SavedCombinationsAnalysis: React.FC = () => {
         new Date(b.date).getTime() - new Date(a.date).getTime()
       );
 
+  // Deduplicate extractions by date - keep only one extraction per date
+  const uniqueExtractionDates = new Map<string, typeof relevantExtractions[0]>();
+  relevantExtractions.forEach(ext => {
+    if (!uniqueExtractionDates.has(ext.date)) {
+      uniqueExtractionDates.set(ext.date, ext);
+    } else {
+      // If duplicate found, keep the one with more complete data
+      const existing = uniqueExtractionDates.get(ext.date)!;
+      const existingNumbers = existing.numbers?.length || 0;
+      const currentNumbers = ext.numbers?.length || 0;
+      if (currentNumbers > existingNumbers) {
+        uniqueExtractionDates.set(ext.date, ext);
+      }
+    }
+  });
+  relevantExtractions = Array.from(uniqueExtractionDates.values())
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
   // Apply date filters
   if (filterStartDate) {
     relevantExtractions = relevantExtractions.filter(ext => 
