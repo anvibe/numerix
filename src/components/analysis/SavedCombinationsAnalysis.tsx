@@ -72,17 +72,35 @@ const SavedCombinationsAnalysis: React.FC = () => {
 
   // Debug: Log to help identify mismatches
   if (process.env.NODE_ENV === 'development') {
+    // Count unique combinations by numbers
+    const uniqueByNumbersSet = new Set<string>();
+    relevantCombinations.forEach(combo => {
+      const sortedNumbers = [...combo.numbers].sort((a, b) => a - b);
+      const numbersKey = `${sortedNumbers.join(',')}-${combo.gameType}`;
+      uniqueByNumbersSet.add(numbersKey);
+    });
+    
     console.log('Analysis Debug:', {
       selectedGame,
       totalSavedCombinations: savedCombinations.length,
       relevantBeforeDedup: savedCombinations.filter(c => c.gameType === selectedGame).length,
       relevantCombinationsCount: relevantCombinations.length,
+      uniqueByNumbersCount: uniqueByNumbersSet.size,
       relevantCombinationIds: relevantCombinations.slice(0, 10).map(c => c.id.slice(0, 8)),
       duplicatesRemoved: savedCombinations.filter(c => c.gameType === selectedGame).length - relevantCombinations.length,
       selectedExtractionDate,
       filterDifference,
-      selectedCombinationId
+      selectedCombinationId,
+      warning: uniqueByNumbersSet.size !== relevantCombinations.length ? 'Still have duplicates by numbers!' : 'OK'
     });
+    
+    if (uniqueByNumbersSet.size !== relevantCombinations.length) {
+      console.warn('WARNING: relevantCombinations still contains duplicates by numbers!', {
+        total: relevantCombinations.length,
+        unique: uniqueByNumbersSet.size,
+        duplicates: relevantCombinations.length - uniqueByNumbersSet.size
+      });
+    }
   }
 
   const currentGameExtractions = extractionsData[selectedGame] || [];
@@ -617,22 +635,38 @@ const SavedCombinationsAnalysis: React.FC = () => {
 
       {/* Results */}
       <div className="space-y-6">
-        {selectedExtractionDate && filteredResults.length > 0 && (
-          <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-md">
-            <div className="font-medium text-primary mb-1">
-              📅 Estrazione selezionata: {new Date(selectedExtractionDate).toLocaleDateString('it-IT')}
+        {selectedExtractionDate && filteredResults.length > 0 && (() => {
+          // Count unique combinations by numbers (not IDs) in filtered results
+          const uniqueComboKeys = new Set<string>();
+          filteredResults.forEach(result => {
+            const sortedNumbers = [...result.savedCombination.numbers].sort((a, b) => a - b);
+            const numbersKey = `${sortedNumbers.join(',')}-${result.savedCombination.gameType}`;
+            uniqueComboKeys.add(numbersKey);
+          });
+          const uniqueCount = uniqueComboKeys.size;
+          
+          return (
+            <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-md">
+              <div className="font-medium text-primary mb-1">
+                📅 Estrazione selezionata: {new Date(selectedExtractionDate).toLocaleDateString('it-IT')}
+              </div>
+              <div className="text-sm text-text-secondary">
+                Mostrate {uniqueCount} combinazioni uniche per questa estrazione
+                {filteredResults.length !== uniqueCount && (
+                  <span className="text-xs text-warning ml-2">
+                    ({filteredResults.length} risultati totali dopo deduplicazione)
+                  </span>
+                )}
+              </div>
+              <div className="text-xs text-text-secondary mt-1">
+                Combinazioni salvate per {selectedGame}: {relevantCombinations.length}
+                {filterDifference !== null && (
+                  <span> | Filtro attivo: differenza = {filterDifference}</span>
+                )}
+              </div>
             </div>
-            <div className="text-sm text-text-secondary">
-              Mostrate {filteredResults.length} combinazioni uniche per questa estrazione
-            </div>
-            <div className="text-xs text-text-secondary mt-1">
-              Combinazioni salvate per {selectedGame}: {relevantCombinations.length}
-              {filterDifference !== null && (
-                <span> | Filtro attivo: differenza = {filterDifference}</span>
-              )}
-            </div>
-          </div>
-        )}
+          );
+        })()}
         
         {filterDifference !== null && selectedCombinationId === null && selectedExtractionDate === null && filteredResults.length > 0 && (
           <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-md">
