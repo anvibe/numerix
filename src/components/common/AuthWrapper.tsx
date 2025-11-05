@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, LogIn, LogOut, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../../utils/supabaseClient';
 import { User as SupabaseUser } from '@supabase/supabase-js';
@@ -19,6 +19,7 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [emailConfirmationSent, setEmailConfirmationSent] = useState(false);
+  const justSignedUpRef = useRef(false); // Use ref to prevent auto-login after signup
 
   // Clear invalid tokens from localStorage
   const clearInvalidTokens = () => {
@@ -89,7 +90,9 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
         } else {
           // If user exists but email not confirmed, sign them out
           if (session?.user) {
+            console.log('Initial session found but email not confirmed, signing out...');
             supabase.auth.signOut();
+            clearInvalidTokens();
           }
           setUser(null);
         }
@@ -104,25 +107,47 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state change:', event, { hasSession: !!session, emailConfirmed: session?.user?.email_confirmed_at });
+      
       if (event === 'TOKEN_REFRESHED') {
         console.log('Token refreshed successfully');
       } else if (event === 'SIGNED_OUT') {
         clearInvalidTokens();
+        setUser(null);
+        setLoading(false);
+        return;
       } else if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
-        // Check if user email is confirmed
-        if (session?.user && !session.user.email_confirmed_at) {
-          // Email not confirmed, sign out immediately
-          console.log('Email not confirmed, signing out...', { event, userId: session.user.id });
+        // CRITICAL: Block any sign-in if we just signed up (prevents auto-login)
+        if (justSignedUpRef.current) {
+          console.log('Blocking sign-in after signup, forcing sign out...');
           await supabase.auth.signOut();
           clearInvalidTokens();
           setUser(null);
           setLoading(false);
-          
-          if (event === 'SIGNED_IN') {
-            setError('La tua email deve essere confermata prima di accedere. Controlla la tua casella email.');
-            setShowAuth(true);
-          }
           return;
+        }
+        
+        // CRITICAL: Check if user email is confirmed FIRST
+        if (session?.user) {
+          if (!session.user.email_confirmed_at) {
+            // Email not confirmed, sign out immediately and block access
+            console.log('Email not confirmed, signing out immediately...', { event, userId: session.user.id });
+            await supabase.auth.signOut();
+            clearInvalidTokens();
+            setUser(null);
+            setLoading(false);
+            
+            if (event === 'SIGNED_IN') {
+              setError('La tua email deve essere confermata prima di accedere. Controlla la tua casella email.');
+              setShowAuth(true);
+            }
+            return; // Exit early, don't set user
+          } else {
+            // Email is confirmed, allow access
+            setUser(session.user);
+            setLoading(false);
+            return;
+          }
         }
       }
       
@@ -177,47 +202,55 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
     setError('');
     
     try {
+      // Sign up with email and password only
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: window.location.origin,
+          emailRedirectTo: `${window.location.origin}`,
         }
       });
       
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
       
-      // IMPORTANT: Supabase may create a session even if email confirmation is required
-      // We need to check and sign out immediately if email is not confirmed
+      // CRITICAL: Immediately sign out to prevent auto-login
+      // Supabase may create a session even if email confirmation is required
+      // We must sign out immediately after signup, regardless of email_confirmed_at
+      
+      // Set flag to prevent any user state from being set
+      justSignedUpRef.current = true;
+      
+      // Sign out immediately
+      await supabase.auth.signOut();
+      clearInvalidTokens();
+      
+      // Force clear any session state
+      setUser(null);
+      
+      // Reset flag after a short delay to allow signout to complete
+      setTimeout(() => {
+        justSignedUpRef.current = false;
+      }, 3000);
+      
+      // Check if user was created
       if (data.user) {
-        // Check if email is confirmed
-        if (!data.user.email_confirmed_at) {
-          // Email confirmation required - sign out immediately to prevent auto-login
-          console.log('Email not confirmed, signing out immediately after signup...');
-          await supabase.auth.signOut();
-          
-          // Clear any session that might have been created
-          clearInvalidTokens();
-          
-          // Show confirmation message
-          setEmailConfirmationSent(true);
-          showToast.success('Email di conferma inviata! Controlla la tua casella email e clicca sul link per confermare il tuo account.');
-          // Don't switch to login, stay on signup form but show confirmation message
-          setPassword('');
-        } else {
-          // Email already confirmed (shouldn't happen if email confirmation is enabled in Supabase)
-          showToast.success('Registrazione completata! Puoi ora effettuare il login.');
-          setIsSignUp(false);
-          setEmail('');
-          setPassword('');
-        }
-      } else {
-        // No user returned - this shouldn't happen but handle it
+        // Always show confirmation message - email confirmation is required
         setEmailConfirmationSent(true);
-        showToast.success('Email di conferma inviata! Controlla la tua casella email.');
+        showToast.success('Registrazione completata! Controlla la tua casella email per confermare il tuo account.');
+        // Clear password but keep email so user can see where confirmation was sent
         setPassword('');
+        
+        // Force user to stay on auth screen
+        setShowAuth(true);
+        setIsSignUp(true);
+      } else {
+        // This shouldn't happen, but handle it
+        setError('Errore durante la registrazione. Riprova.');
       }
     } catch (error) {
+      console.error('Signup error:', error);
       setError(error instanceof Error ? error.message : 'Errore durante la registrazione');
       setEmailConfirmationSent(false);
     }
