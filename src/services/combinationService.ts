@@ -56,7 +56,40 @@ export const combinationService = {
         throw error;
       }
 
-      return data.map(convertRowToGeneratedCombination);
+      const allCombinations = data.map(convertRowToGeneratedCombination);
+      
+      // Deduplicate by ID first
+      const uniqueByIdMap = new Map<string, GeneratedCombination>();
+      allCombinations.forEach(combo => {
+        if (!uniqueByIdMap.has(combo.id)) {
+          uniqueByIdMap.set(combo.id, combo);
+        }
+      });
+      
+      // Then deduplicate by actual numbers (keep most recent)
+      const uniqueNumbersMap = new Map<string, GeneratedCombination>();
+      Array.from(uniqueByIdMap.values()).forEach(combo => {
+        const sortedNumbers = [...combo.numbers].sort((a, b) => a - b);
+        const numbersKey = `${sortedNumbers.join(',')}-${combo.gameType}`;
+        
+        if (!uniqueNumbersMap.has(numbersKey)) {
+          uniqueNumbersMap.set(numbersKey, combo);
+        } else {
+          // Keep the most recent one if duplicate found
+          const existing = uniqueNumbersMap.get(numbersKey)!;
+          if (new Date(combo.date) > new Date(existing.date)) {
+            uniqueNumbersMap.set(numbersKey, combo);
+          }
+        }
+      });
+      
+      const deduplicated = Array.from(uniqueNumbersMap.values());
+      
+      if (process.env.NODE_ENV === 'development' && allCombinations.length !== deduplicated.length) {
+        console.log(`Deduplication: ${allCombinations.length} → ${deduplicated.length} combinations (removed ${allCombinations.length - deduplicated.length} duplicates)`);
+      }
+      
+      return deduplicated;
     } catch (error) {
       console.error('Error in getSavedCombinations:', error);
       return [];

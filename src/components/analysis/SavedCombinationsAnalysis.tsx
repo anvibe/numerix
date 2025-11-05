@@ -77,8 +77,11 @@ const SavedCombinationsAnalysis: React.FC = () => {
       totalSavedCombinations: savedCombinations.length,
       relevantBeforeDedup: savedCombinations.filter(c => c.gameType === selectedGame).length,
       relevantCombinationsCount: relevantCombinations.length,
-      relevantCombinationIds: relevantCombinations.map(c => c.id.slice(0, 8)),
-      duplicatesRemoved: savedCombinations.filter(c => c.gameType === selectedGame).length - relevantCombinations.length
+      relevantCombinationIds: relevantCombinations.slice(0, 10).map(c => c.id.slice(0, 8)),
+      duplicatesRemoved: savedCombinations.filter(c => c.gameType === selectedGame).length - relevantCombinations.length,
+      selectedExtractionDate,
+      filterDifference,
+      selectedCombinationId
     });
   }
 
@@ -292,30 +295,47 @@ const SavedCombinationsAnalysis: React.FC = () => {
   }
 
   // When viewing a specific extraction, ensure we only show relevant combinations
-  // and verify they match the saved combinations, and deduplicate by combination ID
+  // and verify they match the saved combinations, and deduplicate by combination ID AND numbers
   if (selectedExtractionDate) {
-    const relevantCombinationIds = new Set(relevantCombinations.map(c => c.id));
+    // Create a set of valid combination number keys (deduplicated)
+    const validCombinationKeys = new Set<string>();
+    relevantCombinations.forEach(combo => {
+      const sortedNumbers = [...combo.numbers].sort((a, b) => a - b);
+      const numbersKey = `${sortedNumbers.join(',')}-${combo.gameType}`;
+      validCombinationKeys.add(numbersKey);
+    });
     
-    // Filter out any results that don't match saved combinations
-    filteredResults = filteredResults.filter(result => 
-      relevantCombinationIds.has(result.savedCombination.id)
-    );
-    
-    // Deduplicate by combination ID - keep only one result per combination
-    // This ensures each saved combination appears only once, even if there are duplicates
-    const uniqueCombinations = new Map<string, MatchAnalysis>();
-    
+    // Deduplicate by combination ID first
+    const uniqueByIdMap = new Map<string, MatchAnalysis>();
     filteredResults.forEach(result => {
       const comboId = result.savedCombination.id;
-      const existing = uniqueCombinations.get(comboId);
+      const existing = uniqueByIdMap.get(comboId);
       
       // If no existing result, or if this one has better match, keep it
       if (!existing || result.matchCount > existing.matchCount) {
-        uniqueCombinations.set(comboId, result);
+        uniqueByIdMap.set(comboId, result);
       }
     });
     
-    filteredResults = Array.from(uniqueCombinations.values()).sort((a, b) => {
+    // Also deduplicate by numbers (in case same combination has different IDs)
+    // AND filter to only include valid saved combinations
+    const uniqueByNumbersMap = new Map<string, MatchAnalysis>();
+    Array.from(uniqueByIdMap.values()).forEach(result => {
+      const sortedNumbers = [...result.savedCombination.numbers].sort((a, b) => a - b);
+      const numbersKey = `${sortedNumbers.join(',')}-${result.savedCombination.gameType}`;
+      
+      // Only include if this combination key exists in our saved combinations
+      if (!validCombinationKeys.has(numbersKey)) {
+        return; // Skip this result - it's not in our saved combinations
+      }
+      
+      const existing = uniqueByNumbersMap.get(numbersKey);
+      if (!existing || result.matchCount > existing.matchCount) {
+        uniqueByNumbersMap.set(numbersKey, result);
+      }
+    });
+    
+    filteredResults = Array.from(uniqueByNumbersMap.values()).sort((a, b) => {
       if (b.matchCount !== a.matchCount) {
         return b.matchCount - a.matchCount;
       }
@@ -323,13 +343,25 @@ const SavedCombinationsAnalysis: React.FC = () => {
     });
     
     // Debug warning if mismatch detected
-    if (process.env.NODE_ENV === 'development' && uniqueCombinations.size !== relevantCombinationIds.size) {
-      console.warn('Mismatch detected after deduplication:', {
-        uniqueResultCount: uniqueCombinations.size,
-        savedCount: relevantCombinationIds.size,
-        resultIds: Array.from(uniqueCombinations.keys()).map(id => id.slice(0, 8)),
-        savedIds: Array.from(relevantCombinationIds).map(id => id.slice(0, 8))
+    if (process.env.NODE_ENV === 'development') {
+      console.log('After extraction deduplication:', {
+        beforeFilter: Array.from(uniqueByIdMap.values()).length,
+        afterIdDedup: uniqueByIdMap.size,
+        afterNumbersDedup: uniqueByNumbersMap.size,
+        savedUniqueCount: validCombinationKeys.size,
+        savedTotalCount: relevantCombinations.length,
+        resultIds: Array.from(uniqueByNumbersMap.values()).slice(0, 10).map(r => r.savedCombination.id.slice(0, 8)),
+        savedKeys: Array.from(validCombinationKeys).slice(0, 10),
+        mismatch: uniqueByNumbersMap.size !== validCombinationKeys.size
       });
+      
+      if (uniqueByNumbersMap.size !== validCombinationKeys.size) {
+        console.warn('Mismatch detected after deduplication:', {
+          uniqueResultCount: uniqueByNumbersMap.size,
+          savedUniqueCount: validCombinationKeys.size,
+          difference: uniqueByNumbersMap.size - validCombinationKeys.size
+        });
+      }
     }
   }
 
