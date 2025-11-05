@@ -133,14 +133,8 @@ const AIRecommendation: React.FC = () => {
     <div className="card mb-8">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center">
-          {aiResult?.isOpenAI ? (
-            <Sparkles className="h-6 w-6 text-primary mr-3" />
-          ) : (
-            <Brain className="h-6 w-6 text-primary mr-3" />
-          )}
-          <h2 className="text-xl font-semibold">
-            {aiResult?.isOpenAI ? 'AI Avanzata (OpenAI)' : 'Modalità AI Suggerisci'}
-          </h2>
+          <Brain className="h-6 w-6 text-primary mr-3" />
+          <h2 className="text-xl font-semibold">Generatore Intelligente AI</h2>
         </div>
         
         <button
@@ -152,24 +146,26 @@ const AIRecommendation: React.FC = () => {
         </button>
       </div>
       
-      {showSettings && <OpenAISettings />}
-      
-      <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
-        <p className="text-sm text-blue-800 dark:text-blue-200">
+      <div className="mb-6">
+        <p className="text-sm text-text-secondary mb-4">
           {isOpenAIAvailable ? (
             <>
-              <strong>AI Avanzata Disponibile:</strong> Puoi scegliere tra l'AI locale (gratuita) 
-              o l'AI avanzata di OpenAI (più sofisticata, richiede API key).
+              Utilizza l'intelligenza artificiale avanzata per analizzare pattern statistici, probabilità bayesiane, 
+              co-occorrenze e distribuzioni ottimali. Puoi scegliere tra l'AI locale (gratuita) o l'AI avanzata di OpenAI 
+              (più sofisticata, con analisi distribuzionale e calcoli probabilistici avanzati).
             </>
           ) : (
             <>
-              <strong>AI Locale:</strong> Utilizza un algoritmo di apprendimento semplificato per generare numeri con
-              più probabilità di uscita basandosi su pattern statistici e feedback delle combinazioni non vincenti.
+              Utilizza algoritmi di apprendimento avanzati per generare numeri con maggiore probabilità di uscita, 
+              basandosi su analisi statistica sofisticata (probabilità bayesiane, pattern distribuzionali, co-occorrenze) 
+              e feedback delle combinazioni non vincenti.
             </>
           )}
         </p>
       </div>
-
+      
+      {showSettings && <OpenAISettings />}
+      
       {isOpenAIAvailable && (
         <div className="mb-6">
           <label className="block text-sm font-medium text-text-secondary mb-2">
@@ -199,6 +195,13 @@ const AIRecommendation: React.FC = () => {
               AI Avanzata (OpenAI)
             </label>
           </div>
+          <p className="text-xs text-text-secondary mt-2">
+            {useOpenAI ? (
+              <>✨ L'AI avanzata utilizza modelli GPT-4o con analisi distribuzionale, probabilità bayesiane e co-occorrenze per suggerimenti più accurati.</>
+            ) : (
+              <>🧠 L'AI locale utilizza algoritmi di apprendimento locale con statistiche avanzate per generare combinazioni ottimizzate.</>
+            )}
+          </p>
         </div>
       )}
       
@@ -315,13 +318,26 @@ const AIRecommendation: React.FC = () => {
           onClick={handleGenerateAI}
           disabled={isGenerating}
         >
-          {aiResult?.isOpenAI || (useOpenAI && isOpenAIAvailable) ? (
-            <Sparkles className="mr-2 h-5 w-5" />
+          {isGenerating ? (
+            <>
+              <Brain className="mr-2 h-5 w-5 animate-spin" />
+              Analisi in corso...
+            </>
           ) : (
-            <Brain className="mr-2 h-5 w-5" />
+            <>
+              {(useOpenAI && isOpenAIAvailable) ? (
+                <>
+                  <Sparkles className="mr-2 h-5 w-5" />
+                  Genera con AI Avanzata
+                </>
+              ) : (
+                <>
+                  <Brain className="mr-2 h-5 w-5" />
+                  Genera con AI
+                </>
+              )}
+            </>
           )}
-          {isGenerating ? 'Analisi in corso...' : 
-           (useOpenAI && isOpenAIAvailable) ? 'Genera con AI Avanzata' : 'Genera con AI'}
         </button>
         
         {aiResult && (
