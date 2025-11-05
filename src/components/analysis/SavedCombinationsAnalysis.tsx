@@ -35,7 +35,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
   const [filterEndDate, setFilterEndDate] = useState<string>('');
 
   // Calculate combinations and extractions directly (no memoization to avoid React error #310)
-  const relevantCombinations = savedCombinations.filter(combo => {
+  let relevantCombinations = savedCombinations.filter(combo => {
     // Strict filtering by game type
     if (combo.gameType !== selectedGame) return false;
     if (selectedGame === 'lotto' && combo.wheel) {
@@ -44,13 +44,23 @@ const SavedCombinationsAnalysis: React.FC = () => {
     return true;
   });
 
+  // Deduplicate combinations by ID to avoid processing duplicates
+  const uniqueCombinationMap = new Map<string, typeof savedCombinations[0]>();
+  relevantCombinations.forEach(combo => {
+    if (!uniqueCombinationMap.has(combo.id)) {
+      uniqueCombinationMap.set(combo.id, combo);
+    }
+  });
+  relevantCombinations = Array.from(uniqueCombinationMap.values());
+
   // Debug: Log to help identify mismatches
   if (process.env.NODE_ENV === 'development') {
     console.log('Analysis Debug:', {
       selectedGame,
       totalSavedCombinations: savedCombinations.length,
       relevantCombinationsCount: relevantCombinations.length,
-      relevantCombinationIds: relevantCombinations.map(c => c.id.slice(0, 8))
+      relevantCombinationIds: relevantCombinations.map(c => c.id.slice(0, 8)),
+      duplicatesRemoved: savedCombinations.filter(c => c.gameType === selectedGame).length - relevantCombinations.length
     });
   }
 
@@ -264,10 +274,8 @@ const SavedCombinationsAnalysis: React.FC = () => {
   }
 
   // When viewing a specific extraction, ensure we only show relevant combinations
-  // and verify they match the saved combinations
+  // and verify they match the saved combinations, and deduplicate by combination ID
   if (selectedExtractionDate) {
-    // Get unique combination IDs from filtered results
-    const uniqueResultIds = new Set(filteredResults.map(r => r.savedCombination.id));
     const relevantCombinationIds = new Set(relevantCombinations.map(c => c.id));
     
     // Filter out any results that don't match saved combinations
@@ -275,13 +283,34 @@ const SavedCombinationsAnalysis: React.FC = () => {
       relevantCombinationIds.has(result.savedCombination.id)
     );
     
+    // Deduplicate by combination ID - keep only one result per combination
+    // This ensures each saved combination appears only once, even if there are duplicates
+    const uniqueCombinations = new Map<string, MatchAnalysis>();
+    
+    filteredResults.forEach(result => {
+      const comboId = result.savedCombination.id;
+      const existing = uniqueCombinations.get(comboId);
+      
+      // If no existing result, or if this one has better match, keep it
+      if (!existing || result.matchCount > existing.matchCount) {
+        uniqueCombinations.set(comboId, result);
+      }
+    });
+    
+    filteredResults = Array.from(uniqueCombinations.values()).sort((a, b) => {
+      if (b.matchCount !== a.matchCount) {
+        return b.matchCount - a.matchCount;
+      }
+      return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
+    });
+    
     // Debug warning if mismatch detected
-    if (process.env.NODE_ENV === 'development' && uniqueResultIds.size !== relevantCombinationIds.size) {
-      console.warn('Mismatch detected:', {
-        resultIds: Array.from(uniqueResultIds).map(id => id.slice(0, 8)),
-        savedIds: Array.from(relevantCombinationIds).map(id => id.slice(0, 8)),
-        resultCount: uniqueResultIds.size,
-        savedCount: relevantCombinationIds.size
+    if (process.env.NODE_ENV === 'development' && uniqueCombinations.size !== relevantCombinationIds.size) {
+      console.warn('Mismatch detected after deduplication:', {
+        uniqueResultCount: uniqueCombinations.size,
+        savedCount: relevantCombinationIds.size,
+        resultIds: Array.from(uniqueCombinations.keys()).map(id => id.slice(0, 8)),
+        savedIds: Array.from(relevantCombinationIds).map(id => id.slice(0, 8))
       });
     }
   }
@@ -485,13 +514,13 @@ const SavedCombinationsAnalysis: React.FC = () => {
           >
             Tutte
           </button>
-          {[0, 1, 2, 3].map(diff => (
+          {gameConfig && Array.from({ length: gameConfig.numbersToSelect + 1 }, (_, i) => i).map(diff => (
             <button
               key={diff}
               onClick={() => setFilterDifference(diff)}
               className={`btn btn-sm ${filterDifference === diff ? 'btn-primary' : 'btn-outline'}`}
             >
-              Mancavano {diff} {diff === 1 ? 'numero' : 'numeri'}
+              Mancavano {diff} {diff === 1 ? 'numero' : 'numeri'} ({gameConfig.numbersToSelect - diff}/{gameConfig.numbersToSelect})
             </button>
           ))}
         </div>
@@ -505,10 +534,13 @@ const SavedCombinationsAnalysis: React.FC = () => {
               📅 Estrazione selezionata: {new Date(selectedExtractionDate).toLocaleDateString('it-IT')}
             </div>
             <div className="text-sm text-text-secondary">
-              Mostrate {filteredResults.length} risultati per questa estrazione
+              Mostrate {filteredResults.length} combinazioni uniche per questa estrazione
             </div>
             <div className="text-xs text-text-secondary mt-1">
               Combinazioni salvate per {selectedGame}: {relevantCombinations.length}
+              {filterDifference !== null && (
+                <span> | Filtro attivo: differenza = {filterDifference}</span>
+              )}
             </div>
           </div>
         )}
