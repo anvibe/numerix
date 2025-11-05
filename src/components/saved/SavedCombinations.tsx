@@ -213,65 +213,66 @@ const SavedCombinations: React.FC = () => {
             {filteredCombinations.map((combo, index) => {
               const isLatest = index === 0; // First item is the latest
               return (
-              <tr 
-                key={combo.id}
-                className={`hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${isLatest ? 'bg-primary/5 border-l-4 border-primary' : ''}`}
-              >
-                <td className="py-3 px-4 border-b border-gray-200 dark:border-gray-700">
-                  <div className="flex items-center">
-                    {getGameByType(combo.gameType).name}
-                    {isLatest && (
-                      <Sparkles className="h-4 w-4 text-primary ml-2" title="Ultima combinazione salvata" />
-                    )}
-                  </div>
-                </td>
-                <td className="py-3 px-4 border-b border-gray-200 dark:border-gray-700">
-                  <div className="flex flex-wrap gap-1.5">
-                    {combo.numbers.map((number, i) => (
-                      <span 
-                        key={i} 
-                        className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary text-xs font-medium"
-                      >
-                        {number}
+                <tr 
+                  key={combo.id}
+                  className={`hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${isLatest ? 'bg-primary/5 border-l-4 border-primary' : ''}`}
+                >
+                  <td className="py-3 px-4 border-b border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center">
+                      {getGameByType(combo.gameType).name}
+                      {isLatest && (
+                        <Sparkles className="h-4 w-4 text-primary ml-2" title="Ultima combinazione salvata" />
+                      )}
+                    </div>
+                  </td>
+                  <td className="py-3 px-4 border-b border-gray-200 dark:border-gray-700">
+                    <div className="flex flex-wrap gap-1.5">
+                      {combo.numbers.map((number, i) => (
+                        <span 
+                          key={i} 
+                          className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary text-xs font-medium"
+                        >
+                          {number}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="py-3 px-4 border-b border-gray-200 dark:border-gray-700">
+                    {combo.jolly && (
+                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-500/10 text-blue-600 text-xs font-medium">
+                        {combo.jolly}
                       </span>
-                    ))}
-                  </div>
-                </td>
-                <td className="py-3 px-4 border-b border-gray-200 dark:border-gray-700">
-                  {combo.jolly && (
-                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-500/10 text-blue-600 text-xs font-medium">
-                      {combo.jolly}
-                    </span>
-                  )}
-                </td>
-                <td className="py-3 px-4 border-b border-gray-200 dark:border-gray-700">
-                  {combo.superstar && (
-                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-secondary/10 text-secondary text-xs font-medium">
-                      {combo.superstar}
-                    </span>
-                  )}
-                </td>
-                <td className="py-3 px-4 border-b border-gray-200 dark:border-gray-700 whitespace-nowrap">
-                  {new Date(combo.date).toLocaleDateString('it-IT')}
-                </td>
-                <td className="py-3 px-4 border-b border-gray-200 dark:border-gray-700">
-                  {getStrategyDisplay(combo)}
-                </td>
-                <td className="py-3 px-4 border-b border-gray-200 dark:border-gray-700">
-                  <button
-                    className="text-error hover:text-error-dark transition-colors"
-                    onClick={() => {
-                      deleteCombination(combo.id).catch((error) => {
-                        showToast.error('Errore durante l\'eliminazione: ' + error.message);
-                      });
-                    }}
-                    aria-label="Elimina combinazione"
-                  >
-                    <Trash2 className="h-5 w-5" />
-                  </button>
-                </td>
-              </tr>
-            ))}
+                    )}
+                  </td>
+                  <td className="py-3 px-4 border-b border-gray-200 dark:border-gray-700">
+                    {combo.superstar && (
+                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-secondary/10 text-secondary text-xs font-medium">
+                        {combo.superstar}
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-3 px-4 border-b border-gray-200 dark:border-gray-700 whitespace-nowrap">
+                    {new Date(combo.date).toLocaleDateString('it-IT')}
+                  </td>
+                  <td className="py-3 px-4 border-b border-gray-200 dark:border-gray-700">
+                    {getStrategyDisplay(combo)}
+                  </td>
+                  <td className="py-3 px-4 border-b border-gray-200 dark:border-gray-700">
+                    <button
+                      className="text-error hover:text-error-dark transition-colors"
+                      onClick={() => {
+                        deleteCombination(combo.id).catch((error) => {
+                          showToast.error('Errore durante l\'eliminazione: ' + error.message);
+                        });
+                      }}
+                      aria-label="Elimina combinazione"
+                    >
+                      <Trash2 className="h-5 w-5" />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
