@@ -42,19 +42,51 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
     const handleEmailConfirmation = async () => {
       // Check for Supabase email confirmation tokens in URL
       const urlParams = new URLSearchParams(window.location.search);
-      const token = urlParams.get('token');
+      const hash = window.location.hash;
+      
+      // Try different token formats
+      const token = urlParams.get('token') || urlParams.get('token_hash');
       const type = urlParams.get('type');
       
-      if (type === 'signup' && token) {
+      // Check hash for tokens (Supabase sometimes uses hash)
+      let hashToken = null;
+      let hashType = null;
+      if (hash) {
+        const hashParams = new URLSearchParams(hash.substring(1));
+        hashToken = hashParams.get('access_token') || hashParams.get('token');
+        hashType = hashParams.get('type');
+      }
+      
+      const finalToken = token || hashToken;
+      const finalType = type || hashType || 'signup';
+      
+      if (finalToken) {
         // User clicked email confirmation link
         try {
-          const { data, error } = await supabase.auth.verifyOtp({
-            token_hash: token,
+          console.log('Attempting email confirmation...', { finalType, hasToken: !!finalToken });
+          
+          // Try verifyOtp first (for new format)
+          let confirmResult = await supabase.auth.verifyOtp({
+            token_hash: finalToken,
             type: 'signup',
           });
           
-          if (error) {
-            setError('Errore durante la conferma email: ' + error.message);
+          // If that fails, try the exchangeSessionForTokens method
+          if (confirmResult.error) {
+            console.log('verifyOtp failed, trying alternative method...', confirmResult.error);
+            // Try using the token directly in the URL
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            if (sessionError || !session) {
+              // Try to exchange the token
+              const { data: exchangeData, error: exchangeError } = await supabase.auth.getUser();
+              if (exchangeError) {
+                throw confirmResult.error; // Use original error
+              }
+            }
+          }
+          
+          if (confirmResult.error) {
+            setError('Errore durante la conferma email: ' + confirmResult.error.message);
             setShowAuth(true);
           } else {
             showToast.success('Email confermata con successo! Ora puoi effettuare il login.');
@@ -65,7 +97,8 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
             setEmailConfirmationSent(false);
           }
         } catch (error) {
-          setError('Errore durante la conferma email');
+          console.error('Email confirmation error:', error);
+          setError('Errore durante la conferma email: ' + (error instanceof Error ? error.message : 'Errore sconosciuto'));
           setShowAuth(true);
         }
       }
@@ -207,7 +240,11 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}`,
+          emailRedirectTo: `${window.location.origin}/`,
+          // Use the new confirmation method
+          data: {
+            redirect_to: `${window.location.origin}/`,
+          }
         }
       });
       
@@ -421,14 +458,25 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
                         type="button"
                         onClick={async () => {
                           try {
-                            const { error } = await supabase.auth.resend({
+                            console.log('Resending confirmation email to:', email);
+                            const { data, error } = await supabase.auth.resend({
                               type: 'signup',
                               email: email,
+                              options: {
+                                emailRedirectTo: `${window.location.origin}/`,
+                              }
                             });
-                            if (error) throw error;
-                            showToast.success('Email di conferma inviata di nuovo!');
+                            if (error) {
+                              console.error('Resend error:', error);
+                              throw error;
+                            }
+                            console.log('Resend success:', data);
+                            showToast.success('Email di conferma inviata di nuovo! Controlla la tua casella email.');
                           } catch (error) {
-                            showToast.error('Errore durante l\'invio della email: ' + (error instanceof Error ? error.message : 'Errore sconosciuto'));
+                            console.error('Resend error:', error);
+                            const errorMessage = error instanceof Error ? error.message : 'Errore sconosciuto';
+                            showToast.error('Errore durante l\'invio della email: ' + errorMessage);
+                            setError('Errore invio email: ' + errorMessage);
                           }
                         }}
                         className="text-primary hover:underline text-xs"
