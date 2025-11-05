@@ -18,6 +18,7 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [emailConfirmationSent, setEmailConfirmationSent] = useState(false);
 
   // Clear invalid tokens from localStorage
   const clearInvalidTokens = () => {
@@ -36,6 +37,41 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
   };
 
   useEffect(() => {
+    // Handle email confirmation callback from URL
+    const handleEmailConfirmation = async () => {
+      // Check for Supabase email confirmation tokens in URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get('token');
+      const type = urlParams.get('type');
+      
+      if (type === 'signup' && token) {
+        // User clicked email confirmation link
+        try {
+          const { data, error } = await supabase.auth.verifyOtp({
+            token_hash: token,
+            type: 'signup',
+          });
+          
+          if (error) {
+            setError('Errore durante la conferma email: ' + error.message);
+            setShowAuth(true);
+          } else {
+            showToast.success('Email confermata con successo! Ora puoi effettuare il login.');
+            // Clear URL parameters
+            window.history.replaceState(null, '', window.location.pathname);
+            setIsSignUp(false);
+            setShowAuth(true);
+            setEmailConfirmationSent(false);
+          }
+        } catch (error) {
+          setError('Errore durante la conferma email');
+          setShowAuth(true);
+        }
+      }
+    };
+    
+    handleEmailConfirmation();
+    
     // Get initial session with error handling
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (error) {
@@ -47,7 +83,16 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
         }
         setUser(null);
       } else {
-        setUser(session?.user ?? null);
+        // Only set user if email is confirmed
+        if (session?.user?.email_confirmed_at) {
+          setUser(session.user);
+        } else {
+          // If user exists but email not confirmed, sign them out
+          if (session?.user) {
+            supabase.auth.signOut();
+          }
+          setUser(null);
+        }
       }
       setLoading(false);
     }).catch((error) => {
@@ -63,9 +108,23 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
         console.log('Token refreshed successfully');
       } else if (event === 'SIGNED_OUT') {
         clearInvalidTokens();
+      } else if (event === 'SIGNED_IN') {
+        // Check if user email is confirmed
+        if (session?.user && !session.user.email_confirmed_at) {
+          // Email not confirmed, sign out
+          supabase.auth.signOut();
+          setUser(null);
+          setError('La tua email deve essere confermata prima di accedere. Controlla la tua casella email.');
+          return;
+        }
       }
       
-      setUser(session?.user ?? null);
+      // Only set user if email is confirmed
+      if (session?.user?.email_confirmed_at) {
+        setUser(session.user);
+      } else {
+        setUser(null);
+      }
       setLoading(false);
     });
 
@@ -77,18 +136,32 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
     setError('');
     
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       
       if (error) throw error;
       
+      // Check if email is confirmed
+      if (data.user && !data.user.email_confirmed_at) {
+        // Sign out if email not confirmed
+        await supabase.auth.signOut();
+        setError('La tua email deve essere confermata prima di accedere. Controlla la tua casella email e clicca sul link di conferma.');
+        return;
+      }
+      
       setShowAuth(false);
       setEmail('');
       setPassword('');
+      setEmailConfirmationSent(false);
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Errore durante il login');
+      const errorMessage = error instanceof Error ? error.message : 'Errore durante il login';
+      if (errorMessage.includes('Email not confirmed') || errorMessage.includes('email_not_confirmed')) {
+        setError('La tua email deve essere confermata prima di accedere. Controlla la tua casella email e clicca sul link di conferma.');
+      } else {
+        setError(errorMessage);
+      }
     }
   };
 
@@ -97,19 +170,30 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
     setError('');
     
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
       });
       
       if (error) throw error;
       
-      showToast.success('Registrazione completata! Puoi ora effettuare il login.');
-      setIsSignUp(false);
-      setEmail('');
-      setPassword('');
+      // Check if email confirmation is required
+      if (data.user && !data.user.email_confirmed_at) {
+        // Email confirmation required
+        setEmailConfirmationSent(true);
+        showToast.success('Email di conferma inviata! Controlla la tua casella email e clicca sul link per confermare il tuo account.');
+        // Don't switch to login, stay on signup form but show confirmation message
+        setPassword('');
+      } else {
+        // If email confirmation is disabled (shouldn't happen in production)
+        showToast.success('Registrazione completata! Puoi ora effettuare il login.');
+        setIsSignUp(false);
+        setEmail('');
+        setPassword('');
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Errore durante la registrazione');
+      setEmailConfirmationSent(false);
     }
   };
 
@@ -261,12 +345,44 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
                   </div>
                   
                   {error && (
-                    <div className="text-error text-sm">{error}</div>
+                    <div className="text-error text-sm bg-error/10 border border-error/20 rounded-md p-3">{error}</div>
+                  )}
+                  
+                  {emailConfirmationSent && (
+                    <div className="bg-primary/10 border border-primary/30 rounded-md p-4 text-sm">
+                      <div className="font-semibold text-primary mb-2">📧 Email di conferma inviata!</div>
+                      <div className="text-text-secondary mb-3">
+                        Abbiamo inviato un'email di conferma a <strong>{email}</strong>.
+                        <br />
+                        Controlla la tua casella email e clicca sul link per confermare il tuo account.
+                        <br />
+                        Dopo la conferma, potrai effettuare il login.
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const { error } = await supabase.auth.resend({
+                              type: 'signup',
+                              email: email,
+                            });
+                            if (error) throw error;
+                            showToast.success('Email di conferma inviata di nuovo!');
+                          } catch (error) {
+                            showToast.error('Errore durante l\'invio della email: ' + (error instanceof Error ? error.message : 'Errore sconosciuto'));
+                          }
+                        }}
+                        className="text-primary hover:underline text-xs"
+                      >
+                        Non hai ricevuto l'email? Invia di nuovo
+                      </button>
+                    </div>
                   )}
                   
                   <button
                     type="submit"
                     className="btn btn-primary w-full"
+                    disabled={emailConfirmationSent}
                   >
                     {isSignUp ? 'Registrati' : 'Accedi'}
                   </button>
@@ -274,7 +390,11 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
                 
                 <div className="mt-4 text-center">
                   <button
-                    onClick={() => setIsSignUp(!isSignUp)}
+                    onClick={() => {
+                      setIsSignUp(!isSignUp);
+                      setEmailConfirmationSent(false);
+                      setError('');
+                    }}
                     className="text-primary hover:underline text-sm"
                   >
                     {isSignUp 
@@ -286,7 +406,11 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
                 
                 <div className="mt-4 text-center">
                   <button
-                    onClick={() => setShowAuth(false)}
+                    onClick={() => {
+                      setShowAuth(false);
+                      setEmailConfirmationSent(false);
+                      setError('');
+                    }}
                     className="text-text-secondary hover:underline text-sm"
                   >
                     Torna indietro
