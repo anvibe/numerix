@@ -177,8 +177,54 @@ const SavedCombinationsAnalysis: React.FC = () => {
   const combos = relevantCombinations;
   let sortedExtractions = relevantExtractions;
 
-  // When a specific combination is selected, show ALL extractions (not filtered by save date)
-  // This allows users to see how their combination would have performed against all historical extractions
+  // CRITICAL: When a specific combination is selected, only analyze extractions on or after the combination's save date
+  // This ensures we only show results for extractions that happened after the combination was saved
+  // This is logically correct - you can't compare a combination against past extractions before it existed
+  if (selectedCombinationId !== null) {
+    const selectedCombo = relevantCombinations.find(c => c.id === selectedCombinationId);
+    if (selectedCombo) {
+      const comboDate = new Date(selectedCombo.date);
+      // Reset time to start of day for accurate date comparison
+      comboDate.setHours(0, 0, 0, 0);
+      
+      // Debug logging
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Filtering extractions by combination save date:', {
+          combinationId: selectedCombo.id,
+          combinationDate: selectedCombo.date,
+          combinationDateNormalized: comboDate.toISOString(),
+          totalExtractions: relevantExtractions.length
+        });
+      }
+      
+      sortedExtractions = relevantExtractions.filter(ext => {
+        const extDate = new Date(ext.date);
+        // Reset time to start of day for accurate date comparison
+        extDate.setHours(0, 0, 0, 0);
+        // Only include extractions on or after the combination's save date
+        const shouldInclude = extDate >= comboDate;
+        
+        if (process.env.NODE_ENV === 'development' && !shouldInclude) {
+          console.log('Excluding extraction:', {
+            extractionDate: ext.date,
+            extractionDateNormalized: extDate.toISOString(),
+            combinationDateNormalized: comboDate.toISOString(),
+            comparison: extDate >= comboDate
+          });
+        }
+        
+        return shouldInclude;
+      });
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Filtered extractions:', {
+          before: relevantExtractions.length,
+          after: sortedExtractions.length,
+          filteredOut: relevantExtractions.length - sortedExtractions.length
+        });
+      }
+    }
+  }
 
   const numbersToSelect = gameConfig.numbersToSelect;
   const results: MatchAnalysis[] = [];
@@ -630,7 +676,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
                 {selectedCombo && (
                   <span className="block mt-1 text-xs">
                     📅 Combinazione salvata il: {comboDate} | 
-                    Confronto con tutte le estrazioni disponibili
+                    Mostrate solo estrazioni dal {comboDate} in poi
                   </span>
                 )}
                 <span className="block mt-1 text-xs text-info">
