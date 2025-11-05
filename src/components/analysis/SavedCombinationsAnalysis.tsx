@@ -321,6 +321,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
 
   // Filter by selected combination FIRST (if specified)
   // When a specific combination is selected, show its full comparison across all relevant extractions
+  // IMPORTANT: When a combination is selected, show ALL results (including 0 matches) regardless of difference filter
   let filteredResults: MatchAnalysis[];
   
   if (selectedCombinationId !== null) {
@@ -350,11 +351,9 @@ const SavedCombinationsAnalysis: React.FC = () => {
       return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
     });
     
-    // AFTER showing all results, apply difference filter if specified (for visual filtering)
-    // This allows users to see all results but filter by difference if they want
-    if (filterDifference !== null) {
-      filteredResults = filteredResults.filter(result => result.difference === filterDifference);
-    }
+    // When a combination is selected, show ALL results including 0 matches
+    // The difference filter is ignored when viewing a specific combination
+    // This ensures users can see all results for their selected combination
   } else {
     // No specific combination selected - apply difference filter normally
     filteredResults = filterDifference === null 
@@ -645,9 +644,9 @@ const SavedCombinationsAnalysis: React.FC = () => {
                     Mostrate solo estrazioni dal {comboDate} in poi
                   </span>
                 )}
-                {filterDifference !== null && (
-                  <span className="block mt-1 text-xs"> | Filtro attivo: differenza = {filterDifference}</span>
-                )}
+                <span className="block mt-1 text-xs text-info">
+                  ℹ️ Tutti i risultati sono mostrati (inclusi 0 match) per vedere il confronto completo
+                </span>
               </div>
             </div>
           );
@@ -667,7 +666,18 @@ const SavedCombinationsAnalysis: React.FC = () => {
         
         {filteredResults.length === 0 ? (
           <div className="text-center py-8 text-text-secondary">
-            Nessun risultato trovato con i filtri selezionati.
+            {selectedCombinationId !== null ? (
+              <div>
+                <div className="text-lg font-semibold mb-2">Nessun risultato trovato per questa combinazione</div>
+                <div className="text-sm">
+                  Non ci sono estrazioni disponibili dopo la data di salvataggio di questa combinazione.
+                  <br />
+                  La combinazione verrà confrontata con le estrazioni future quando saranno disponibili.
+                </div>
+              </div>
+            ) : (
+              'Nessun risultato trovato con i filtri selezionati.'
+            )}
           </div>
         ) : (
           filteredResults.slice(0, 10).map((result, index) => {
