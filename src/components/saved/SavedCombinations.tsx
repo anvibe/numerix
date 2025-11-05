@@ -6,24 +6,27 @@ import { getGameByType } from '../../utils/generators';
 import { showToast } from '../../utils/toast';
 
 const SavedCombinations: React.FC = () => {
-  const { savedCombinations, deleteCombination, clearCombinations } = useGame();
+  const { savedCombinations, deleteCombination, selectedGame } = useGame();
+  
+  // Filter combinations by selected game type
+  const filteredCombinations = savedCombinations.filter(combo => combo.gameType === selectedGame);
   
   const handleExportCSV = () => {
-    if (savedCombinations.length === 0) {
+    if (filteredCombinations.length === 0) {
       showToast.error('Non ci sono combinazioni da esportare.');
       return;
     }
     
-    exportToCSV(savedCombinations);
+    exportToCSV(filteredCombinations);
   };
   
   const handleExportPDF = () => {
-    if (savedCombinations.length === 0) {
+    if (filteredCombinations.length === 0) {
       showToast.error('Non ci sono combinazioni da esportare.');
       return;
     }
     
-    exportToPDF(savedCombinations);
+    exportToPDF(filteredCombinations);
   };
   
   const getStrategyDisplay = (combo: typeof savedCombinations[0]) => {
@@ -48,7 +51,7 @@ const SavedCombinations: React.FC = () => {
     return combo.strategy === 'standard' ? 'Standard' : 'Alta Variabilità';
   };
   
-  if (savedCombinations.length === 0) {
+  if (filteredCombinations.length === 0) {
     return (
       <div className="card mb-8">
         <div className="flex items-center mb-4">
@@ -57,7 +60,7 @@ const SavedCombinations: React.FC = () => {
         </div>
         
         <p className="text-text-secondary text-center py-8">
-          Non hai ancora salvato nessuna combinazione.
+          Non hai ancora salvato nessuna combinazione per {getGameByType(selectedGame).name}.
         </p>
       </div>
     );
@@ -68,7 +71,14 @@ const SavedCombinations: React.FC = () => {
       <div className="flex items-center mb-4 justify-between">
         <div className="flex items-center">
           <BookmarkIcon className="h-6 w-6 text-primary mr-3" />
-          <h2 className="text-xl font-semibold">Combinazioni Salvate</h2>
+          <h2 className="text-xl font-semibold">
+            Combinazioni Salvate ({filteredCombinations.length})
+            {savedCombinations.length !== filteredCombinations.length && (
+              <span className="ml-2 text-sm text-text-secondary font-normal">
+                ({savedCombinations.length} totali)
+              </span>
+            )}
+          </h2>
         </div>
         
         <div className="flex space-x-2">
@@ -103,7 +113,7 @@ const SavedCombinations: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {savedCombinations.map((combo) => (
+            {filteredCombinations.map((combo) => (
               <tr 
                 key={combo.id}
                 className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
@@ -166,9 +176,17 @@ const SavedCombinations: React.FC = () => {
         <button
           className="btn btn-outline text-error flex items-center justify-center"
           onClick={() => {
-            if (confirm('Sei sicuro di voler eliminare tutte le combinazioni salvate?')) {
-              clearCombinations().catch((error) => {
-                alert('Errore durante l\'eliminazione: ' + error.message);
+            if (confirm(`Sei sicuro di voler eliminare tutte le ${filteredCombinations.length} combinazioni salvate per ${getGameByType(selectedGame).name}?`)) {
+              // Delete only combinations for current game
+              Promise.all(filteredCombinations.map(combo => 
+                deleteCombination(combo.id).catch(error => {
+                  showToast.error('Errore durante l\'eliminazione: ' + error.message);
+                  throw error;
+                })
+              )).then(() => {
+                showToast.success(`Eliminate ${filteredCombinations.length} combinazioni`);
+              }).catch(() => {
+                // Error already handled in Promise.all
               });
             }
           }}
