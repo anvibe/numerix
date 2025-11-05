@@ -35,6 +35,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
   const [filterEndDate, setFilterEndDate] = useState<string>('');
 
   // Calculate combinations and extractions directly (no memoization to avoid React error #310)
+  // Start with savedCombinations which should already be deduplicated, but apply additional safety checks
   let relevantCombinations = savedCombinations.filter(combo => {
     // Strict filtering by game type
     if (combo.gameType !== selectedGame) return false;
@@ -44,31 +45,34 @@ const SavedCombinationsAnalysis: React.FC = () => {
     return true;
   });
 
-  // Deduplicate combinations by ID first
-  const uniqueCombinationMap = new Map<string, typeof savedCombinations[0]>();
+  // CRITICAL: Final deduplication - ensure absolutely no duplicates by numbers
+  // This is a safety net in case duplicates somehow made it through previous deduplication
+  const finalUniqueNumbersMap = new Map<string, typeof savedCombinations[0]>();
   relevantCombinations.forEach(combo => {
-    if (!uniqueCombinationMap.has(combo.id)) {
-      uniqueCombinationMap.set(combo.id, combo);
+    // Validate numbers array
+    if (!Array.isArray(combo.numbers) || combo.numbers.length === 0) {
+      return; // Skip invalid combinations
     }
-  });
-  relevantCombinations = Array.from(uniqueCombinationMap.values());
-
-  // Also deduplicate by actual numbers (in case same combination saved with different IDs)
-  const uniqueNumbersMap = new Map<string, typeof savedCombinations[0]>();
-  relevantCombinations.forEach(combo => {
+    
     const sortedNumbers = [...combo.numbers].sort((a, b) => a - b);
     const numbersKey = `${sortedNumbers.join(',')}-${combo.gameType}`;
-    if (!uniqueNumbersMap.has(numbersKey)) {
-      uniqueNumbersMap.set(numbersKey, combo);
+    
+    const existing = finalUniqueNumbersMap.get(numbersKey);
+    if (!existing) {
+      // First time seeing this combination, add it
+      finalUniqueNumbersMap.set(numbersKey, combo);
     } else {
-      // Keep the most recent one if duplicate found
-      const existing = uniqueNumbersMap.get(numbersKey)!;
-      if (new Date(combo.date) > new Date(existing.date)) {
-        uniqueNumbersMap.set(numbersKey, combo);
+      // Duplicate found - keep the most recent one
+      const existingDate = new Date(existing.date);
+      const currentDate = new Date(combo.date);
+      if (currentDate > existingDate) {
+        finalUniqueNumbersMap.set(numbersKey, combo);
       }
+      // Otherwise keep the existing one
     }
   });
-  relevantCombinations = Array.from(uniqueNumbersMap.values());
+  
+  relevantCombinations = Array.from(finalUniqueNumbersMap.values());
 
   // Debug: Log to help identify mismatches
   if (process.env.NODE_ENV === 'development') {
@@ -662,6 +666,9 @@ const SavedCombinationsAnalysis: React.FC = () => {
                 Combinazioni salvate per {selectedGame}: {relevantCombinations.length}
                 {filterDifference !== null && (
                   <span> | Filtro attivo: differenza = {filterDifference}</span>
+                )}
+                {process.env.NODE_ENV === 'development' && uniqueByNumbersSet.size !== relevantCombinations.length && (
+                  <span className="text-warning ml-2">⚠️ Duplicati rilevati! Usa "Rimuovi Duplicati" in Combinazioni Salvate</span>
                 )}
               </div>
             </div>
