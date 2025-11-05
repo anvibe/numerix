@@ -696,6 +696,23 @@ const SavedCombinationsAnalysis: React.FC = () => {
 
       {/* Results */}
       <div className="space-y-6">
+        {selectedCombinationId !== null && !selectedExtractionDate && filteredResults.length > 0 && (
+          <div className="mb-4 p-3 bg-info/10 border border-info/20 rounded-md">
+            <div className="font-medium text-info mb-1">
+              🔍 Combinazione selezionata: Analisi completa
+            </div>
+            <div className="text-sm text-text-secondary">
+              Mostrate tutte le estrazioni per questa combinazione ({filteredResults.length} risultati)
+              {filterDifference !== null && (
+                <span> | Filtro attivo: differenza = {filterDifference}</span>
+              )}
+            </div>
+            <div className="text-xs text-text-secondary mt-1">
+              Seleziona una data specifica per vedere solo quella estrazione
+            </div>
+          </div>
+        )}
+        
         {selectedExtractionDate && filteredResults.length > 0 && (() => {
           // Count unique combinations by numbers (not IDs) in filtered results
           const uniqueComboKeys = new Set<string>();
