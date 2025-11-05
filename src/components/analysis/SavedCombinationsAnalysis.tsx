@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Target, AlertCircle, Lightbulb, CheckCircle2, XCircle, Calendar } from 'lucide-react';
+import { Target, AlertCircle, Lightbulb, CheckCircle2, XCircle } from 'lucide-react';
 import { useGame } from '../../context/GameContext';
 import { GeneratedCombination, ExtractedNumbers, LottoWheel } from '../../types';
 import NumberBubble from '../common/NumberBubble';
@@ -30,7 +30,6 @@ const SavedCombinationsAnalysis: React.FC = () => {
   const [filterDifference, setFilterDifference] = useState<number | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [selectedCombinationId, setSelectedCombinationId] = useState<string | null>(null);
-  const [selectedExtractionDate, setSelectedExtractionDate] = useState<string | null>(null);
   const [filterStartDate, setFilterStartDate] = useState<string>('');
   const [filterEndDate, setFilterEndDate] = useState<string>('');
 
@@ -45,16 +44,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
     return true;
   });
 
-  // CRITICAL: When a specific extraction date is selected, only show combinations saved on or before that date
-  // This ensures users only see combinations that existed when that extraction happened
-  if (selectedExtractionDate) {
-    const extractionDate = new Date(selectedExtractionDate);
-    relevantCombinations = relevantCombinations.filter(combo => {
-      const comboDate = new Date(combo.date);
-      // Only include combinations saved on or before the extraction date
-      return comboDate <= extractionDate;
-    });
-  }
+  // When a specific combination is selected, we'll filter extractions by the combination's save date later
 
   // CRITICAL: Final deduplication - ensure absolutely no duplicates by numbers
   // This is a safety net in case duplicates somehow made it through previous deduplication
@@ -113,7 +103,6 @@ const SavedCombinationsAnalysis: React.FC = () => {
       relevantUniqueByNumbers: relevantUniqueSet.size,
       duplicatesInContext: savedCombinations.filter(c => c.gameType === selectedGame).length - savedUniqueSet.size,
       duplicatesAfterDedup: relevantCombinations.length - relevantUniqueSet.size,
-      selectedExtractionDate,
       recommendation: relevantUniqueSet.size < relevantCombinations.length 
         ? '⚠️ Use "Rimuovi Duplicati" button to clean database!' 
         : relevantUniqueSet.size === savedUniqueSet.size 
@@ -188,9 +177,18 @@ const SavedCombinationsAnalysis: React.FC = () => {
   const combos = relevantCombinations;
   let sortedExtractions = relevantExtractions;
 
-  // Filter by selected extraction if specified
-  if (selectedExtractionDate) {
-    sortedExtractions = sortedExtractions.filter(ext => ext.date === selectedExtractionDate);
+  // CRITICAL: When a specific combination is selected, only analyze extractions on or after the combination's save date
+  // This ensures we only show results for extractions that happened after the combination was saved
+  if (selectedCombinationId !== null) {
+    const selectedCombo = relevantCombinations.find(c => c.id === selectedCombinationId);
+    if (selectedCombo) {
+      const comboDate = new Date(selectedCombo.date);
+      sortedExtractions = relevantExtractions.filter(ext => {
+        const extDate = new Date(ext.date);
+        // Only include extractions on or after the combination's save date
+        return extDate >= comboDate;
+      });
+    }
   }
 
   const numbersToSelect = gameConfig.numbersToSelect;
@@ -322,43 +320,40 @@ const SavedCombinationsAnalysis: React.FC = () => {
   });
 
   // Filter by selected combination FIRST (if specified)
-  // When a specific combination is selected, show its full comparison across all extractions
+  // When a specific combination is selected, show its full comparison across all relevant extractions
   let filteredResults: MatchAnalysis[];
   
   if (selectedCombinationId !== null) {
     filteredResults = analysisResults.filter(result => result.savedCombination.id === selectedCombinationId);
     
     // When a specific combination is selected, show only one result per extraction date (best match)
-    // unless a specific extraction date is also selected
-    if (!selectedExtractionDate) {
-      // Group by extraction date and keep best match for each extraction
-      const bestByExtraction = new Map<string, MatchAnalysis>();
-      filteredResults.forEach(result => {
-        const extDate = result.extraction.date;
-        const existing = bestByExtraction.get(extDate);
-        
-        // Keep the result with the best match for this extraction
-        if (!existing || 
-            result.matchCount > existing.matchCount ||
-            (result.matchCount === existing.matchCount && 
-             new Date(result.extraction.date) > new Date(existing.extraction.date))) {
-          bestByExtraction.set(extDate, result);
-        }
-      });
+    // Group by extraction date and keep best match for each extraction
+    const bestByExtraction = new Map<string, MatchAnalysis>();
+    filteredResults.forEach(result => {
+      const extDate = result.extraction.date;
+      const existing = bestByExtraction.get(extDate);
       
-      filteredResults = Array.from(bestByExtraction.values()).sort((a, b) => {
-        // Sort by match count (best first), then by date (most recent first)
-        if (b.matchCount !== a.matchCount) {
-          return b.matchCount - a.matchCount;
-        }
-        return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
-      });
-      
-      // AFTER showing all results, apply difference filter if specified (for visual filtering)
-      // This allows users to see all results but filter by difference if they want
-      if (filterDifference !== null) {
-        filteredResults = filteredResults.filter(result => result.difference === filterDifference);
+      // Keep the result with the best match for this extraction
+      if (!existing || 
+          result.matchCount > existing.matchCount ||
+          (result.matchCount === existing.matchCount && 
+           new Date(result.extraction.date) > new Date(existing.extraction.date))) {
+        bestByExtraction.set(extDate, result);
       }
+    });
+    
+    filteredResults = Array.from(bestByExtraction.values()).sort((a, b) => {
+      // Sort by match count (best first), then by date (most recent first)
+      if (b.matchCount !== a.matchCount) {
+        return b.matchCount - a.matchCount;
+      }
+      return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
+    });
+    
+    // AFTER showing all results, apply difference filter if specified (for visual filtering)
+    // This allows users to see all results but filter by difference if they want
+    if (filterDifference !== null) {
+      filteredResults = filteredResults.filter(result => result.difference === filterDifference);
     }
   } else {
     // No specific combination selected - apply difference filter normally
@@ -366,16 +361,10 @@ const SavedCombinationsAnalysis: React.FC = () => {
       ? analysisResults 
       : analysisResults.filter(result => result.difference === filterDifference);
   }
-  
-  // CRITICAL: Filter by selected extraction date FIRST, before deduplication
-  // This ensures only results for the selected extraction are shown
-  if (selectedExtractionDate) {
-    filteredResults = filteredResults.filter(result => result.extraction.date === selectedExtractionDate);
-  }
 
-  // If filtering by difference but NOT by a specific extraction or combination,
+  // If filtering by difference but NOT by a specific combination,
   // deduplicate to show each saved combination only once (best match)
-  if (filterDifference !== null && selectedCombinationId === null && selectedExtractionDate === null) {
+  if (filterDifference !== null && selectedCombinationId === null) {
     const uniqueCombinations = new Map<string, MatchAnalysis>();
     
     filteredResults.forEach(result => {
@@ -399,12 +388,9 @@ const SavedCombinationsAnalysis: React.FC = () => {
     });
   }
 
-  // When viewing a specific extraction, ensure we only show relevant combinations
-  // and verify they match the saved combinations, and deduplicate by combination ID AND numbers
-  if (selectedExtractionDate) {
-    // Ensure ALL results are for the selected extraction date
-    filteredResults = filteredResults.filter(result => result.extraction.date === selectedExtractionDate);
-    
+  // When a specific combination is selected, ensure we only show results for extractions >= combination save date
+  // This is already handled in the extraction filtering above, but ensure deduplication works correctly
+  if (selectedCombinationId !== null) {
     // Create a set of valid combination number keys (deduplicated)
     const validCombinationKeys = new Set<string>();
     relevantCombinations.forEach(combo => {
@@ -416,11 +402,6 @@ const SavedCombinationsAnalysis: React.FC = () => {
     // Deduplicate by combination ID first
     const uniqueByIdMap = new Map<string, MatchAnalysis>();
     filteredResults.forEach(result => {
-      // Double-check extraction date matches
-      if (result.extraction.date !== selectedExtractionDate) {
-        return; // Skip if date doesn't match
-      }
-      
       const comboId = result.savedCombination.id;
       const existing = uniqueByIdMap.get(comboId);
       
@@ -434,11 +415,6 @@ const SavedCombinationsAnalysis: React.FC = () => {
     // AND filter to only include valid saved combinations
     const uniqueByNumbersMap = new Map<string, MatchAnalysis>();
     Array.from(uniqueByIdMap.values()).forEach(result => {
-      // Final check: ensure extraction date matches
-      if (result.extraction.date !== selectedExtractionDate) {
-        return; // Skip if date doesn't match
-      }
-      
       const sortedNumbers = [...result.savedCombination.numbers].sort((a, b) => a - b);
       const numbersKey = `${sortedNumbers.join(',')}-${result.savedCombination.gameType}`;
       
@@ -453,36 +429,12 @@ const SavedCombinationsAnalysis: React.FC = () => {
       }
     });
     
-    filteredResults = Array.from(uniqueByNumbersMap.values())
-      .filter(result => result.extraction.date === selectedExtractionDate) // Final safety check
-      .sort((a, b) => {
-        if (b.matchCount !== a.matchCount) {
-          return b.matchCount - a.matchCount;
-        }
-        return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
-      });
-    
-    // Debug warning if mismatch detected
-    if (process.env.NODE_ENV === 'development') {
-      console.log('After extraction deduplication:', {
-        beforeFilter: Array.from(uniqueByIdMap.values()).length,
-        afterIdDedup: uniqueByIdMap.size,
-        afterNumbersDedup: uniqueByNumbersMap.size,
-        savedUniqueCount: validCombinationKeys.size,
-        savedTotalCount: relevantCombinations.length,
-        resultIds: Array.from(uniqueByNumbersMap.values()).slice(0, 10).map(r => r.savedCombination.id.slice(0, 8)),
-        savedKeys: Array.from(validCombinationKeys).slice(0, 10),
-        mismatch: uniqueByNumbersMap.size !== validCombinationKeys.size
-      });
-      
-      if (uniqueByNumbersMap.size !== validCombinationKeys.size) {
-        console.warn('Mismatch detected after deduplication:', {
-          uniqueResultCount: uniqueByNumbersMap.size,
-          savedUniqueCount: validCombinationKeys.size,
-          difference: uniqueByNumbersMap.size - validCombinationKeys.size
-        });
+    filteredResults = Array.from(uniqueByNumbersMap.values()).sort((a, b) => {
+      if (b.matchCount !== a.matchCount) {
+        return b.matchCount - a.matchCount;
       }
-    }
+      return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
+    });
   }
 
   if (relevantCombinations.length === 0) {
@@ -601,30 +553,8 @@ const SavedCombinationsAnalysis: React.FC = () => {
         )}
       </div>
 
-      {/* Date Filters and Extraction Selector */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        {/* Filter by Extraction Date */}
-        {relevantExtractions.length > 0 && (
-          <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">
-              <Calendar className="h-4 w-4 inline mr-1" />
-              Seleziona Estrazione
-            </label>
-            <select
-              value={selectedExtractionDate || ''}
-              onChange={(e) => setSelectedExtractionDate(e.target.value === '' ? null : e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-bg-primary"
-            >
-              <option value="">Tutte le estrazioni</option>
-              {relevantExtractions.map((ext) => (
-                <option key={ext.date} value={ext.date}>
-                  {new Date(ext.date).toLocaleDateString('it-IT')}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
+      {/* Date Range Filters */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         {/* Start Date Filter */}
         <div>
           <label className="block text-sm font-medium text-text-secondary mb-2">
@@ -698,76 +628,32 @@ const SavedCombinationsAnalysis: React.FC = () => {
 
       {/* Results */}
       <div className="space-y-6">
-        {selectedCombinationId !== null && !selectedExtractionDate && filteredResults.length > 0 && (
-          <div className="mb-4 p-3 bg-info/10 border border-info/20 rounded-md">
-            <div className="font-medium text-info mb-1">
-              🔍 Combinazione selezionata: Analisi completa
-            </div>
-            <div className="text-sm text-text-secondary">
-              Mostrate tutte le estrazioni per questa combinazione ({filteredResults.length} risultati)
-              {filterDifference !== null && (
-                <span> | Filtro attivo: differenza = {filterDifference}</span>
-              )}
-            </div>
-            <div className="text-xs text-text-secondary mt-1">
-              Seleziona una data specifica per vedere solo quella estrazione
-            </div>
-          </div>
-        )}
-        
-        {selectedExtractionDate && filteredResults.length > 0 && (() => {
-          // Count unique combinations by numbers (not IDs) in filtered results
-          const uniqueComboKeys = new Set<string>();
-          filteredResults.forEach(result => {
-            const sortedNumbers = [...result.savedCombination.numbers].sort((a, b) => a - b);
-            const numbersKey = `${sortedNumbers.join(',')}-${result.savedCombination.gameType}`;
-            uniqueComboKeys.add(numbersKey);
-          });
-          const uniqueCount = uniqueComboKeys.size;
-          
-          // Verify if relevantCombinations has duplicates
-          const relevantUniqueSet = new Set<string>();
-          relevantCombinations.forEach(combo => {
-            const sortedNumbers = [...combo.numbers].sort((a, b) => a - b);
-            const numbersKey = `${sortedNumbers.join(',')}-${combo.gameType}`;
-            relevantUniqueSet.add(numbersKey);
-          });
-          const hasDuplicates = relevantUniqueSet.size !== relevantCombinations.length;
+        {selectedCombinationId !== null && filteredResults.length > 0 && (() => {
+          const selectedCombo = relevantCombinations.find(c => c.id === selectedCombinationId);
+          const comboDate = selectedCombo ? new Date(selectedCombo.date).toLocaleDateString('it-IT') : '';
           
           return (
-            <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-md">
-              <div className="font-medium text-primary mb-1">
-                📅 Estrazione selezionata: {new Date(selectedExtractionDate).toLocaleDateString('it-IT')}
+            <div className="mb-4 p-3 bg-info/10 border border-info/20 rounded-md">
+              <div className="font-medium text-info mb-1">
+                🔍 Combinazione selezionata: Analisi completa
               </div>
               <div className="text-sm text-text-secondary">
-                Mostrate {uniqueCount} combinazioni uniche per questa estrazione
-                {filteredResults.length !== uniqueCount && (
-                  <span className="text-xs text-warning ml-2">
-                    ({filteredResults.length} risultati totali dopo deduplicazione)
-                  </span>
-                )}
-              </div>
-              <div className="text-xs text-text-secondary mt-1">
-                Combinazioni analizzate: {uniqueCount} uniche per questa estrazione
-                {relevantUniqueSet.size !== uniqueCount && (
-                  <span className="text-secondary ml-2">
-                    (su {relevantUniqueSet.size} totali salvate per {selectedGame})
-                  </span>
-                )}
-                {hasDuplicates && (
-                  <span className="text-warning ml-2 block mt-1">
-                    ⚠️ Rilevati duplicati nel database - usa "Rimuovi Duplicati" per pulire
+                Mostrate tutte le estrazioni per questa combinazione ({filteredResults.length} risultati)
+                {selectedCombo && (
+                  <span className="block mt-1 text-xs">
+                    📅 Combinazione salvata il: {comboDate} | 
+                    Mostrate solo estrazioni dal {comboDate} in poi
                   </span>
                 )}
                 {filterDifference !== null && (
-                  <span> | Filtro attivo: differenza = {filterDifference}</span>
+                  <span className="block mt-1 text-xs"> | Filtro attivo: differenza = {filterDifference}</span>
                 )}
               </div>
             </div>
           );
         })()}
         
-        {filterDifference !== null && selectedCombinationId === null && selectedExtractionDate === null && filteredResults.length > 0 && (
+        {filterDifference !== null && selectedCombinationId === null && filteredResults.length > 0 && (
           <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-md">
             <div className="font-medium text-primary mb-1">
               ℹ️ Filtro attivo: Mostrate {filteredResults.length} combinazioni uniche (miglior match per combinazione)
@@ -784,7 +670,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
             Nessun risultato trovato con i filtri selezionati.
           </div>
         ) : (
-          filteredResults.slice(0, selectedExtractionDate ? filteredResults.length : 10).map((result, index) => {
+          filteredResults.slice(0, 10).map((result, index) => {
             const { savedCombination, extraction, matches, matchCount, missingNumbers, difference, suggestions } = result;
             
             // Highlight very recent extractions (last 7 days)
@@ -966,7 +852,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
         )}
       </div>
 
-      {filteredResults.length > 10 && !selectedExtractionDate && (
+      {filteredResults.length > 10 && (
         <div className="mt-4 text-center text-sm text-text-secondary">
           Mostrati i primi 10 risultati su {filteredResults.length} totali
         </div>
