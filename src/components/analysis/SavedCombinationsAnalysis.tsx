@@ -30,8 +30,6 @@ const SavedCombinationsAnalysis: React.FC = () => {
   const [filterDifference, setFilterDifference] = useState<number | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [selectedCombinationId, setSelectedCombinationId] = useState<string | null>(null);
-  const [filterStartDate, setFilterStartDate] = useState<string>('');
-  const [filterEndDate, setFilterEndDate] = useState<string>('');
 
   // Calculate combinations and extractions directly (no memoization to avoid React error #310)
   // Start with savedCombinations which should already be deduplicated, but apply additional safety checks
@@ -143,18 +141,6 @@ const SavedCombinationsAnalysis: React.FC = () => {
   });
   relevantExtractions = Array.from(uniqueExtractionDates.values())
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-  // Apply date filters
-  if (filterStartDate) {
-    relevantExtractions = relevantExtractions.filter(ext => 
-      new Date(ext.date) >= new Date(filterStartDate)
-    );
-  }
-  if (filterEndDate) {
-    relevantExtractions = relevantExtractions.filter(ext => 
-      new Date(ext.date) <= new Date(filterEndDate)
-    );
-  }
 
   // Analyze matches between saved combinations and extractions
   // Calculate directly without useMemo to avoid React error #310
@@ -587,35 +573,6 @@ const SavedCombinationsAnalysis: React.FC = () => {
         )}
       </div>
 
-      {/* Date Range Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        {/* Start Date Filter */}
-        <div>
-          <label className="block text-sm font-medium text-text-secondary mb-2">
-            Data Inizio
-          </label>
-          <input
-            type="date"
-            value={filterStartDate}
-            onChange={(e) => setFilterStartDate(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-bg-primary"
-          />
-        </div>
-
-        {/* End Date Filter */}
-        <div>
-          <label className="block text-sm font-medium text-text-secondary mb-2">
-            Data Fine
-          </label>
-          <input
-            type="date"
-            value={filterEndDate}
-            onChange={(e) => setFilterEndDate(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-bg-primary"
-          />
-        </div>
-      </div>
-
       {/* Statistics Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-bg-secondary rounded-lg p-4">
@@ -940,21 +897,6 @@ const SavedCombinationsAnalysis: React.FC = () => {
       {filteredResults.length > 10 && (
         <div className="mt-4 text-center text-sm text-text-secondary">
           Mostrati i primi 10 risultati su {filteredResults.length} totali
-        </div>
-      )}
-      
-      {/* Clear Date Filters Button */}
-      {(filterStartDate || filterEndDate) && (
-        <div className="mt-4 text-center">
-          <button
-            onClick={() => {
-              setFilterStartDate('');
-              setFilterEndDate('');
-            }}
-            className="btn btn-outline btn-sm"
-          >
-            Cancella filtri data
-          </button>
         </div>
       )}
     </div>

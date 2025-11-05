@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookmarkIcon, Download, Trash2, FileText, Save } from 'lucide-react';
+import { BookmarkIcon, Download, Trash2, FileText, Save, Sparkles } from 'lucide-react';
 import { useGame } from '../../context/GameContext';
 import { exportToCSV, exportToPDF } from '../../utils/exportUtils';
 import { getGameByType } from '../../utils/generators';
@@ -37,6 +37,16 @@ const SavedCombinations: React.FC = () => {
     }
   });
   filteredCombinations = Array.from(uniqueNumbersMap.values());
+  
+  // Sort combinations by date (newest first) - latest saved combination will be first
+  filteredCombinations.sort((a, b) => {
+    const dateA = new Date(a.date).getTime();
+    const dateB = new Date(b.date).getTime();
+    return dateB - dateA; // Descending order (newest first)
+  });
+  
+  // Get the latest saved combination (first in sorted array)
+  const latestCombination = filteredCombinations.length > 0 ? filteredCombinations[0] : null;
   
   const handleExportCSV = () => {
     if (filteredCombinations.length === 0) {
@@ -139,6 +149,53 @@ const SavedCombinations: React.FC = () => {
         </div>
       </div>
       
+      {/* Latest Saved Combination Highlight */}
+      {latestCombination && (
+        <div className="mb-6 p-4 bg-primary/10 border-2 border-primary/30 rounded-lg">
+          <div className="flex items-center mb-3">
+            <Sparkles className="h-5 w-5 text-primary mr-2" />
+            <h3 className="text-lg font-semibold text-primary">Ultima Combinazione Salvata</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div className="text-sm text-text-secondary mb-2">Numeri:</div>
+              <div className="flex flex-wrap gap-1.5">
+                {latestCombination.numbers.map((number, i) => (
+                  <span 
+                    key={i} 
+                    className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white text-sm font-medium"
+                  >
+                    {number}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {latestCombination.jolly && (
+                <div>
+                  <div className="text-sm text-text-secondary mb-2">Jolly:</div>
+                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 text-white text-sm font-medium">
+                    {latestCombination.jolly}
+                  </span>
+                </div>
+              )}
+              {latestCombination.superstar && (
+                <div>
+                  <div className="text-sm text-text-secondary mb-2">SuperStar:</div>
+                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-secondary text-white text-sm font-medium">
+                    {latestCombination.superstar}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="mt-3 text-sm text-text-secondary">
+            <span className="font-medium">Data:</span> {new Date(latestCombination.date).toLocaleDateString('it-IT')} | 
+            <span className="font-medium ml-2">Strategia:</span> {getStrategyDisplay(latestCombination)}
+          </div>
+        </div>
+      )}
+      
       <div className="overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
@@ -153,13 +210,20 @@ const SavedCombinations: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredCombinations.map((combo) => (
+            {filteredCombinations.map((combo, index) => {
+              const isLatest = index === 0; // First item is the latest
+              return (
               <tr 
                 key={combo.id}
-                className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                className={`hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${isLatest ? 'bg-primary/5 border-l-4 border-primary' : ''}`}
               >
                 <td className="py-3 px-4 border-b border-gray-200 dark:border-gray-700">
-                  {getGameByType(combo.gameType).name}
+                  <div className="flex items-center">
+                    {getGameByType(combo.gameType).name}
+                    {isLatest && (
+                      <Sparkles className="h-4 w-4 text-primary ml-2" title="Ultima combinazione salvata" />
+                    )}
+                  </div>
                 </td>
                 <td className="py-3 px-4 border-b border-gray-200 dark:border-gray-700">
                   <div className="flex flex-wrap gap-1.5">
