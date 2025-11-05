@@ -226,6 +226,32 @@ const SavedCombinationsAnalysis: React.FC = () => {
     filteredResults = filteredResults.filter(result => result.savedCombination.id === selectedCombinationId);
   }
 
+  // If filtering by difference but NOT by a specific extraction or combination,
+  // deduplicate to show each saved combination only once (best match)
+  if (filterDifference !== null && selectedCombinationId === null && selectedExtractionDate === null) {
+    const uniqueCombinations = new Map<string, MatchAnalysis>();
+    
+    filteredResults.forEach(result => {
+      const comboId = result.savedCombination.id;
+      const existing = uniqueCombinations.get(comboId);
+      
+      // Keep the result with the best match (lowest difference, or if same difference, most recent)
+      if (!existing || 
+          result.matchCount > existing.matchCount ||
+          (result.matchCount === existing.matchCount && 
+           new Date(result.extraction.date) > new Date(existing.extraction.date))) {
+        uniqueCombinations.set(comboId, result);
+      }
+    });
+    
+    filteredResults = Array.from(uniqueCombinations.values()).sort((a, b) => {
+      if (b.matchCount !== a.matchCount) {
+        return b.matchCount - a.matchCount;
+      }
+      return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
+    });
+  }
+
   if (relevantCombinations.length === 0) {
     return (
       <div className="card mb-8">
@@ -450,6 +476,18 @@ const SavedCombinationsAnalysis: React.FC = () => {
           </div>
         )}
         
+        {filterDifference !== null && selectedCombinationId === null && selectedExtractionDate === null && filteredResults.length > 0 && (
+          <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-md">
+            <div className="font-medium text-primary mb-1">
+              ℹ️ Filtro attivo: Mostrate {filteredResults.length} combinazioni uniche (miglior match per combinazione)
+            </div>
+            <div className="text-sm text-text-secondary">
+              Totale combinazioni salvate: {relevantCombinations.length} | 
+              Totale estrazioni: {relevantExtractions.length}
+            </div>
+          </div>
+        )}
+        
         {filteredResults.length === 0 ? (
           <div className="text-center py-8 text-text-secondary">
             Nessun risultato trovato con i filtri selezionati.
@@ -516,6 +554,9 @@ const SavedCombinationsAnalysis: React.FC = () => {
                   <div>
                     <div className="text-sm font-medium text-text-secondary mb-2">
                       Tua Combinazione Salvata:
+                      <span className="ml-2 text-xs text-text-secondary opacity-70">
+                        (ID: {savedCombination.id.slice(0, 8)}...)
+                      </span>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {savedCombination.numbers.map((num) => {
