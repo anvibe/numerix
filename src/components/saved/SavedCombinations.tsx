@@ -9,7 +9,33 @@ const SavedCombinations: React.FC = () => {
   const { savedCombinations, deleteCombination, selectedGame } = useGame();
   
   // Filter combinations by selected game type
-  const filteredCombinations = savedCombinations.filter(combo => combo.gameType === selectedGame);
+  let filteredCombinations = savedCombinations.filter(combo => combo.gameType === selectedGame);
+  
+  // Deduplicate by ID first
+  const uniqueByIdMap = new Map<string, typeof savedCombinations[0]>();
+  filteredCombinations.forEach(combo => {
+    if (!uniqueByIdMap.has(combo.id)) {
+      uniqueByIdMap.set(combo.id, combo);
+    }
+  });
+  filteredCombinations = Array.from(uniqueByIdMap.values());
+  
+  // Also deduplicate by actual numbers (in case same combination saved with different IDs)
+  const uniqueNumbersMap = new Map<string, typeof savedCombinations[0]>();
+  filteredCombinations.forEach(combo => {
+    const sortedNumbers = [...combo.numbers].sort((a, b) => a - b);
+    const numbersKey = `${sortedNumbers.join(',')}-${combo.gameType}`;
+    if (!uniqueNumbersMap.has(numbersKey)) {
+      uniqueNumbersMap.set(numbersKey, combo);
+    } else {
+      // Keep the most recent one if duplicate found
+      const existing = uniqueNumbersMap.get(numbersKey)!;
+      if (new Date(combo.date) > new Date(existing.date)) {
+        uniqueNumbersMap.set(numbersKey, combo);
+      }
+    }
+  });
+  filteredCombinations = Array.from(uniqueNumbersMap.values());
   
   const handleExportCSV = () => {
     if (filteredCombinations.length === 0) {

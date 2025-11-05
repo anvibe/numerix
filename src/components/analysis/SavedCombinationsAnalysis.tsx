@@ -44,7 +44,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
     return true;
   });
 
-  // Deduplicate combinations by ID to avoid processing duplicates
+  // Deduplicate combinations by ID first
   const uniqueCombinationMap = new Map<string, typeof savedCombinations[0]>();
   relevantCombinations.forEach(combo => {
     if (!uniqueCombinationMap.has(combo.id)) {
@@ -53,11 +53,29 @@ const SavedCombinationsAnalysis: React.FC = () => {
   });
   relevantCombinations = Array.from(uniqueCombinationMap.values());
 
+  // Also deduplicate by actual numbers (in case same combination saved with different IDs)
+  const uniqueNumbersMap = new Map<string, typeof savedCombinations[0]>();
+  relevantCombinations.forEach(combo => {
+    const sortedNumbers = [...combo.numbers].sort((a, b) => a - b);
+    const numbersKey = `${sortedNumbers.join(',')}-${combo.gameType}`;
+    if (!uniqueNumbersMap.has(numbersKey)) {
+      uniqueNumbersMap.set(numbersKey, combo);
+    } else {
+      // Keep the most recent one if duplicate found
+      const existing = uniqueNumbersMap.get(numbersKey)!;
+      if (new Date(combo.date) > new Date(existing.date)) {
+        uniqueNumbersMap.set(numbersKey, combo);
+      }
+    }
+  });
+  relevantCombinations = Array.from(uniqueNumbersMap.values());
+
   // Debug: Log to help identify mismatches
   if (process.env.NODE_ENV === 'development') {
     console.log('Analysis Debug:', {
       selectedGame,
       totalSavedCombinations: savedCombinations.length,
+      relevantBeforeDedup: savedCombinations.filter(c => c.gameType === selectedGame).length,
       relevantCombinationsCount: relevantCombinations.length,
       relevantCombinationIds: relevantCombinations.map(c => c.id.slice(0, 8)),
       duplicatesRemoved: savedCombinations.filter(c => c.gameType === selectedGame).length - relevantCombinations.length
