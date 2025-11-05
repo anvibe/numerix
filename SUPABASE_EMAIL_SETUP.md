@@ -21,14 +21,33 @@ If users are not receiving email confirmation emails, check the following Supaba
 <p><a href="{{ .ConfirmationURL }}">Confirm your mail</a></p>
 ```
 
-## 2. Enable Email Confirmation
+## 2. Enable Email Confirmation (CRITICAL)
+
+This is a **separate setting** from "Enable Email provider". Both must be enabled!
 
 1. Go to **Authentication** → **Settings**
-2. Under **User Management**:
-   - ✅ Ensure **Enable email confirmations** is checked
-   - ✅ Ensure **Enable email signup** is checked
-3. Under **Email Auth**:
-   - ✅ Ensure **Enable email confirmations** is ON
+2. Scroll down to find **Email Auth** section (or **User Management** section)
+3. Look for **"Enable email confirmations"** toggle/checkbox
+   - ⚠️ **This is DIFFERENT from "Enable Email provider"**
+   - ✅ **Enable Email provider** = Allows users to sign up/login with email
+   - ✅ **Enable email confirmations** = Requires users to confirm email before accessing app
+4. Ensure both are checked:
+   - ✅ **Enable Email provider** - ON
+   - ✅ **Enable email confirmations** - ON
+
+### If you don't see "Enable email confirmations" option:
+
+Some Supabase projects have this setting in a different location:
+1. Check **Authentication** → **Email Templates** → Settings
+2. Check **Authentication** → **Policies** → Email confirmation
+3. Check **Settings** → **Auth** → **Email Auth** section
+4. Look for any toggle related to "email verification" or "email confirmation"
+
+### Quick Test:
+After enabling, try signing up a new user. If emails still don't arrive:
+- Check Supabase Dashboard → **Logs** → **Auth Logs** for errors
+- Check if there's a rate limit message
+- Verify SMTP configuration (if using custom SMTP)
 
 ## 3. Configure Email Provider
 

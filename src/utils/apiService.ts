@@ -1,3 +1,28 @@
+// Extraction sync service
+export class ExtractionSyncService {
+  static async syncExtractions(gameType?: 'superenalotto' | 'lotto' | '10elotto' | 'millionday' | 'all') {
+    try {
+      const endpoint = gameType && gameType !== 'all' 
+        ? `/sync/sync-all?gameType=${gameType}`
+        : '/sync/sync-all';
+      
+      const response = await ApiService.get(endpoint);
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to sync extractions:', error);
+      throw error;
+    }
+  }
+  
+  static async syncAllGames() {
+    return this.syncExtractions('all');
+  }
+  
+  static async syncSuperEnalotto() {
+    return this.syncExtractions('superenalotto');
+  }
+}
+
 // API Service utility for handling backend communications
 export class ApiService {
   private static baseUrl = '/api';

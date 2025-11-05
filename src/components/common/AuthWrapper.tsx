@@ -249,7 +249,22 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
       });
       
       if (error) {
+        console.error('Signup error:', error);
         throw error;
+      }
+      
+      console.log('Signup response:', { 
+        hasUser: !!data.user, 
+        hasSession: !!data.session,
+        emailConfirmed: data.user?.email_confirmed_at,
+        email: data.user?.email,
+        userId: data.user?.id
+      });
+      
+      // Check if email confirmation is required but user was auto-confirmed
+      // This happens when "Enable email confirmations" is OFF in Supabase
+      if (data.user && data.user.email_confirmed_at && !data.session) {
+        console.warn('User was auto-confirmed without email confirmation. This means "Enable email confirmations" is disabled in Supabase.');
       }
       
       // CRITICAL: Immediately sign out to prevent auto-login
@@ -273,9 +288,19 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
       
       // Check if user was created
       if (data.user) {
-        // Always show confirmation message - email confirmation is required
-        setEmailConfirmationSent(true);
-        showToast.success('Registrazione completata! Controlla la tua casella email per confermare il tuo account.');
+        // Check if email was already confirmed (means email confirmation is disabled in Supabase)
+        if (data.user.email_confirmed_at) {
+          console.warn('⚠️ Email confirmation is DISABLED in Supabase. User was auto-confirmed.');
+          setError('⚠️ Email confirmation non è abilitata in Supabase. Controlla le impostazioni di autenticazione.');
+          // Still show confirmation message but warn user
+          setEmailConfirmationSent(true);
+        } else {
+          // Email confirmation is enabled - normal flow
+          console.log('✅ Email confirmation enabled. User must confirm email.');
+          setEmailConfirmationSent(true);
+          showToast.success('Registrazione completata! Controlla la tua casella email per confermare il tuo account.');
+        }
+        
         // Clear password but keep email so user can see where confirmation was sent
         setPassword('');
         
@@ -284,6 +309,7 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
         setIsSignUp(true);
       } else {
         // This shouldn't happen, but handle it
+        console.error('No user returned from signup');
         setError('Errore durante la registrazione. Riprova.');
       }
     } catch (error) {

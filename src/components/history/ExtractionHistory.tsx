@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { History, Filter, Plus, Upload } from 'lucide-react';
+import { History, Filter, Plus, Upload, RefreshCw } from 'lucide-react';
 import { useGame } from '../../context/GameContext';
 import NumberBubble from '../common/NumberBubble';
 import { LottoWheel } from '../../types';
 import AddExtractionForm from './AddExtractionForm';
 import CSVUploader from './CSVUploader';
+import { ExtractionSyncService } from '../../utils/apiService';
+import { showToast } from '../../utils/toast';
 
 const ExtractionHistory: React.FC = () => {
   const { selectedGame, gameConfig, extractionsData } = useGame();
@@ -12,9 +14,36 @@ const ExtractionHistory: React.FC = () => {
   const [selectedWheel, setSelectedWheel] = useState<LottoWheel>('Bari');
   const [showAddForm, setShowAddForm] = useState(false);
   const [showCSVUploader, setShowCSVUploader] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   
   const extractions = extractionsData[selectedGame];
   const displayExtractions = extractions.slice(0, limit);
+  
+  const handleSync = async () => {
+    setIsSyncing(true);
+    try {
+      const result = await ExtractionSyncService.syncExtractions(selectedGame);
+      
+      if (result.success) {
+        showToast.success(
+          result.new > 0
+            ? `Sincronizzazione completata! ${result.new} nuove estrazioni aggiunte.`
+            : result.message || 'Sincronizzazione completata. Nessuna nuova estrazione trovata.'
+        );
+        
+        // Reload extractions from context
+        // The context will automatically reload from Supabase
+        window.location.reload();
+      } else {
+        showToast.error(result.message || 'Errore durante la sincronizzazione');
+      }
+    } catch (error) {
+      console.error('Sync error:', error);
+      showToast.error('Errore durante la sincronizzazione: ' + (error instanceof Error ? error.message : 'Errore sconosciuto'));
+    } finally {
+      setIsSyncing(false);
+    }
+  };
   
   return (
     <div className="card mb-8">
@@ -25,6 +54,16 @@ const ExtractionHistory: React.FC = () => {
         </div>
         
         <div className="flex space-x-2">
+          <button
+            onClick={handleSync}
+            disabled={isSyncing}
+            className="btn btn-primary flex items-center text-sm"
+            title="Aggiorna le estrazioni dal web"
+          >
+            <RefreshCw className={`h-4 w-4 mr-1 ${isSyncing ? 'animate-spin' : ''}`} />
+            {isSyncing ? 'Sincronizzazione...' : 'Aggiorna Estrazioni'}
+          </button>
+          
           <button
             onClick={() => setShowAddForm(!showAddForm)}
             className="btn btn-outline flex items-center text-sm"
