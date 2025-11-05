@@ -175,7 +175,32 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         combinationService.getUnsuccessfulCombinations()
       ]);
       
-      setSavedCombinations(savedCombs);
+      // Final deduplication safeguard - ensure no duplicates by ID
+      const uniqueById = new Map<string, GeneratedCombination>();
+      savedCombs.forEach(combo => {
+        if (!uniqueById.has(combo.id)) {
+          uniqueById.set(combo.id, combo);
+        }
+      });
+      
+      // Then deduplicate by numbers
+      const uniqueByNumbers = new Map<string, GeneratedCombination>();
+      Array.from(uniqueById.values()).forEach(combo => {
+        const sortedNumbers = [...combo.numbers].sort((a, b) => a - b);
+        const numbersKey = `${sortedNumbers.join(',')}-${combo.gameType}`;
+        const existing = uniqueByNumbers.get(numbersKey);
+        if (!existing || new Date(combo.date) > new Date(existing.date)) {
+          uniqueByNumbers.set(numbersKey, combo);
+        }
+      });
+      
+      const deduplicatedCombs = Array.from(uniqueByNumbers.values());
+      
+      if (process.env.NODE_ENV === 'development' && savedCombs.length !== deduplicatedCombs.length) {
+        console.log(`Context deduplication: ${savedCombs.length} → ${deduplicatedCombs.length} combinations`);
+      }
+      
+      setSavedCombinations(deduplicatedCombs);
       setUnsuccessfulCombinations(unsuccessfulCombs);
     } catch (error) {
       console.error('Error loading user data:', error);
@@ -398,9 +423,28 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         isAdvancedAI
       });
       
-      // Reload saved combinations
+      // Reload saved combinations (with deduplication)
       const updatedCombinations = await combinationService.getSavedCombinations();
-      setSavedCombinations(updatedCombinations);
+      
+      // Apply deduplication before setting state
+      const uniqueById = new Map<string, GeneratedCombination>();
+      updatedCombinations.forEach(combo => {
+        if (!uniqueById.has(combo.id)) {
+          uniqueById.set(combo.id, combo);
+        }
+      });
+      
+      const uniqueByNumbers = new Map<string, GeneratedCombination>();
+      Array.from(uniqueById.values()).forEach(combo => {
+        const sortedNumbers = [...combo.numbers].sort((a, b) => a - b);
+        const numbersKey = `${sortedNumbers.join(',')}-${combo.gameType}`;
+        const existing = uniqueByNumbers.get(numbersKey);
+        if (!existing || new Date(combo.date) > new Date(existing.date)) {
+          uniqueByNumbers.set(numbersKey, combo);
+        }
+      });
+      
+      setSavedCombinations(Array.from(uniqueByNumbers.values()));
     } catch (error) {
       console.error('Error saving combination:', error);
       throw error;
@@ -432,7 +476,26 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       const result = await combinationService.removeDuplicateCombinations();
       // Reload combinations after cleanup
       const updatedCombinations = await combinationService.getSavedCombinations();
-      setSavedCombinations(updatedCombinations);
+      
+      // Apply deduplication before setting state
+      const uniqueById = new Map<string, GeneratedCombination>();
+      updatedCombinations.forEach(combo => {
+        if (!uniqueById.has(combo.id)) {
+          uniqueById.set(combo.id, combo);
+        }
+      });
+      
+      const uniqueByNumbers = new Map<string, GeneratedCombination>();
+      Array.from(uniqueById.values()).forEach(combo => {
+        const sortedNumbers = [...combo.numbers].sort((a, b) => a - b);
+        const numbersKey = `${sortedNumbers.join(',')}-${combo.gameType}`;
+        const existing = uniqueByNumbers.get(numbersKey);
+        if (!existing || new Date(combo.date) > new Date(existing.date)) {
+          uniqueByNumbers.set(numbersKey, combo);
+        }
+      });
+      
+      setSavedCombinations(Array.from(uniqueByNumbers.values()));
       return result.removed;
     } catch (error) {
       console.error('Error removing duplicates:', error);

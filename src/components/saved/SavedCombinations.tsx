@@ -57,13 +57,6 @@ const SavedCombinations: React.FC = () => {
   };
   
   const getStrategyDisplay = (combo: typeof savedCombinations[0]) => {
-    console.log('Combo flags:', {
-      id: combo.id,
-      isAI: combo.isAI,
-      isAdvancedAI: combo.isAdvancedAI,
-      strategy: combo.strategy
-    });
-    
     // Check for AI Avanzata first (OpenAI)
     if (combo.isAdvancedAI === true) {
       return 'AI Avanzata';
@@ -77,6 +70,26 @@ const SavedCombinations: React.FC = () => {
     // Regular strategies
     return combo.strategy === 'standard' ? 'Standard' : 'Alta Variabilità';
   };
+  
+  // Debug: Verify deduplication worked
+  if (process.env.NODE_ENV === 'development') {
+    const beforeDedup = savedCombinations.filter(c => c.gameType === selectedGame).length;
+    const afterDedup = filteredCombinations.length;
+    const duplicatesFound = beforeDedup - afterDedup;
+    
+    if (duplicatesFound > 0) {
+      console.log(`SavedCombinations deduplication: ${beforeDedup} → ${afterDedup} (removed ${duplicatesFound} duplicates)`);
+    }
+    
+    // Check for duplicate IDs
+    const ids = new Set(filteredCombinations.map(c => c.id));
+    if (ids.size !== filteredCombinations.length) {
+      console.warn('WARNING: Found duplicate IDs in filteredCombinations!', {
+        uniqueIds: ids.size,
+        totalCombinations: filteredCombinations.length
+      });
+    }
+  }
   
   if (filteredCombinations.length === 0) {
     return (
