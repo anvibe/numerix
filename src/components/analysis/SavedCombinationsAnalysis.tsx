@@ -329,6 +329,44 @@ const SavedCombinationsAnalysis: React.FC = () => {
   // Filter by selected combination if specified
   if (selectedCombinationId !== null) {
     filteredResults = filteredResults.filter(result => result.savedCombination.id === selectedCombinationId);
+    
+    // When a specific combination is selected, show only the best match per extraction
+    // unless a specific extraction date is also selected
+    if (!selectedExtractionDate) {
+      // Group by extraction date and keep best match for each extraction
+      const bestByExtraction = new Map<string, MatchAnalysis>();
+      filteredResults.forEach(result => {
+        const extDate = result.extraction.date;
+        const existing = bestByExtraction.get(extDate);
+        
+        // Keep the result with the best match for this extraction
+        if (!existing || 
+            result.matchCount > existing.matchCount ||
+            (result.matchCount === existing.matchCount && 
+             new Date(result.extraction.date) > new Date(existing.extraction.date))) {
+          bestByExtraction.set(extDate, result);
+        }
+      });
+      
+      // If filtering by difference, only show extractions with that difference
+      if (filterDifference !== null) {
+        filteredResults = Array.from(bestByExtraction.values())
+          .filter(result => result.difference === filterDifference)
+          .sort((a, b) => {
+            if (b.matchCount !== a.matchCount) {
+              return b.matchCount - a.matchCount;
+            }
+            return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
+          });
+      } else {
+        filteredResults = Array.from(bestByExtraction.values()).sort((a, b) => {
+          if (b.matchCount !== a.matchCount) {
+            return b.matchCount - a.matchCount;
+          }
+          return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
+        });
+      }
+    }
   }
   
   // CRITICAL: Filter by selected extraction date FIRST, before deduplication
