@@ -122,4 +122,5 @@ export interface GameStatistics {
     unluckyNumbers?: Frequency[];
     unluckyPairs?: { pair: [number, number]; count: number }[];
   }>;
+  advancedStatistics?: import('../utils/advancedStatistics').AdvancedStatistics;
 }

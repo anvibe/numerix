@@ -1,5 +1,6 @@
 import { ExtractedNumbers, GameStatistics, GameType, LottoWheel, UnsuccessfulCombination, Frequency } from '../types';
 import { GAMES, LOTTO_WHEELS } from './constants';
+import { calculateAdvancedStatistics } from './advancedStatistics';
 
 // Calculate number frequencies from extractions
 export const calculateFrequencies = (
@@ -142,7 +143,7 @@ export const calculateUnluckyStatistics = (
   return { unluckyNumbers, unluckyPairs };
 };
 
-// Calculate game statistics
+// Calculate game statistics with advanced statistics
 export const calculateGameStatistics = (
   gameType: GameType,
   extractionsData: Record<GameType, ExtractedNumbers[]>,
@@ -185,6 +186,19 @@ export const calculateGameStatistics = (
       };
     });
     
+    // Calculate advanced statistics for Bari (default wheel)
+    const unsuccessfulForWheel = unsuccessfulCombinations.filter(
+      combo => combo.gameType === gameType && (!combo.wheel || combo.wheel === 'Bari')
+    );
+    
+    const advancedStats = extractions.length > 0 ? calculateAdvancedStatistics(
+      gameType,
+      extractions,
+      unsuccessfulForWheel,
+      game.maxNumber,
+      game.numbersToSelect
+    ) : undefined;
+    
     // Use Bari's stats as default
     return {
       frequentNumbers: wheelStats.Bari.frequentNumbers,
@@ -192,7 +206,8 @@ export const calculateGameStatistics = (
       delays: wheelStats.Bari.delays,
       unluckyNumbers: wheelStats.Bari.unluckyNumbers,
       unluckyPairs: wheelStats.Bari.unluckyPairs,
-      wheelStats
+      wheelStats,
+      advancedStatistics: advancedStats
     };
   }
   
@@ -208,12 +223,22 @@ export const calculateGameStatistics = (
     game.maxNumber
   );
   
+  // Calculate advanced statistics
+  const advancedStats = extractions.length > 0 ? calculateAdvancedStatistics(
+    gameType,
+    extractions,
+    unsuccessfulCombinations.filter(combo => combo.gameType === gameType),
+    game.maxNumber,
+    game.numbersToSelect
+  ) : undefined;
+  
   return {
     frequentNumbers,
     infrequentNumbers,
     delays,
     unluckyNumbers,
     unluckyPairs,
+    advancedStatistics: advancedStats
   };
 };
 

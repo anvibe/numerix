@@ -50,13 +50,14 @@ const AIRecommendation: React.FC = () => {
     
     try {
       if (useOpenAI && isOpenAIAvailable) {
-        // Use OpenAI for advanced AI recommendation
+        // Use OpenAI for advanced AI recommendation with advanced statistics
         const result = await openAIService.generateAIRecommendation(
           selectedGame,
           gameStats,
           unsuccessfulCombinations,
           extractionsData[selectedGame],
-          selectedGame === 'lotto' ? selectedWheel : undefined
+          selectedGame === 'lotto' ? selectedWheel : undefined,
+          gameStats.advancedStatistics // Pass advanced statistics
         );
         
         setAiResult({
@@ -64,12 +65,13 @@ const AIRecommendation: React.FC = () => {
           isOpenAI: true
         });
       } else {
-        // Use local AI recommendation
+        // Use local AI recommendation with advanced statistics
         setTimeout(() => {
           const result = generateAIRecommendation(
             selectedGame, 
             gameStats,
-            selectedGame === 'lotto' ? selectedWheel : undefined
+            selectedGame === 'lotto' ? selectedWheel : undefined,
+            gameStats.advancedStatistics // Pass advanced statistics
           );
           setAiResult({
             ...result,
@@ -88,7 +90,8 @@ const AIRecommendation: React.FC = () => {
           const result = generateAIRecommendation(
             selectedGame, 
             gameStats,
-            selectedGame === 'lotto' ? selectedWheel : undefined
+            selectedGame === 'lotto' ? selectedWheel : undefined,
+            gameStats.advancedStatistics // Pass advanced statistics
           );
           setAiResult({
             ...result,

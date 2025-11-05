@@ -1,5 +1,13 @@
 import { GameType, Game, GameStatistics, LottoWheel } from '../types';
 import { GAMES } from './constants';
+import { 
+  calculateAdvancedStatistics, 
+  generateAdvancedCombination,
+  calculateOptimalCombination,
+  calculateDistributionAnalysis,
+  calculatePatternScore,
+  calculateOptimalDistribution
+} from './advancedStatistics';
 
 // Get game configuration by type
 export const getGameByType = (gameType: GameType): Game => {
@@ -319,15 +327,84 @@ export const generateCombination = (
   return { numbers: combination };
 };
 
-// AI recommendation function with enhanced unlucky pattern avoidance
+// AI recommendation function with enhanced unlucky pattern avoidance and advanced statistics
 export const generateAIRecommendation = (
   gameType: GameType,
   statistics: GameStatistics,
-  wheel?: LottoWheel
+  wheel?: LottoWheel,
+  advancedStats?: import('./advancedStatistics').AdvancedStatistics
 ): { numbers: number[]; reasons: string[]; jolly?: number; superstar?: number } => {
   const game = getGameByType(gameType);
   const stats = wheel && statistics.wheelStats ? statistics.wheelStats[wheel] : statistics;
   
+  // If advanced statistics are available, use them
+  if (advancedStats) {
+    const optimalDist = calculateOptimalDistribution(gameType, game.maxNumber, game.numbersToSelect);
+    const combination = calculateOptimalCombination(
+      advancedStats,
+      game.numbersToSelect,
+      game.maxNumber,
+      advancedStats.coOccurrences
+    );
+    
+    // Calculate distribution for generated combination
+    const actualDist = calculateDistributionAnalysis(combination);
+    const patternScore = calculatePatternScore(
+      actualDist,
+      optimalDist,
+      advancedStats.bayesianProbabilities,
+      combination
+    );
+    
+    // Generate reasons based on advanced statistics
+    const reasons: string[] = combination.map(num => {
+      const bayesianProb = advancedStats.bayesianProbabilities.find(p => p.number === num);
+      const coOcc = advancedStats.coOccurrences.filter(co => 
+        co.numbers.includes(num)
+      ).slice(0, 2);
+      
+      let reason = '';
+      if (bayesianProb) {
+        reason = `Numero ${num}: Probabilità Bayesiana ${bayesianProb.posteriorProbability.toFixed(1)}% `;
+        reason += `(Prior: ${bayesianProb.priorProbability.toFixed(1)}%, `;
+        reason += `Likelihood: ${bayesianProb.likelihood.toFixed(1)}%)`;
+      } else {
+        reason = `Numero ${num}: Selezionato per distribuzione ottimale`;
+      }
+      
+      if (coOcc.length > 0) {
+        reason += `. Co-occorre positivamente con altri numeri selezionati.`;
+      }
+      
+      return reason;
+    });
+    
+    reasons.push(`Punteggio Pattern: ${patternScore.toFixed(1)}/100`);
+    reasons.push(`Distribuzione: Somma=${actualDist.sum.toFixed(0)}, Spread=${actualDist.spread}, Parità=${(actualDist.evenOddRatio * 100).toFixed(0)}%`);
+    
+    // For SuperEnalotto, generate Jolly and Superstar
+    if (gameType === 'superenalotto') {
+      // Use Bayesian probabilities for jolly and superstar too
+      const topBayesian = advancedStats.bayesianProbabilities
+        .filter(p => !combination.includes(p.number))
+        .slice(0, 5)
+        .map(p => p.number);
+      
+      const jolly = topBayesian[Math.floor(Math.random() * topBayesian.length)] || 
+        generateUniqueNumberExcluding(1, game.maxNumber, combination);
+      const superstar = topBayesian[Math.floor(Math.random() * topBayesian.length)] || 
+        getRandomNumber(1, game.maxNumber);
+      
+      reasons.push(`Jolly ${jolly}: Selezionato usando probabilità Bayesiane`);
+      reasons.push(`SuperStar ${superstar}: Ottimizzato per pattern statistici avanzati`);
+      
+      return { numbers: combination, reasons, jolly, superstar };
+    }
+    
+    return { numbers: combination, reasons };
+  }
+  
+  // Fallback to standard AI recommendation if advanced stats not available
   // Start with some hot numbers (frequently drawn) but avoid unlucky ones
   const hotCount = Math.ceil(game.numbersToSelect * 0.4);
   const hotNumbers = generateBasedOnFrequency(hotCount, stats, true);
