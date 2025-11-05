@@ -45,6 +45,17 @@ const SavedCombinationsAnalysis: React.FC = () => {
     return true;
   });
 
+  // CRITICAL: When a specific extraction date is selected, only show combinations saved on or before that date
+  // This ensures users only see combinations that existed when that extraction happened
+  if (selectedExtractionDate) {
+    const extractionDate = new Date(selectedExtractionDate);
+    relevantCombinations = relevantCombinations.filter(combo => {
+      const comboDate = new Date(combo.date);
+      // Only include combinations saved on or before the extraction date
+      return comboDate <= extractionDate;
+    });
+  }
+
   // CRITICAL: Final deduplication - ensure absolutely no duplicates by numbers
   // This is a safety net in case duplicates somehow made it through previous deduplication
   const finalUniqueNumbersMap = new Map<string, typeof savedCombinations[0]>();
@@ -62,7 +73,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
       // First time seeing this combination, add it
       finalUniqueNumbersMap.set(numbersKey, combo);
     } else {
-      // Duplicate found - keep the most recent one
+      // Duplicate found - keep the most recent one that's still before/on extraction date
       const existingDate = new Date(existing.date);
       const currentDate = new Date(combo.date);
       if (currentDate > existingDate) {
