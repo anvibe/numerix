@@ -323,6 +323,8 @@ const SavedCombinationsAnalysis: React.FC = () => {
 
   // Filter by selected combination FIRST (if specified)
   // When a specific combination is selected, show its full comparison across all extractions
+  let filteredResults: MatchAnalysis[];
+  
   if (selectedCombinationId !== null) {
     filteredResults = analysisResults.filter(result => result.savedCombination.id === selectedCombinationId);
     
