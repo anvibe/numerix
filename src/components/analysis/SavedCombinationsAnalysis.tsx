@@ -649,6 +649,15 @@ const SavedCombinationsAnalysis: React.FC = () => {
           });
           const uniqueCount = uniqueComboKeys.size;
           
+          // Verify if relevantCombinations has duplicates
+          const relevantUniqueSet = new Set<string>();
+          relevantCombinations.forEach(combo => {
+            const sortedNumbers = [...combo.numbers].sort((a, b) => a - b);
+            const numbersKey = `${sortedNumbers.join(',')}-${combo.gameType}`;
+            relevantUniqueSet.add(numbersKey);
+          });
+          const hasDuplicates = relevantUniqueSet.size !== relevantCombinations.length;
+          
           return (
             <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-md">
               <div className="font-medium text-primary mb-1">
@@ -664,11 +673,11 @@ const SavedCombinationsAnalysis: React.FC = () => {
               </div>
               <div className="text-xs text-text-secondary mt-1">
                 Combinazioni salvate per {selectedGame}: {relevantCombinations.length}
+                {hasDuplicates && (
+                  <span className="text-warning ml-2">⚠️ {relevantCombinations.length - relevantUniqueSet.size} duplicati rilevati! Usa "Rimuovi Duplicati" in Combinazioni Salvate</span>
+                )}
                 {filterDifference !== null && (
                   <span> | Filtro attivo: differenza = {filterDifference}</span>
-                )}
-                {process.env.NODE_ENV === 'development' && uniqueByNumbersSet.size !== relevantCombinations.length && (
-                  <span className="text-warning ml-2">⚠️ Duplicati rilevati! Usa "Rimuovi Duplicati" in Combinazioni Salvate</span>
                 )}
               </div>
             </div>
