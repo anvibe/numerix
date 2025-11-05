@@ -321,16 +321,12 @@ const SavedCombinationsAnalysis: React.FC = () => {
     return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
   });
 
-  // Filter by difference and combination (calculate directly without useMemo)
-  let filteredResults = filterDifference === null 
-    ? analysisResults 
-    : analysisResults.filter(result => result.difference === filterDifference);
-  
-  // Filter by selected combination if specified
+  // Filter by selected combination FIRST (if specified)
+  // When a specific combination is selected, show its full comparison across all extractions
   if (selectedCombinationId !== null) {
-    filteredResults = filteredResults.filter(result => result.savedCombination.id === selectedCombinationId);
+    filteredResults = analysisResults.filter(result => result.savedCombination.id === selectedCombinationId);
     
-    // When a specific combination is selected, show only the best match per extraction
+    // When a specific combination is selected, show only one result per extraction date (best match)
     // unless a specific extraction date is also selected
     if (!selectedExtractionDate) {
       // Group by extraction date and keep best match for each extraction
@@ -348,25 +344,25 @@ const SavedCombinationsAnalysis: React.FC = () => {
         }
       });
       
-      // If filtering by difference, only show extractions with that difference
+      filteredResults = Array.from(bestByExtraction.values()).sort((a, b) => {
+        // Sort by match count (best first), then by date (most recent first)
+        if (b.matchCount !== a.matchCount) {
+          return b.matchCount - a.matchCount;
+        }
+        return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
+      });
+      
+      // AFTER showing all results, apply difference filter if specified (for visual filtering)
+      // This allows users to see all results but filter by difference if they want
       if (filterDifference !== null) {
-        filteredResults = Array.from(bestByExtraction.values())
-          .filter(result => result.difference === filterDifference)
-          .sort((a, b) => {
-            if (b.matchCount !== a.matchCount) {
-              return b.matchCount - a.matchCount;
-            }
-            return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
-          });
-      } else {
-        filteredResults = Array.from(bestByExtraction.values()).sort((a, b) => {
-          if (b.matchCount !== a.matchCount) {
-            return b.matchCount - a.matchCount;
-          }
-          return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
-        });
+        filteredResults = filteredResults.filter(result => result.difference === filterDifference);
       }
     }
+  } else {
+    // No specific combination selected - apply difference filter normally
+    filteredResults = filterDifference === null 
+      ? analysisResults 
+      : analysisResults.filter(result => result.difference === filterDifference);
   }
   
   // CRITICAL: Filter by selected extraction date FIRST, before deduplication
