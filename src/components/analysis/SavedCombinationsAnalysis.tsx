@@ -36,12 +36,23 @@ const SavedCombinationsAnalysis: React.FC = () => {
 
   // Calculate combinations and extractions directly (no memoization to avoid React error #310)
   const relevantCombinations = savedCombinations.filter(combo => {
+    // Strict filtering by game type
     if (combo.gameType !== selectedGame) return false;
     if (selectedGame === 'lotto' && combo.wheel) {
       return combo.wheel === selectedWheel;
     }
     return true;
   });
+
+  // Debug: Log to help identify mismatches
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Analysis Debug:', {
+      selectedGame,
+      totalSavedCombinations: savedCombinations.length,
+      relevantCombinationsCount: relevantCombinations.length,
+      relevantCombinationIds: relevantCombinations.map(c => c.id.slice(0, 8))
+    });
+  }
 
   const currentGameExtractions = extractionsData[selectedGame] || [];
   let relevantExtractions = currentGameExtractions.length === 0 
@@ -250,6 +261,29 @@ const SavedCombinationsAnalysis: React.FC = () => {
       }
       return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
     });
+  }
+
+  // When viewing a specific extraction, ensure we only show relevant combinations
+  // and verify they match the saved combinations
+  if (selectedExtractionDate) {
+    // Get unique combination IDs from filtered results
+    const uniqueResultIds = new Set(filteredResults.map(r => r.savedCombination.id));
+    const relevantCombinationIds = new Set(relevantCombinations.map(c => c.id));
+    
+    // Filter out any results that don't match saved combinations
+    filteredResults = filteredResults.filter(result => 
+      relevantCombinationIds.has(result.savedCombination.id)
+    );
+    
+    // Debug warning if mismatch detected
+    if (process.env.NODE_ENV === 'development' && uniqueResultIds.size !== relevantCombinationIds.size) {
+      console.warn('Mismatch detected:', {
+        resultIds: Array.from(uniqueResultIds).map(id => id.slice(0, 8)),
+        savedIds: Array.from(relevantCombinationIds).map(id => id.slice(0, 8)),
+        resultCount: uniqueResultIds.size,
+        savedCount: relevantCombinationIds.size
+      });
+    }
   }
 
   if (relevantCombinations.length === 0) {
@@ -471,7 +505,10 @@ const SavedCombinationsAnalysis: React.FC = () => {
               📅 Estrazione selezionata: {new Date(selectedExtractionDate).toLocaleDateString('it-IT')}
             </div>
             <div className="text-sm text-text-secondary">
-              Mostrate tutte le {filteredResults.length} combinazioni salvate per questa estrazione
+              Mostrate {filteredResults.length} risultati per questa estrazione
+            </div>
+            <div className="text-xs text-text-secondary mt-1">
+              Combinazioni salvate per {selectedGame}: {relevantCombinations.length}
             </div>
           </div>
         )}
