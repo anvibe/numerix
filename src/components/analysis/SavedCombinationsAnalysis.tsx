@@ -726,14 +726,16 @@ const SavedCombinationsAnalysis: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-4 mb-4">
+                <div className="grid md:grid-cols-2 gap-6 mb-4">
                   {/* Saved Combination */}
-                  <div>
-                    <div className="text-sm font-medium text-text-secondary mb-2">
-                      Tua Combinazione Salvata:
-                      <span className="ml-2 text-xs text-text-secondary opacity-70">
-                        (ID: {savedCombination.id.slice(0, 8)}...)
+                  <div className={`p-4 rounded-lg border-2 ${matchCount === 0 ? 'bg-bg-secondary border-warning/30' : matchCount === gameConfig?.numbersToSelect ? 'bg-success/10 border-success/30' : 'bg-bg-secondary border-gray-300 dark:border-gray-700'}`}>
+                    <div className="text-sm font-semibold text-text-secondary mb-3 flex items-center justify-between">
+                      <span>
+                        Tua Combinazione Salvata:
                       </span>
+                      {matchCount === 0 && (
+                        <span className="text-xs text-warning font-medium">0 Match</span>
+                      )}
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {savedCombination.numbers.map((num) => {
@@ -748,12 +750,27 @@ const SavedCombinationsAnalysis: React.FC = () => {
                         );
                       })}
                     </div>
+                    {savedCombination.jolly && (
+                      <div className="mt-3 text-xs text-text-secondary">
+                        Jolly: <span className="font-medium">{savedCombination.jolly}</span>
+                      </div>
+                    )}
+                    {savedCombination.superstar && (
+                      <div className="mt-1 text-xs text-text-secondary">
+                        Superstar: <span className="font-medium">{savedCombination.superstar}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Winning Extraction */}
-                  <div>
-                    <div className="text-sm font-medium text-text-secondary mb-2">
-                      Numeri Vincenti:
+                  <div className={`p-4 rounded-lg border-2 ${matchCount === 0 ? 'bg-bg-secondary border-warning/30' : matchCount === gameConfig?.numbersToSelect ? 'bg-success/10 border-success/30' : 'bg-bg-secondary border-gray-300 dark:border-gray-700'}`}>
+                    <div className="text-sm font-semibold text-text-secondary mb-3 flex items-center justify-between">
+                      <span>
+                        Numeri Vincenti:
+                      </span>
+                      {matchCount === 0 && (
+                        <span className="text-xs text-warning font-medium">Nessun Match</span>
+                      )}
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {(selectedGame === 'lotto' && extraction.wheels && selectedWheel
@@ -771,8 +788,31 @@ const SavedCombinationsAnalysis: React.FC = () => {
                         );
                       })}
                     </div>
+                    {extraction.jolly && (
+                      <div className="mt-3 text-xs text-text-secondary">
+                        Jolly: <span className="font-medium">{extraction.jolly}</span>
+                      </div>
+                    )}
+                    {extraction.superstar && (
+                      <div className="mt-1 text-xs text-text-secondary">
+                        Superstar: <span className="font-medium">{extraction.superstar}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
+
+                {/* Match Indicator for 0 matches */}
+                {matchCount === 0 && (
+                  <div className="mb-4 p-3 bg-warning/10 border border-warning/30 rounded-md">
+                    <div className="text-sm font-medium text-warning mb-1 flex items-center gap-2">
+                      <XCircle className="h-4 w-4" />
+                      Nessun numero corrispondente
+                    </div>
+                    <div className="text-xs text-text-secondary mt-1">
+                      Confronta i numeri a sinistra (tua combinazione) con quelli a destra (numeri vincenti) per vedere le differenze
+                    </div>
+                  </div>
+                )}
 
                 {/* Missing Numbers */}
                 {missingNumbers.length > 0 && (
