@@ -1,5 +1,12 @@
 import React, { useEffect, useRef } from 'react';
 
+// Extend Window interface for our custom property
+declare global {
+  interface Window {
+    _isMouseOverAuthDiv?: boolean;
+  }
+}
+
 const NumberAnimation: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -95,31 +102,63 @@ const NumberAnimation: React.FC = () => {
       }
 
       update() {
+        // Check if ball is behind auth div (roughly centered)
+        const authDivX = W / 2;
+        const authDivY = H / 2;
+        const authDivWidth = Math.min(448, W * 0.9);
+        const authDivHeight = 600;
+        
+        const isBehindAuthDiv = Math.abs(this.x - authDivX) < authDivWidth / 2 && 
+                               Math.abs(this.y - authDivY) < authDivHeight / 2;
+        
+        // If ball is behind auth div and mouse is also over auth div, don't react
+        if (isBehindAuthDiv && window._isMouseOverAuthDiv) {
+          // Just return to base position
+          const returnSpeed = 0.12;
+          this.vx = (this.baseX - this.x) * returnSpeed;
+          this.vy = (this.baseY - this.y) * returnSpeed;
+          this.vx *= 0.88;
+          this.vy *= 0.88;
+          this.x += this.vx;
+          this.y += this.vy;
+          return;
+        }
+        
         // Calculate distance from mouse to current position
         const dx = mouseX - this.x;
         const dy = mouseY - this.y;
         const dist = Math.hypot(dx, dy);
-        const maxDist = 120; // Maximum distance for interaction
+        const maxDist = Math.max(W, H) * 1.5; // Maximum distance for interaction - covers entire screen
         
-        if (dist < maxDist && dist > 5) {
-          // Calculate attraction strength (stronger when closer)
-          const strength = (1 - dist / maxDist) * 0.6;
+        // All balls should react to mouse, with strength inversely proportional to distance
+        if (dist > 5) {
+          // Calculate attraction strength (stronger when closer, but all balls react)
+          const strength = Math.max(0, (1 - dist / maxDist) * 0.8);
           const angle = Math.atan2(dy, dx);
           
-          // Move towards mouse position
-          const moveDistance = dist * strength * 0.3;
-          const targetX = this.x + Math.cos(angle) * moveDistance;
-          const targetY = this.y + Math.sin(angle) * moveDistance;
+          // Move towards mouse position (repel effect)
+          const moveDistance = Math.min(dist * strength * 0.5, 50); // Limit max movement
+          const targetX = this.x - Math.cos(angle) * moveDistance;
+          const targetY = this.y - Math.sin(angle) * moveDistance;
           
           // Smooth interpolation towards target
-          this.vx = (targetX - this.x) * 0.2;
-          this.vy = (targetY - this.y) * 0.2;
+          this.vx = (targetX - this.x) * 0.15;
+          this.vy = (targetY - this.y) * 0.15;
         } else {
-          // Return to base position smoothly
-          const returnSpeed = 0.12;
-          this.vx = (this.baseX - this.x) * returnSpeed;
-          this.vy = (this.baseY - this.y) * returnSpeed;
+          // Very close to mouse - strong repel
+          const repelStrength = 0.8;
+          this.vx = -dx * repelStrength;
+          this.vy = -dy * repelStrength;
         }
+        
+        // Return to base position smoothly (always try to return)
+        const returnSpeed = 0.08;
+        const returnX = (this.baseX - this.x) * returnSpeed;
+        const returnY = (this.baseY - this.y) * returnSpeed;
+        
+        // Combine return force with mouse interaction
+        this.vx += returnX;
+        this.vy += returnY;
         
         // Apply velocity with damping
         this.vx *= 0.88;
@@ -230,14 +269,29 @@ const NumberAnimation: React.FC = () => {
     // Layout grid after all balls are created
     layoutGrid();
 
-    // Mouse interaction
+    // Mouse interaction - attach to window so it works even when hovering over other elements
     function handleMouseMove(e: MouseEvent) {
       const rect = canvas.getBoundingClientRect();
       mouseX = (e.clientX - rect.left) * (canvas.width / rect.width) / dpr;
       mouseY = (e.clientY - rect.top) * (canvas.height / rect.height) / dpr;
+      
+      // Check if mouse is over auth div (approximately centered, max-w-md)
+      // This is a rough estimate - auth div is typically centered with max-width ~448px
+      const authDivX = W / 2;
+      const authDivY = H / 2;
+      const authDivWidth = Math.min(448, W * 0.9) / (canvas.width / rect.width) * dpr;
+      const authDivHeight = 600 / (canvas.height / rect.height) * dpr;
+      
+      // Check if mouse is within auth div bounds
+      const isOverAuthDiv = Math.abs(mouseX - authDivX) < authDivWidth / 2 && 
+                            Math.abs(mouseY - authDivY) < authDivHeight / 2;
+      
+      // Store this for use in ball update
+      window._isMouseOverAuthDiv = isOverAuthDiv;
     }
 
-    canvas.addEventListener('mousemove', handleMouseMove);
+    // Use window event listener so it works even when mouse is over other elements
+    window.addEventListener('mousemove', handleMouseMove);
 
     let animationId: number;
 
@@ -253,7 +307,7 @@ const NumberAnimation: React.FC = () => {
 
     return () => {
       window.removeEventListener('resize', resize);
-      canvas.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mousemove', handleMouseMove);
       cancelAnimationFrame(animationId);
     };
   }, []);
