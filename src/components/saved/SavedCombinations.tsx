@@ -6,7 +6,8 @@ import { getGameByType } from '../../utils/generators';
 import { showToast } from '../../utils/toast';
 
 const SavedCombinations: React.FC = () => {
-  const { savedCombinations, deleteCombination, selectedGame } = useGame();
+  const { savedCombinations, deleteCombination, selectedGame, removeDuplicateCombinations } = useGame();
+  const [isCleaning, setIsCleaning] = React.useState(false);
   
   // Filter combinations by selected game type
   let filteredCombinations = savedCombinations.filter(combo => combo.gameType === selectedGame);
@@ -198,7 +199,39 @@ const SavedCombinations: React.FC = () => {
         </table>
       </div>
       
-      <div className="mt-4 flex justify-end">
+      <div className="mt-4 flex justify-between">
+        <button
+          className="btn btn-outline flex items-center justify-center"
+          onClick={async () => {
+            setIsCleaning(true);
+            try {
+              const removed = await removeDuplicateCombinations();
+              if (removed > 0) {
+                showToast.success(`Rimosse ${removed} combinazioni duplicate`);
+              } else {
+                showToast.info('Nessuna combinazione duplicata trovata');
+              }
+            } catch (error: any) {
+              showToast.error('Errore durante la pulizia: ' + (error.message || 'Errore sconosciuto'));
+            } finally {
+              setIsCleaning(false);
+            }
+          }}
+          disabled={isCleaning}
+        >
+          {isCleaning ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 dark:border-gray-100 mr-2"></div>
+              Pulizia...
+            </>
+          ) : (
+            <>
+              <Trash2 className="mr-2 h-5 w-5" />
+              Rimuovi Duplicati
+            </>
+          )}
+        </button>
+        
         <button
           className="btn btn-outline text-error flex items-center justify-center"
           onClick={() => {

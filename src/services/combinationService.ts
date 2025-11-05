@@ -67,6 +67,63 @@ export const combinationService = {
     try {
       const user = await requireAuth();
       
+      // Validate numbers array
+      if (!Array.isArray(combination.numbers) || combination.numbers.length === 0) {
+        throw new Error('Invalid numbers array');
+      }
+      
+      // Validate numbers are within valid range
+      const gameConfigs: Record<string, { max: number; count: number }> = {
+        'superenalotto': { max: 90, count: 6 },
+        'lotto': { max: 90, count: 5 },
+        '10elotto': { max: 90, count: 10 },
+        'millionday': { max: 55, count: 5 }
+      };
+      
+      const config = gameConfigs[combination.gameType];
+      if (!config) {
+        throw new Error('Invalid game type');
+      }
+      
+      // Check count
+      if (combination.numbers.length !== config.count) {
+        throw new Error(`Per ${combination.gameType} devi selezionare esattamente ${config.count} numeri`);
+      }
+      
+      // Check for duplicates within the combination
+      if (new Set(combination.numbers).size !== combination.numbers.length) {
+        throw new Error('Non puoi inserire numeri duplicati nella stessa combinazione');
+      }
+      
+      // Check range
+      const invalidNumbers = combination.numbers.filter(n => n < 1 || n > config.max);
+      if (invalidNumbers.length > 0) {
+        throw new Error(`Numeri non validi: ${invalidNumbers.join(', ')}. I numeri devono essere tra 1 e ${config.max}`);
+      }
+      
+      // Check for duplicates before saving
+      const sortedNumbers = [...combination.numbers].sort((a, b) => a - b);
+      const numbersKey = sortedNumbers.join(',');
+      
+      const { data: existing } = await supabase
+        .from('saved_combinations')
+        .select('id, numbers')
+        .eq('user_id', user.id)
+        .eq('game_type', combination.gameType);
+      
+      if (existing && existing.length > 0) {
+        // Check if this exact combination already exists
+        const duplicate = existing.find(existingCombo => {
+          const existingSorted = [...existingCombo.numbers].sort((a, b) => a - b);
+          return existingSorted.join(',') === numbersKey;
+        });
+        
+        if (duplicate) {
+          console.warn('Combination already exists, skipping save:', numbersKey);
+          throw new Error('Questa combinazione è già stata salvata');
+        }
+      }
+      
       const insertData: SavedCombinationsInsert = {
         user_id: user.id,
         game_type: combination.gameType,
@@ -89,6 +146,80 @@ export const combinationService = {
       }
     } catch (error) {
       console.error('Error in saveCombination:', error);
+      throw error;
+    }
+  },
+  
+  // Cleanup function to remove duplicate combinations
+  async removeDuplicateCombinations(): Promise<{ removed: number }> {
+    try {
+      const user = await requireAuth();
+      
+      // Get all combinations for this user
+      const { data: allCombinations, error: fetchError } = await supabase
+        .from('saved_combinations')
+        .select('id, game_type, numbers, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      
+      if (fetchError) throw fetchError;
+      if (!allCombinations) return { removed: 0 };
+      
+      // Group by game type and find duplicates
+      const groups = new Map<string, typeof allCombinations>();
+      allCombinations.forEach(combo => {
+        const key = combo.game_type;
+        if (!groups.has(key)) {
+          groups.set(key, []);
+        }
+        groups.get(key)!.push(combo);
+      });
+      
+      let removedCount = 0;
+      const idsToDelete: string[] = [];
+      
+      // For each game type, find duplicates
+      groups.forEach((combos, gameType) => {
+        const seen = new Map<string, string>(); // numbersKey -> id to keep
+        
+        combos.forEach(combo => {
+          const sortedNumbers = [...combo.numbers].sort((a, b) => a - b);
+          const numbersKey = sortedNumbers.join(',');
+          
+          if (seen.has(numbersKey)) {
+            // Duplicate found - mark older one for deletion
+            const existingId = seen.get(numbersKey)!;
+            const existingCombo = combos.find(c => c.id === existingId);
+            const currentCombo = combo;
+            
+            // Keep the most recent one
+            if (existingCombo && new Date(existingCombo.created_at) < new Date(currentCombo.created_at)) {
+              idsToDelete.push(existingId);
+              seen.set(numbersKey, currentCombo.id);
+            } else {
+              idsToDelete.push(currentCombo.id);
+            }
+          } else {
+            seen.set(numbersKey, combo.id);
+          }
+        });
+      });
+      
+      // Delete duplicates
+      if (idsToDelete.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('saved_combinations')
+          .delete()
+          .eq('user_id', user.id)
+          .in('id', idsToDelete);
+        
+        if (deleteError) throw deleteError;
+        removedCount = idsToDelete.length;
+      }
+      
+      return { removed: removedCount };
+    } catch (error) {
+      console.error('Error removing duplicates:', error);
       throw error;
     }
   },

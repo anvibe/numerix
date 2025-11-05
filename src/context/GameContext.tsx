@@ -39,6 +39,7 @@ interface GameContextType {
   ) => void;
   deleteCombination: (id: string) => void;
   clearCombinations: () => void;
+  removeDuplicateCombinations: () => Promise<number>;
   extractionsData: Record<GameType, ExtractedNumbers[]>;
   addExtraction: (gameType: GameType, extraction: ExtractedNumbers) => void;
   setExtractionsForGame: (gameType: GameType, newExtractions: ExtractedNumbers[]) => void;
@@ -58,6 +59,7 @@ export const GameContext = createContext<GameContextType>({
   saveCombination: () => {},
   deleteCombination: () => {},
   clearCombinations: () => {},
+  removeDuplicateCombinations: () => Promise.resolve(0),
   extractionsData: { superenalotto: [], lotto: [], '10elotto': [], millionday: [] },
   addExtraction: () => {},
   setExtractionsForGame: () => {},
@@ -424,6 +426,19 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       throw error;
     }
   };
+  
+  const removeDuplicateCombinations = async (): Promise<number> => {
+    try {
+      const result = await combinationService.removeDuplicateCombinations();
+      // Reload combinations after cleanup
+      const updatedCombinations = await combinationService.getSavedCombinations();
+      setSavedCombinations(updatedCombinations);
+      return result.removed;
+    } catch (error) {
+      console.error('Error removing duplicates:', error);
+      throw error;
+    }
+  };
 
   const addUnsuccessfulCombination = async (combination: Omit<UnsuccessfulCombination, 'id' | 'dateAdded'>) => {
     try {
@@ -482,6 +497,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         saveCombination,
         deleteCombination,
         clearCombinations,
+        removeDuplicateCombinations,
         extractionsData,
         addExtraction,
         setExtractionsForGame,
