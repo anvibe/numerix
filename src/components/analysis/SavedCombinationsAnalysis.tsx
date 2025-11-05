@@ -267,6 +267,12 @@ const SavedCombinationsAnalysis: React.FC = () => {
   if (selectedCombinationId !== null) {
     filteredResults = filteredResults.filter(result => result.savedCombination.id === selectedCombinationId);
   }
+  
+  // CRITICAL: Filter by selected extraction date FIRST, before deduplication
+  // This ensures only results for the selected extraction are shown
+  if (selectedExtractionDate) {
+    filteredResults = filteredResults.filter(result => result.extraction.date === selectedExtractionDate);
+  }
 
   // If filtering by difference but NOT by a specific extraction or combination,
   // deduplicate to show each saved combination only once (best match)
@@ -297,6 +303,9 @@ const SavedCombinationsAnalysis: React.FC = () => {
   // When viewing a specific extraction, ensure we only show relevant combinations
   // and verify they match the saved combinations, and deduplicate by combination ID AND numbers
   if (selectedExtractionDate) {
+    // Ensure ALL results are for the selected extraction date
+    filteredResults = filteredResults.filter(result => result.extraction.date === selectedExtractionDate);
+    
     // Create a set of valid combination number keys (deduplicated)
     const validCombinationKeys = new Set<string>();
     relevantCombinations.forEach(combo => {
@@ -308,6 +317,11 @@ const SavedCombinationsAnalysis: React.FC = () => {
     // Deduplicate by combination ID first
     const uniqueByIdMap = new Map<string, MatchAnalysis>();
     filteredResults.forEach(result => {
+      // Double-check extraction date matches
+      if (result.extraction.date !== selectedExtractionDate) {
+        return; // Skip if date doesn't match
+      }
+      
       const comboId = result.savedCombination.id;
       const existing = uniqueByIdMap.get(comboId);
       
@@ -321,6 +335,11 @@ const SavedCombinationsAnalysis: React.FC = () => {
     // AND filter to only include valid saved combinations
     const uniqueByNumbersMap = new Map<string, MatchAnalysis>();
     Array.from(uniqueByIdMap.values()).forEach(result => {
+      // Final check: ensure extraction date matches
+      if (result.extraction.date !== selectedExtractionDate) {
+        return; // Skip if date doesn't match
+      }
+      
       const sortedNumbers = [...result.savedCombination.numbers].sort((a, b) => a - b);
       const numbersKey = `${sortedNumbers.join(',')}-${result.savedCombination.gameType}`;
       
@@ -335,12 +354,14 @@ const SavedCombinationsAnalysis: React.FC = () => {
       }
     });
     
-    filteredResults = Array.from(uniqueByNumbersMap.values()).sort((a, b) => {
-      if (b.matchCount !== a.matchCount) {
-        return b.matchCount - a.matchCount;
-      }
-      return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
-    });
+    filteredResults = Array.from(uniqueByNumbersMap.values())
+      .filter(result => result.extraction.date === selectedExtractionDate) // Final safety check
+      .sort((a, b) => {
+        if (b.matchCount !== a.matchCount) {
+          return b.matchCount - a.matchCount;
+        }
+        return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
+      });
     
     // Debug warning if mismatch detected
     if (process.env.NODE_ENV === 'development') {
