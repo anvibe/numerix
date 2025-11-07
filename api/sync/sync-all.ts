@@ -1,11 +1,21 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
-import { scrapeSuperEnalottoExtractions } from '../scrape/superenalotto';
 
-// Configure function limits
-export const config = {
-  maxDuration: 60, // 60 seconds timeout
-};
+// Lazy import to avoid top-level errors
+let scrapeSuperEnalottoExtractions: (() => Promise<any>) | null = null;
+
+async function getScraper() {
+  if (!scrapeSuperEnalottoExtractions) {
+    try {
+      const scraperModule = await import('../scrape/superenalotto');
+      scrapeSuperEnalottoExtractions = scraperModule.scrapeSuperEnalottoExtractions;
+    } catch (error) {
+      console.error('Failed to import scraper:', error);
+      throw new Error(`Failed to load scraper module: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  return scrapeSuperEnalottoExtractions;
+}
 
 // Define types locally to avoid import issues
 interface ExtractedNumbers {
@@ -67,8 +77,10 @@ async function syncSuperEnalotto(): Promise<{
     // Scrape extractions with timeout protection
     let extractions;
     try {
+      const scraper = await getScraper();
+      
       // Add timeout wrapper
-      const scrapePromise = scrapeSuperEnalottoExtractions();
+      const scrapePromise = scraper();
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error('Scraping timeout after 30 seconds')), 30000);
       });
@@ -193,16 +205,20 @@ async function syncSuperEnalotto(): Promise<{
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  
+  // Wrap everything in try-catch to catch initialization errors
   try {
+    // CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+    
+    console.log('Sync handler called', { method: req.method, query: req.query });
+    
+    try {
     // Validate input
     const gameType = (req.query.gameType as string) || req.body?.gameType || 'all';
     
@@ -262,14 +278,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         message: `Scraper for ${gameType} is not yet implemented`,
       });
     }
-  } catch (error) {
-    console.error('Error in sync handler:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const errorStack = error instanceof Error ? error.stack : String(error);
-    console.error('Error details:', { errorMessage, errorStack });
+    } catch (error) {
+      console.error('Error in sync handler:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : String(error);
+      console.error('Error details:', { errorMessage, errorStack });
+      
+      return res.status(500).json({
+        error: 'Sync failed',
+        message: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? errorStack : undefined,
+      });
+    }
+  } catch (initError) {
+    // Catch initialization errors (imports, etc.)
+    console.error('Fatal initialization error:', initError);
+    const errorMessage = initError instanceof Error ? initError.message : 'Initialization failed';
+    const errorStack = initError instanceof Error ? initError.stack : String(initError);
     
     return res.status(500).json({
-      error: 'Sync failed',
+      error: 'Function initialization failed',
       message: errorMessage,
       details: process.env.NODE_ENV === 'development' ? errorStack : undefined,
     });
