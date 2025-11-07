@@ -383,29 +383,53 @@ const SavedCombinationsAnalysis: React.FC = () => {
   }
 
   // If filtering by difference but NOT by a specific combination,
-  // deduplicate to show each saved combination only once (best match)
+  // Show all results that match the filter, prioritizing recent extractions
+  // This ensures new extractions are visible even if they're not the best match for a combination
   if (filterDifference !== null && selectedCombinationId === null) {
-    const uniqueCombinations = new Map<string, MatchAnalysis>();
+    const now = Date.now();
+    const sevenDaysAgo = now - (7 * 24 * 60 * 60 * 1000);
+    
+    // Separate recent extractions (last 7 days) from older ones
+    const recentResults: MatchAnalysis[] = [];
+    const olderResults: MatchAnalysis[] = [];
     
     filteredResults.forEach(result => {
+      const extractionDate = new Date(result.extraction.date).getTime();
+      if (extractionDate >= sevenDaysAgo) {
+        recentResults.push(result);
+      } else {
+        olderResults.push(result);
+      }
+    });
+    
+    // For recent extractions, show all (no deduplication)
+    // For older extractions, deduplicate (one per combination)
+    const uniqueOlderCombinations = new Map<string, MatchAnalysis>();
+    olderResults.forEach(result => {
       const comboId = result.savedCombination.id;
-      const existing = uniqueCombinations.get(comboId);
+      const existing = uniqueOlderCombinations.get(comboId);
       
-      // Keep the result with the best match (lowest difference, or if same difference, most recent)
+      // Keep the best match for older extractions
       if (!existing || 
           result.matchCount > existing.matchCount ||
           (result.matchCount === existing.matchCount && 
            new Date(result.extraction.date) > new Date(existing.extraction.date))) {
-        uniqueCombinations.set(comboId, result);
+        uniqueOlderCombinations.set(comboId, result);
       }
     });
     
-    filteredResults = Array.from(uniqueCombinations.values()).sort((a, b) => {
-      if (b.matchCount !== a.matchCount) {
-        return b.matchCount - a.matchCount;
-      }
-      return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
-    });
+    // Combine: recent first (all of them), then older (deduplicated)
+    filteredResults = [
+      ...recentResults.sort((a, b) => 
+        new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime()
+      ),
+      ...Array.from(uniqueOlderCombinations.values()).sort((a, b) => {
+        if (b.matchCount !== a.matchCount) {
+          return b.matchCount - a.matchCount;
+        }
+        return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
+      })
+    ];
   }
 
   // When a specific combination is selected, ensure we only show results for extractions >= combination save date
