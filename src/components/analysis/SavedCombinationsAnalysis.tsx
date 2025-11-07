@@ -30,6 +30,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
   const [filterDifference, setFilterDifference] = useState<number | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [selectedCombinationId, setSelectedCombinationId] = useState<string | null>(null);
+  const [resultsLimit, setResultsLimit] = useState<number>(10);
 
   // Calculate combinations and extractions directly (no memoization to avoid React error #310)
   // Start with savedCombinations which should already be deduplicated, but apply additional safety checks
@@ -378,9 +379,9 @@ const SavedCombinationsAnalysis: React.FC = () => {
   } else {
     // No specific combination selected - apply difference filter normally
     if (filterDifference === null) {
-      // When "Tutte" is selected, sort by date ascending (oldest first)
+      // When "Tutte" is selected, sort by date descending (most recent first)
       filteredResults = [...analysisResults].sort((a, b) => {
-        return new Date(a.extraction.date).getTime() - new Date(b.extraction.date).getTime();
+        return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
       });
     } else {
       filteredResults = analysisResults.filter(result => result.difference === filterDifference);
@@ -701,7 +702,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
             )}
           </div>
         ) : (
-          filteredResults.slice(0, 10).map((result, index) => {
+          filteredResults.slice(0, resultsLimit).map((result, index) => {
             const { savedCombination, extraction, matches, matchCount, missingNumbers, difference, suggestions } = result;
             
             // Highlight very recent extractions (last 7 days)
@@ -923,9 +924,28 @@ const SavedCombinationsAnalysis: React.FC = () => {
         )}
       </div>
 
-      {filteredResults.length > 10 && (
-        <div className="mt-4 text-center text-sm text-text-secondary">
-          Mostrati i primi 10 risultati su {filteredResults.length} totali
+      {filteredResults.length > 0 && (
+        <div className="mt-4 flex items-center justify-between flex-wrap gap-4">
+          <div className="text-sm text-text-secondary">
+            Mostrati {Math.min(resultsLimit, filteredResults.length)} risultati su {filteredResults.length} totali
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-text-secondary">Mostra:</label>
+            <select
+              value={resultsLimit}
+              onChange={(e) => setResultsLimit(Number(e.target.value))}
+              className="px-3 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-bg-primary text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value={10}>10</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={500}>500</option>
+              <option value={1000}>1000</option>
+              <option value={5000}>5000</option>
+              <option value={10000}>10000</option>
+              <option value={filteredResults.length}>Tutti ({filteredResults.length})</option>
+            </select>
+          </div>
         </div>
       )}
     </div>
