@@ -43,6 +43,7 @@ interface GameContextType {
   extractionsData: Record<GameType, ExtractedNumbers[]>;
   addExtraction: (gameType: GameType, extraction: ExtractedNumbers) => void;
   setExtractionsForGame: (gameType: GameType, newExtractions: ExtractedNumbers[]) => void;
+  reloadExtractions: () => Promise<void>;
   unsuccessfulCombinations: UnsuccessfulCombination[];
   addUnsuccessfulCombination: (combination: Omit<UnsuccessfulCombination, 'id' | 'dateAdded'>) => void;
   deleteUnsuccessfulCombination: (id: string) => void;
@@ -63,6 +64,7 @@ export const GameContext = createContext<GameContextType>({
   extractionsData: { superenalotto: [], lotto: [], '10elotto': [], millionday: [] },
   addExtraction: () => {},
   setExtractionsForGame: () => {},
+  reloadExtractions: () => Promise.resolve(),
   unsuccessfulCombinations: [],
   addUnsuccessfulCombination: () => {},
   deleteUnsuccessfulCombination: () => {},
@@ -214,74 +216,81 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     }
   }, [isAuthenticated]);
   
-  // Load extractions data on initialization
-  useEffect(() => {
-    const loadExtractionsData = async () => {
-      try {
-        // Load extractions from Supabase for all game types
-        const extractionsPromises = (['superenalotto', 'lotto', '10elotto', 'millionday'] as GameType[]).map(async (gameType) => {
-          const extractions = await extractionService.getExtractions(gameType);
-          return { gameType, extractions };
-        });
+  // Function to load extractions data (extracted for reuse)
+  const loadExtractionsData = async () => {
+    try {
+      // Load extractions from Supabase for all game types
+      const extractionsPromises = (['superenalotto', 'lotto', '10elotto', 'millionday'] as GameType[]).map(async (gameType) => {
+        const extractions = await extractionService.getExtractions(gameType);
+        return { gameType, extractions };
+      });
+      
+      const results = await Promise.all(extractionsPromises);
+      const newExtractionsData: Record<GameType, ExtractedNumbers[]> = {
+        superenalotto: [],
+        lotto: [],
+        '10elotto': [],
+        millionday: []
+      };
+      
+      results.forEach(({ gameType, extractions }) => {
+        newExtractionsData[gameType] = extractions;
+      });
+      
+      // If no data exists in Supabase, load from CSV files and populate the database
+      const hasSuper = newExtractionsData.superenalotto.length > 0;
+      const hasLotto = newExtractionsData.lotto.length > 0;
+      
+      if (!hasSuper || !hasLotto) {
+        console.log('Loading default CSV data and populating Supabase...');
         
-        const results = await Promise.all(extractionsPromises);
-        const newExtractionsData: Record<GameType, ExtractedNumbers[]> = {
-          superenalotto: [],
-          lotto: [],
-          '10elotto': [],
-          millionday: []
-        };
+        const [lottoData, superenalottoData] = await Promise.all([
+          fetchAndParseLottoCSV(),
+          fetchAndParseSuperenalottoCSV()
+        ]);
         
-        results.forEach(({ gameType, extractions }) => {
-          newExtractionsData[gameType] = extractions;
-        });
-        
-        // If no data exists in Supabase, load from CSV files and populate the database
-        const hasSuper = newExtractionsData.superenalotto.length > 0;
-        const hasLotto = newExtractionsData.lotto.length > 0;
-        
-        if (!hasSuper || !hasLotto) {
-          console.log('Loading default CSV data and populating Supabase...');
-          
-          const [lottoData, superenalottoData] = await Promise.all([
-            fetchAndParseLottoCSV(),
-            fetchAndParseSuperenalottoCSV()
-          ]);
-          
-          // Upload to Supabase if we have data
-          if (!hasLotto && lottoData.length > 0) {
-            await extractionService.bulkInsertExtractions('lotto', lottoData);
-            newExtractionsData.lotto = lottoData;
-          }
-          
-          if (!hasSuper && superenalottoData.length > 0) {
-            await extractionService.bulkInsertExtractions('superenalotto', superenalottoData);
-            newExtractionsData.superenalotto = superenalottoData;
-          }
+        // Upload to Supabase if we have data
+        if (!hasLotto && lottoData.length > 0) {
+          await extractionService.bulkInsertExtractions('lotto', lottoData);
+          newExtractionsData.lotto = lottoData;
         }
         
-        setExtractionsData(newExtractionsData);
-      } catch (error) {
-        console.error('Error loading extractions data:', error);
-        // Fallback to CSV files if Supabase fails
-        try {
-          const [lottoData, superenalottoData] = await Promise.all([
-            fetchAndParseLottoCSV(),
-            fetchAndParseSuperenalottoCSV()
-          ]);
-          
-          setExtractionsData({
-            superenalotto: superenalottoData,
-            lotto: lottoData,
-            '10elotto': [],
-            millionday: []
-          });
-        } catch (csvError) {
-          console.error('Error loading CSV fallback data:', csvError);
+        if (!hasSuper && superenalottoData.length > 0) {
+          await extractionService.bulkInsertExtractions('superenalotto', superenalottoData);
+          newExtractionsData.superenalotto = superenalottoData;
         }
       }
-    };
-    
+      
+      setExtractionsData(newExtractionsData);
+    } catch (error) {
+      console.error('Error loading extractions data:', error);
+      // Fallback to CSV files if Supabase fails
+      try {
+        const [lottoData, superenalottoData] = await Promise.all([
+          fetchAndParseLottoCSV(),
+          fetchAndParseSuperenalottoCSV()
+        ]);
+        
+        setExtractionsData({
+          superenalotto: superenalottoData,
+          lotto: lottoData,
+          '10elotto': [],
+          millionday: []
+        });
+      } catch (csvError) {
+        console.error('Error loading CSV fallback data:', csvError);
+      }
+    }
+  };
+  
+  // Function to reload extractions (for use after scraping)
+  const reloadExtractions = async () => {
+    console.log('Reloading extractions from Supabase...');
+    await loadExtractionsData();
+  };
+  
+  // Load extractions data on initialization
+  useEffect(() => {
     if (!isLoading) {
       loadExtractionsData();
     }
@@ -564,6 +573,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         extractionsData,
         addExtraction,
         setExtractionsForGame,
+        reloadExtractions,
         unsuccessfulCombinations,
         addUnsuccessfulCombination,
         deleteUnsuccessfulCombination,

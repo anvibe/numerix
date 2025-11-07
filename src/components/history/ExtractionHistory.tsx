@@ -9,7 +9,7 @@ import { ExtractionSyncService } from '../../utils/apiService';
 import { showToast } from '../../utils/toast';
 
 const ExtractionHistory: React.FC = () => {
-  const { selectedGame, gameConfig, extractionsData } = useGame();
+  const { selectedGame, gameConfig, extractionsData, reloadExtractions } = useGame();
   const [limit, setLimit] = useState<number>(10);
   const [selectedWheel, setSelectedWheel] = useState<LottoWheel>('Bari');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -30,12 +30,12 @@ const ExtractionHistory: React.FC = () => {
           : result.message || 'Sincronizzazione completata. Nessuna nuova estrazione trovata.';
         showToast.success(message);
         
-        // Reload extractions from context
-        // The context will automatically reload from Supabase
+        // Reload extractions from Supabase
         // Use a small delay to ensure the database has been updated
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
+        setTimeout(async () => {
+          await reloadExtractions();
+          showToast.success('Estrazioni aggiornate!');
+        }, 1500);
       } else {
         // Show the actual error message from the server
         const errorMsg = result.message || result.error || 'Errore durante la sincronizzazione';
