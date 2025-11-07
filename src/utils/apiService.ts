@@ -64,33 +64,76 @@ export class ExtractionSyncService {
 export class ApiService {
   private static baseUrl = '/api';
   
-  static async makeRequest(endpoint: string, options: RequestInit = {}): Promise<Response> {
+  static async makeRequest(endpoint: string, options: RequestInit = {}, retries = 3): Promise<Response> {
     const url = `${this.baseUrl}${endpoint}`;
     
-    try {
-      console.log(`Making API request to: ${url}`);
-      
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
-      });
-      
-      console.log(`API Response: ${response.status} ${response.statusText}`);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`API Error ${response.status}:`, errorText);
-        throw new ApiError(response.status, response.statusText, errorText);
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        console.log(`Making API request to: ${url} (attempt ${attempt + 1}/${retries})`);
+        
+        // Add timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout
+        
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+          cache: 'no-store',
+          headers: {
+            'Content-Type': 'application/json',
+            ...options.headers,
+          },
+        });
+        
+        clearTimeout(timeoutId);
+        console.log(`API Response: ${response.status} ${response.statusText}`);
+        
+        if (!response.ok) {
+          const isJson = response.headers.get('content-type')?.includes('application/json');
+          const errorText = isJson 
+            ? JSON.stringify(await response.json().catch(() => ({})))
+            : await response.text();
+          console.error(`API Error ${response.status}:`, errorText);
+          
+          // Retry on 5xx errors (server errors)
+          if (response.status >= 500 && attempt < retries - 1) {
+            const backoff = 300 * (attempt + 1) ** 2; // Exponential backoff
+            console.log(`Retrying after ${backoff}ms...`);
+            await new Promise(resolve => setTimeout(resolve, backoff));
+            continue;
+          }
+          
+          throw new ApiError(response.status, response.statusText, errorText);
+        }
+        
+        return response;
+      } catch (error) {
+        // Handle abort/timeout
+        if (error instanceof Error && error.name === 'AbortError') {
+          console.error('Request timeout');
+          if (attempt < retries - 1) {
+            const backoff = 300 * (attempt + 1) ** 2;
+            await new Promise(resolve => setTimeout(resolve, backoff));
+            continue;
+          }
+          throw new ApiError(504, 'Request Timeout', 'The request took too long to complete');
+        }
+        
+        // Network errors - retry
+        if (attempt < retries - 1 && error instanceof Error && 
+            (error.message.includes('fetch') || error.message.includes('network'))) {
+          const backoff = 300 * (attempt + 1) ** 2;
+          console.log(`Network error, retrying after ${backoff}ms...`);
+          await new Promise(resolve => setTimeout(resolve, backoff));
+          continue;
+        }
+        
+        console.error('API Request failed:', error);
+        throw error;
       }
-      
-      return response;
-    } catch (error) {
-      console.error('API Request failed:', error);
-      throw error;
     }
+    
+    throw new ApiError(500, 'Request Failed', 'All retry attempts failed');
   }
   
   static async get(endpoint: string, headers?: Record<string, string>) {

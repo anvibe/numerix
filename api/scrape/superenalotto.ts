@@ -285,6 +285,11 @@ async function scrapeLottologiaSuperEnalotto(): Promise<ExtractedNumbers[]> {
   }
 }
 
+// Configure function limits
+export const config = {
+  maxDuration: 60, // 60 seconds timeout
+};
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');

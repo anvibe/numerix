@@ -2,6 +2,11 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import { scrapeSuperEnalottoExtractions } from '../scrape/superenalotto';
 
+// Configure function limits
+export const config = {
+  maxDuration: 60, // 60 seconds timeout
+};
+
 // Define types locally to avoid import issues
 interface ExtractedNumbers {
   date: string;
@@ -9,6 +14,20 @@ interface ExtractedNumbers {
   wheels?: Record<string, number[]>;
   jolly?: number;
   superstar?: number;
+}
+
+// Valid game types
+const VALID_GAME_TYPES = ['superenalotto', 'lotto', '10elotto', 'millionday'] as const;
+type GameType = typeof VALID_GAME_TYPES[number];
+
+// Helper to return API errors
+function toApiError(res: VercelResponse, status: number, message: string, details?: unknown) {
+  console.error('API Error:', { status, message, details });
+  return res.status(status).json({
+    success: false,
+    error: message,
+    details: process.env.NODE_ENV === 'development' ? details : undefined,
+  });
 }
 
 // Get Supabase client (lazy initialization)
@@ -35,22 +54,38 @@ const convertExtractionToInsert = (gameType: string, extraction: ExtractedNumber
   };
 };
 
-async function syncSuperEnalotto() {
+async function syncSuperEnalotto(): Promise<{
+  success: boolean;
+  message: string;
+  total: number;
+  new: number;
+  error?: string;
+}> {
   try {
     console.log('Starting SuperEnalotto sync...');
     
-    // Scrape extractions
+    // Scrape extractions with timeout protection
     let extractions;
     try {
-      extractions = await scrapeSuperEnalottoExtractions();
+      // Add timeout wrapper
+      const scrapePromise = scrapeSuperEnalottoExtractions();
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Scraping timeout after 30 seconds')), 30000);
+      });
+      
+      extractions = await Promise.race([scrapePromise, timeoutPromise]);
     } catch (scrapeError) {
       console.error('Error scraping SuperEnalotto:', scrapeError);
+      const errorMessage = scrapeError instanceof Error ? scrapeError.message : 'Scraping failed';
+      const errorStack = scrapeError instanceof Error ? scrapeError.stack : String(scrapeError);
+      console.error('Scrape error details:', { errorMessage, errorStack });
+      
       return {
         success: false,
-        message: scrapeError instanceof Error ? scrapeError.message : 'Scraping failed',
+        message: errorMessage,
         total: 0,
         new: 0,
-        error: scrapeError instanceof Error ? scrapeError.stack : String(scrapeError),
+        error: errorStack,
       };
     }
     
@@ -66,17 +101,34 @@ async function syncSuperEnalotto() {
     console.log(`Found ${extractions.length} extractions`);
     
     // Check for existing extractions to avoid duplicates
-    const supabase = getSupabaseClient();
-    const existingDates = new Set<string>();
-    const { data: existingExtractions } = await supabase
-      .from('extractions')
-      .select('extraction_date')
-      .eq('game_type', 'superenalotto');
-    
-    if (existingExtractions) {
-      existingExtractions.forEach((ext) => {
-        existingDates.add(ext.extraction_date);
-      });
+    let existingDates = new Set<string>();
+    try {
+      const supabase = getSupabaseClient();
+      const { data: existingExtractions, error: queryError } = await supabase
+        .from('extractions')
+        .select('extraction_date')
+        .eq('game_type', 'superenalotto')
+        .limit(10000); // Add limit to prevent huge queries
+      
+      if (queryError) {
+        console.error('Error querying existing extractions:', queryError);
+        throw queryError;
+      }
+      
+      if (existingExtractions) {
+        existingExtractions.forEach((ext) => {
+          existingDates.add(ext.extraction_date);
+        });
+      }
+    } catch (dbError) {
+      console.error('Database query error:', dbError);
+      return {
+        success: false,
+        message: dbError instanceof Error ? dbError.message : 'Database query failed',
+        total: extractions.length,
+        new: 0,
+        error: dbError instanceof Error ? dbError.stack : String(dbError),
+      };
     }
     
     // Filter out duplicates
@@ -95,24 +147,35 @@ async function syncSuperEnalotto() {
       };
     }
     
-    // Insert new extractions in batches
+    // Insert new extractions in batches with error handling
     const batchSize = 50;
     let inserted = 0;
+    const supabase = getSupabaseClient();
     
     for (let i = 0; i < newExtractions.length; i += batchSize) {
-      const batch = newExtractions.slice(i, i + batchSize);
-      const insertData = batch.map((ext) => convertExtractionToInsert('superenalotto', ext));
-      
-      const { error } = await supabase
-        .from('extractions')
-        .insert(insertData);
-      
-      if (error) {
-        console.error('Error inserting batch:', error);
-        throw error;
+      try {
+        const batch = newExtractions.slice(i, i + batchSize);
+        const insertData = batch.map((ext) => convertExtractionToInsert('superenalotto', ext));
+        
+        const { error, data } = await supabase
+          .from('extractions')
+          .insert(insertData)
+          .select();
+        
+        if (error) {
+          console.error(`Error inserting batch ${i / batchSize + 1}:`, error);
+          // Continue with other batches instead of failing completely
+          console.warn(`Skipping batch ${i / batchSize + 1}, continuing...`);
+          continue;
+        }
+        
+        inserted += batch.length;
+        console.log(`Inserted batch ${i / batchSize + 1}/${Math.ceil(newExtractions.length / batchSize)}: ${batch.length} items`);
+      } catch (batchError) {
+        console.error(`Exception in batch ${i / batchSize + 1}:`, batchError);
+        // Continue with next batch
+        continue;
       }
-      
-      inserted += batch.length;
     }
     
     console.log(`Successfully inserted ${inserted} extractions`);
@@ -140,7 +203,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   
   try {
+    // Validate input
     const gameType = (req.query.gameType as string) || req.body?.gameType || 'all';
+    
+    if (gameType !== 'all' && !VALID_GAME_TYPES.includes(gameType as GameType)) {
+      return toApiError(res, 400, `Invalid game type. Must be one of: ${VALID_GAME_TYPES.join(', ')}, or 'all'`);
+    }
     
     if (gameType === 'all') {
       // Sync all games
@@ -167,14 +235,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         results,
       });
     } else {
-      // Sync single game
-      if (!['superenalotto', 'lotto', '10elotto', 'millionday'].includes(gameType)) {
-        return res.status(400).json({
-          error: 'Invalid game type',
-          message: `Game type must be one of: superenalotto, lotto, 10elotto, millionday`,
-        });
-      }
-      
+      // Sync single game (already validated above)
       if (gameType === 'superenalotto') {
         try {
           const result = await syncSuperEnalotto();
