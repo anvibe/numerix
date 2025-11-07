@@ -82,13 +82,16 @@ async function syncSuperEnalotto(): Promise<{
     // Scrape extractions with timeout protection
     let extractions;
     try {
+      console.log('[sync] Calling scrapeSuperEnalottoExtractions...');
       // Add timeout wrapper
       const scrapePromise = scrapeSuperEnalottoExtractions();
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error('Scraping timeout after 30 seconds')), 30000);
       });
       
+      console.log('[sync] Waiting for scrape to complete...');
       extractions = await Promise.race([scrapePromise, timeoutPromise]);
+      console.log(`[sync] Scrape completed, got ${extractions.length} extractions`);
     } catch (scrapeError) {
       console.error('Error scraping SuperEnalotto:', scrapeError);
       const errorMessage = scrapeError instanceof Error ? scrapeError.message : 'Scraping failed';

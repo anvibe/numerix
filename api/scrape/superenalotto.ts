@@ -94,25 +94,31 @@ async function scrapeLottologiaSuperEnalotto(): Promise<ExtractedNumbers[]> {
   
   try {
     const url = 'https://www.lottologia.com/superenalotto/archivio-estrazioni/';
-    console.log('Scraping SuperEnalotto from Lottologia...', url);
+    console.log('[scrape] Starting scrape from Lottologia...', url);
     
-    // Use native fetch (Node 18+ on Vercel) or fallback to node-fetch
+    // Use native fetch (Node 18+ on Vercel)
     let fetchImpl: typeof fetch;
     try {
       // Try native fetch first (available in Node 18+)
       if (typeof globalThis.fetch === 'function') {
         fetchImpl = globalThis.fetch;
-        console.log('Using native fetch');
+        console.log('[scrape] Using native fetch');
       } else {
         throw new Error('Native fetch not available');
       }
     } catch (e) {
       // Fallback to node-fetch
-      console.log('Falling back to node-fetch');
-      const nodeFetch = await import('node-fetch');
-      fetchImpl = nodeFetch.default as typeof fetch;
+      console.log('[scrape] Falling back to node-fetch');
+      try {
+        const nodeFetch = await import('node-fetch');
+        fetchImpl = nodeFetch.default as typeof fetch;
+      } catch (importError) {
+        console.error('[scrape] Failed to import node-fetch:', importError);
+        throw new Error(`Failed to load fetch implementation: ${importError instanceof Error ? importError.message : String(importError)}`);
+      }
     }
     
+    console.log('[scrape] Making fetch request...');
     const response = await fetchImpl(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -127,14 +133,23 @@ async function scrapeLottologiaSuperEnalotto(): Promise<ExtractedNumbers[]> {
       throw new Error(`Lottologia request failed: ${response.status} - ${errorText.substring(0, 200)}`);
     }
     
+    console.log('[scrape] Fetch successful, reading response...');
     const html = await response.text();
-    console.log(`Fetched HTML, length: ${html.length}`);
+    console.log(`[scrape] Fetched HTML, length: ${html.length}`);
     
     if (!html || html.length < 100) {
       throw new Error('Received empty or too short HTML response');
     }
     
-    const $ = cheerio.load(html);
+    console.log('[scrape] Loading HTML with cheerio...');
+    let $: cheerio.CheerioAPI;
+    try {
+      $ = cheerio.load(html);
+      console.log('[scrape] Cheerio loaded successfully');
+    } catch (cheerioError) {
+      console.error('[scrape] Cheerio load error:', cheerioError);
+      throw new Error(`Failed to parse HTML with cheerio: ${cheerioError instanceof Error ? cheerioError.message : String(cheerioError)}`);
+    }
     
     // Parse Lottologia HTML structure - table with class "table table-balls"
     let tableRows = $('table.table-balls tbody tr');
