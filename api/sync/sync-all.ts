@@ -17,12 +17,14 @@ type GameType = typeof VALID_GAME_TYPES[number];
 
 // Helper to return API errors with structured logging
 function toApiError(res: VercelResponse, status: number, message: string, details?: unknown) {
-  const errorInfo = {
+  const errorInfo: Record<string, unknown> = {
     status,
     message,
     timestamp: new Date().toISOString(),
-    ...(details && { details }),
   };
+  if (details && typeof details === 'object') {
+    errorInfo.details = details;
+  }
   console.error('[sync-all]', errorInfo);
   return res.status(status).json({
     success: false,
@@ -96,10 +98,10 @@ async function scrapeSuperEnalottoExtractions(): Promise<ExtractedNumbers[]> {
     console.log('[scrape] Starting scrape from Lottologia...', url);
     
     // Use native fetch (Node 18+ on Vercel)
-    let fetchImpl: typeof fetch;
+    let fetchImpl: (url: string | URL | Request, init?: RequestInit) => Promise<Response>;
     try {
       if (typeof globalThis.fetch === 'function') {
-        fetchImpl = globalThis.fetch;
+        fetchImpl = globalThis.fetch as typeof fetch;
         console.log('[scrape] Using native fetch');
       } else {
         throw new Error('Native fetch not available');
@@ -108,35 +110,84 @@ async function scrapeSuperEnalottoExtractions(): Promise<ExtractedNumbers[]> {
       console.log('[scrape] Falling back to node-fetch');
       try {
         const nodeFetch = await import('node-fetch');
-        fetchImpl = nodeFetch.default as typeof fetch;
+        fetchImpl = nodeFetch.default as unknown as typeof fetch;
       } catch (importError) {
         console.error('[scrape] Failed to import node-fetch:', importError);
         throw new Error(`Failed to load fetch implementation: ${importError instanceof Error ? importError.message : String(importError)}`);
       }
     }
     
-    console.log('[scrape] Making fetch request...');
-    const response = await fetchImpl(url, {
-      headers: {
+    // Add random delay to appear more human-like (1-3 seconds)
+    const delay = Math.floor(Math.random() * 2000) + 1000;
+    console.log(`[scrape] Waiting ${delay}ms before request...`);
+    await new Promise(resolve => setTimeout(resolve, delay));
+    
+    // Try multiple header configurations
+    const headerConfigs: Record<string, string>[] = [
+      // Config 1: Minimal headers
+      {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'it-IT,it;q=0.9,en;q=0.8',
+      },
+      // Config 2: Full browser headers
+      {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
         'Accept-Language': 'it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7',
         'Accept-Encoding': 'gzip, deflate, br',
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'none',
-        'Sec-Fetch-User': '?1',
-        'Cache-Control': 'max-age=0',
         'Referer': 'https://www.google.com/',
       },
-    });
+    ];
     
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unable to read error response');
-      console.error(`[scrape] Lottologia request failed: ${response.status}`, errorText);
-      throw new Error(`Lottologia request failed: ${response.status} - ${errorText.substring(0, 200)}`);
+    let response: Response | null = null;
+    let lastError: Error | null = null;
+    
+    // Try each header configuration with retries
+    for (let configIndex = 0; configIndex < headerConfigs.length; configIndex++) {
+      const headers = headerConfigs[configIndex];
+      
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          if (attempt > 0) {
+            const retryDelay = Math.floor(Math.random() * 1000) + 500;
+            console.log(`[scrape] Retry attempt ${attempt + 1} with config ${configIndex + 1}, waiting ${retryDelay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+          }
+          
+          console.log(`[scrape] Making fetch request (config ${configIndex + 1}, attempt ${attempt + 1})...`);
+          response = await fetchImpl(url, { headers });
+          
+          if (response.ok) {
+            console.log(`[scrape] Success with config ${configIndex + 1}`);
+            break;
+          } else if (response.status === 403) {
+            console.warn(`[scrape] Got 403 with config ${configIndex + 1}, trying next config...`);
+            lastError = new Error(`Lottologia request failed: ${response.status}`);
+            response = null;
+            continue;
+          } else {
+            const errorText = await response.text().catch(() => 'Unable to read error response');
+            throw new Error(`Lottologia request failed: ${response.status} - ${errorText.substring(0, 200)}`);
+          }
+        } catch (error) {
+          console.error(`[scrape] Request failed (config ${configIndex + 1}, attempt ${attempt + 1}):`, error);
+          lastError = error instanceof Error ? error : new Error(String(error));
+          response = null;
+        }
+      }
+      
+      if (response && response.ok) {
+        break;
+      }
+    }
+    
+    if (!response || !response.ok) {
+      const errorText = lastError?.message || 'All request attempts failed';
+      console.error(`[scrape] All attempts failed: ${errorText}`);
+      throw new Error(`Lottologia request failed after all attempts: ${errorText}`);
     }
     
     console.log('[scrape] Fetch successful, reading response...');
@@ -148,7 +199,7 @@ async function scrapeSuperEnalottoExtractions(): Promise<ExtractedNumbers[]> {
     }
     
     console.log('[scrape] Loading HTML with cheerio...');
-    let $: cheerio.CheerioAPI;
+    let $: ReturnType<typeof cheerio.load>;
     try {
       $ = cheerio.load(html);
       console.log('[scrape] Cheerio loaded successfully');
@@ -521,7 +572,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         try {
           const result = await syncSuperEnalotto();
           return res.status(200).json({
-            success: result.success,
             gameType,
             ...result,
           });
