@@ -1,7 +1,15 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
-import { ExtractedNumbers } from '../../src/types';
+
+// Define types locally to avoid import issues
+interface ExtractedNumbers {
+  date: string;
+  numbers: number[];
+  wheels?: Record<string, number[]>;
+  jolly?: number;
+  superstar?: number;
+}
 
 // Get Supabase client (lazy initialization)
 function getSupabaseClient() {
