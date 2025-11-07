@@ -3,6 +3,9 @@ import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
 import { ExtractedNumbers } from '../../src/types';
 
+// Vercel uses Node 18+ which has native fetch, so we can use it directly
+// If needed, we can fallback to node-fetch, but it should not be necessary
+
 // Initialize Supabase client
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
@@ -84,8 +87,9 @@ async function scrapeLottologiaSuperEnalotto(): Promise<ExtractedNumbers[]> {
   
   try {
     const url = 'https://www.lottologia.com/superenalotto/archivio-estrazioni/';
-    console.log('Scraping SuperEnalotto from Lottologia...');
+    console.log('Scraping SuperEnalotto from Lottologia...', url);
     
+    // Use native fetch (available in Node 18+ on Vercel)
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -95,14 +99,44 @@ async function scrapeLottologiaSuperEnalotto(): Promise<ExtractedNumbers[]> {
     });
     
     if (!response.ok) {
-      throw new Error(`Lottologia request failed: ${response.status}`);
+      const errorText = await response.text().catch(() => 'Unable to read error response');
+      console.error(`Lottologia request failed: ${response.status}`, errorText);
+      throw new Error(`Lottologia request failed: ${response.status} - ${errorText.substring(0, 200)}`);
     }
     
     const html = await response.text();
+    console.log(`Fetched HTML, length: ${html.length}`);
+    
+    if (!html || html.length < 100) {
+      throw new Error('Received empty or too short HTML response');
+    }
+    
     const $ = cheerio.load(html);
     
     // Parse Lottologia HTML structure - table with class "table table-balls"
-    $('table.table-balls tbody tr').each((i, elem) => {
+    let tableRows = $('table.table-balls tbody tr');
+    console.log(`Found ${tableRows.length} table rows with selector 'table.table-balls tbody tr'`);
+    
+    if (tableRows.length === 0) {
+      // Try alternative selectors
+      tableRows = $('table tbody tr');
+      console.log(`Trying 'table tbody tr', found ${tableRows.length} rows`);
+      
+      if (tableRows.length === 0) {
+        tableRows = $('table tr');
+        console.log(`Trying 'table tr', found ${tableRows.length} rows`);
+      }
+      
+      if (tableRows.length === 0) {
+        console.error('No table rows found in HTML');
+        // Log a sample of the HTML for debugging
+        const sampleHtml = html.substring(0, 1000);
+        console.error('HTML sample:', sampleHtml);
+        return [];
+      }
+    }
+    
+    tableRows.each((i, elem) => {
       try {
         const $row = $(elem);
         
@@ -213,10 +247,18 @@ async function scrapeLottologiaSuperEnalotto(): Promise<ExtractedNumbers[]> {
     
     console.log(`Parsed ${extractions.length} extractions from Lottologia`);
     
+    if (extractions.length === 0) {
+      console.warn('No extractions parsed - this might indicate a parsing issue');
+    }
+    
     return extractions;
   } catch (error) {
     console.error('Error scraping Lottologia:', error);
-    return [];
+    if (error instanceof Error) {
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+    }
+    throw error; // Re-throw to let the caller handle it
   }
 }
 
@@ -234,7 +276,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('Starting SuperEnalotto scrape...');
     
     // Scrape extractions
-    const extractions = await scrapeLottologiaSuperEnalotto();
+    let extractions: ExtractedNumbers[];
+    try {
+      extractions = await scrapeLottologiaSuperEnalotto();
+    } catch (scrapeError) {
+      console.error('Scraping failed:', scrapeError);
+      return res.status(500).json({
+        error: 'Scraping failed',
+        message: scrapeError instanceof Error ? scrapeError.message : 'Unknown scraping error',
+        details: scrapeError instanceof Error ? scrapeError.stack : String(scrapeError),
+      });
+    }
     
     if (extractions.length === 0) {
       return res.status(500).json({

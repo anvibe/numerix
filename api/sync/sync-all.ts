@@ -29,7 +29,19 @@ async function syncSuperEnalotto() {
     console.log('Starting SuperEnalotto sync...');
     
     // Scrape extractions
-    const extractions = await scrapeSuperEnalottoExtractions();
+    let extractions;
+    try {
+      extractions = await scrapeSuperEnalottoExtractions();
+    } catch (scrapeError) {
+      console.error('Error scraping SuperEnalotto:', scrapeError);
+      return {
+        success: false,
+        message: scrapeError instanceof Error ? scrapeError.message : 'Scraping failed',
+        total: 0,
+        new: 0,
+        error: scrapeError instanceof Error ? scrapeError.stack : String(scrapeError),
+      };
+    }
     
     if (extractions.length === 0) {
       return {
