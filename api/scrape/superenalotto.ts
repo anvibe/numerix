@@ -3,8 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
 import { ExtractedNumbers } from '../../src/types';
 
-// Vercel uses Node 18+ which has native fetch, so we can use it directly
-// If needed, we can fallback to node-fetch, but it should not be necessary
+// Use node-fetch for HTTP requests (ESM compatible)
+import fetch from 'node-fetch';
 
 // Initialize Supabase client
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -89,7 +89,7 @@ async function scrapeLottologiaSuperEnalotto(): Promise<ExtractedNumbers[]> {
     const url = 'https://www.lottologia.com/superenalotto/archivio-estrazioni/';
     console.log('Scraping SuperEnalotto from Lottologia...', url);
     
-    // Use native fetch (available in Node 18+ on Vercel)
+    // Use node-fetch for compatibility
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -273,6 +273,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   
   try {
+    // Verify environment variables
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('Missing Supabase environment variables');
+      return res.status(500).json({
+        error: 'Configuration error',
+        message: 'Missing Supabase environment variables',
+      });
+    }
+    
     console.log('Starting SuperEnalotto scrape...');
     
     // Scrape extractions
@@ -356,9 +365,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   } catch (error) {
     console.error('Error in SuperEnalotto scraper:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : String(error);
+    console.error('Error details:', { errorMessage, errorStack });
+    
     return res.status(500).json({
       error: 'Scraping failed',
-      message: error instanceof Error ? error.message : 'Unknown error',
+      message: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? errorStack : undefined,
     });
   }
 }

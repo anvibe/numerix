@@ -128,6 +128,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   
   try {
+    // Verify environment variables
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('Missing Supabase environment variables');
+      return res.status(500).json({
+        error: 'Configuration error',
+        message: 'Missing Supabase environment variables',
+      });
+    }
+    
     const gameType = (req.query.gameType as string) || req.body?.gameType || 'all';
     
     if (gameType === 'all') {
@@ -164,12 +173,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       
       if (gameType === 'superenalotto') {
-        const result = await syncSuperEnalotto();
-        return res.status(200).json({
-          success: result.success,
-          gameType,
-          ...result,
-        });
+        try {
+          const result = await syncSuperEnalotto();
+          return res.status(200).json({
+            success: result.success,
+            gameType,
+            ...result,
+          });
+        } catch (syncError) {
+          console.error('Error in syncSuperEnalotto:', syncError);
+          return res.status(500).json({
+            success: false,
+            error: 'Sync failed',
+            message: syncError instanceof Error ? syncError.message : 'Unknown error',
+            gameType,
+            details: process.env.NODE_ENV === 'development' ? (syncError instanceof Error ? syncError.stack : String(syncError)) : undefined,
+          });
+        }
       }
       
       // Other games not implemented yet
@@ -180,9 +200,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   } catch (error) {
     console.error('Error in sync handler:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : String(error);
+    console.error('Error details:', { errorMessage, errorStack });
+    
     return res.status(500).json({
       error: 'Sync failed',
-      message: error instanceof Error ? error.message : 'Unknown error',
+      message: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? errorStack : undefined,
     });
   }
 }
