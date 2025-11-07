@@ -15,13 +15,19 @@ interface ExtractedNumbers {
 const VALID_GAME_TYPES = ['superenalotto', 'lotto', '10elotto', 'millionday'] as const;
 type GameType = typeof VALID_GAME_TYPES[number];
 
-// Helper to return API errors
+// Helper to return API errors with structured logging
 function toApiError(res: VercelResponse, status: number, message: string, details?: unknown) {
-  console.error('API Error:', { status, message, details });
+  const errorInfo = {
+    status,
+    message,
+    timestamp: new Date().toISOString(),
+    ...(details && { details }),
+  };
+  console.error('[sync-all]', errorInfo);
   return res.status(status).json({
     success: false,
     error: message,
-    details: process.env.NODE_ENV === 'development' ? details : undefined,
+    ...(process.env.NODE_ENV === 'development' && details ? { details } : {}),
   });
 }
 
@@ -29,12 +35,26 @@ function toApiError(res: VercelResponse, status: number, message: string, detail
 function getSupabaseClient() {
   const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
   const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+  // Try service role key for server-side operations (bypasses RLS)
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error('Missing Supabase environment variables');
+  if (!supabaseUrl) {
+    throw new Error('VITE_SUPABASE_URL or SUPABASE_URL environment variable is missing');
   }
 
-  return createClient(supabaseUrl, supabaseKey);
+  if (!supabaseKey && !serviceRoleKey) {
+    throw new Error('VITE_SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE_KEY environment variable is missing');
+  }
+
+  // Use service role key if available (for server-side operations that bypass RLS)
+  const key = serviceRoleKey || supabaseKey!;
+  
+  return createClient(supabaseUrl, key, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
 }
 
 // Helper function to convert extraction to database format
@@ -199,15 +219,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).end();
     }
     
-    console.log('Sync handler called', { method: req.method, query: req.query });
+    console.log('[sync-all] Handler called', { method: req.method, query: req.query, body: req.body });
+    
+    // Validate environment variables upfront
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+    const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    
+    if (!supabaseUrl) {
+      return toApiError(res, 500, 'VITE_SUPABASE_URL or SUPABASE_URL is not configured');
+    }
+    
+    if (!supabaseKey && !serviceRoleKey) {
+      return toApiError(res, 500, 'VITE_SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE_KEY is not configured');
+    }
     
     try {
     // Validate input
     const gameType = (req.query.gameType as string) || req.body?.gameType || 'all';
     
-    if (gameType !== 'all' && !VALID_GAME_TYPES.includes(gameType as GameType)) {
-      return toApiError(res, 400, `Invalid game type. Must be one of: ${VALID_GAME_TYPES.join(', ')}, or 'all'`);
+    if (!gameType || (gameType !== 'all' && !VALID_GAME_TYPES.includes(gameType as GameType))) {
+      return toApiError(res, 400, `Invalid or missing 'gameType'. Must be one of: ${VALID_GAME_TYPES.join(', ')}, or 'all'`);
     }
+    
+    console.log('[sync-all] Processing gameType:', gameType);
     
     if (gameType === 'all') {
       // Sync all games
@@ -262,16 +297,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
     } catch (error) {
-      console.error('Error in sync handler:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const errorStack = error instanceof Error ? error.stack : String(error);
-      console.error('Error details:', { errorMessage, errorStack });
+      const errorName = error instanceof Error ? error.name : 'Error';
       
-      return res.status(500).json({
-        error: 'Sync failed',
+      console.error('[sync-all] Handler error:', {
+        name: errorName,
         message: errorMessage,
-        details: process.env.NODE_ENV === 'development' ? errorStack : undefined,
+        stack: errorStack,
       });
+      
+      // Detect specific error types
+      if (errorName === 'AbortError' || errorMessage.includes('timeout')) {
+        return toApiError(res, 504, 'Sync timed out', process.env.NODE_ENV === 'development' ? errorStack : undefined);
+      }
+      
+      if (errorMessage.includes('RLS') || errorMessage.includes('permission denied') || errorMessage.includes('row-level security')) {
+        return toApiError(res, 500, 'Database permission error. Check if service role key is configured.', process.env.NODE_ENV === 'development' ? errorStack : undefined);
+      }
+      
+      if (errorMessage.includes('fetch failed') || errorMessage.includes('ECONNRESET') || errorMessage.includes('ETIMEDOUT')) {
+        return toApiError(res, 502, 'Network error during sync', process.env.NODE_ENV === 'development' ? errorStack : undefined);
+      }
+      
+      return toApiError(res, 500, errorMessage, process.env.NODE_ENV === 'development' ? errorStack : undefined);
     }
   } catch (initError) {
     // Catch initialization errors (imports, etc.)

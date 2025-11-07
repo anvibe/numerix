@@ -90,12 +90,23 @@ export class ApiService {
         
         if (!response.ok) {
           const isJson = response.headers.get('content-type')?.includes('application/json');
-          const errorText = isJson 
-            ? JSON.stringify(await response.json().catch(() => ({})))
-            : await response.text();
+          let errorData: any = null;
+          let errorText = '';
+          
+          try {
+            if (isJson) {
+              errorData = await response.json();
+              errorText = errorData?.error || errorData?.message || JSON.stringify(errorData);
+            } else {
+              errorText = await response.text();
+            }
+          } catch (e) {
+            errorText = `HTTP ${response.status} ${response.statusText}`;
+          }
+          
           console.error(`API Error ${response.status}:`, errorText);
           
-          // Retry on 5xx errors (server errors)
+          // Retry on 5xx errors (server errors) but not on 4xx
           if (response.status >= 500 && attempt < retries - 1) {
             const backoff = 300 * (attempt + 1) ** 2; // Exponential backoff
             console.log(`Retrying after ${backoff}ms...`);
@@ -103,7 +114,9 @@ export class ApiService {
             continue;
           }
           
-          throw new ApiError(response.status, response.statusText, errorText);
+          // Extract meaningful error message
+          const errorMessage = errorData?.error || errorData?.message || errorText || `HTTP ${response.status}`;
+          throw new ApiError(response.status, response.statusText, errorMessage);
         }
         
         return response;

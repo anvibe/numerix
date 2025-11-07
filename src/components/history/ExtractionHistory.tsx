@@ -37,11 +37,27 @@ const ExtractionHistory: React.FC = () => {
           window.location.reload();
         }, 1000);
       } else {
-        showToast.error(result.message || 'Errore durante la sincronizzazione');
+        // Show the actual error message from the server
+        const errorMsg = result.message || result.error || 'Errore durante la sincronizzazione';
+        showToast.error(`Sincronizzazione fallita: ${errorMsg}`);
       }
     } catch (error) {
       console.error('Sync error:', error);
-      showToast.error('Errore durante la sincronizzazione: ' + (error instanceof Error ? error.message : 'Errore sconosciuto'));
+      // Extract meaningful error message
+      let errorMessage = 'Errore sconosciuto';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        // If it's an ApiError, try to get the response text
+        if ('responseText' in error) {
+          try {
+            const parsed = JSON.parse((error as any).responseText);
+            errorMessage = parsed.error || parsed.message || errorMessage;
+          } catch (e) {
+            // Keep original message
+          }
+        }
+      }
+      showToast.error(`Sincronizzazione fallita: ${errorMessage}`);
     } finally {
       setIsSyncing(false);
     }
