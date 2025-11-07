@@ -234,14 +234,10 @@ const SavedCombinationsAnalysis: React.FC = () => {
     });
     
     // If showing all combinations (Tutte selected), compare each with only the latest extraction
+    // Show ALL combinations regardless of save date - compare all with the latest extraction
     const extractionsToCompare = isShowingAllCombinations && latestExtraction 
-      ? (() => {
-          const latestDate = new Date(latestExtraction.date);
-          latestDate.setHours(0, 0, 0, 0);
-          // Only include latest extraction if it's after the combination's save date
-          return latestDate >= comboDate ? [latestExtraction] : [];
-        })()
-      : validExtractions; // Otherwise, compare with all valid extractions
+      ? [latestExtraction] // Always use latest extraction for all combinations when "Tutte" is selected
+      : validExtractions; // Otherwise, compare with all valid extractions (respecting date filter)
     
     // Compare this combination with the selected extractions
     extractionsToCompare.forEach(extraction => {
