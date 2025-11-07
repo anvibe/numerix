@@ -216,8 +216,12 @@ const SavedCombinationsAnalysis: React.FC = () => {
   const numbersToSelect = gameConfig.numbersToSelect;
   const results: MatchAnalysis[] = [];
 
-  // CRITICAL: For each saved combination, compare it with all extractions that happened on or after its save date
-  // This ensures we see ALL saved combinations compared with ALL relevant extractions
+  // When "Tutte" is selected and no specific combination is selected,
+  // compare all saved combinations with only the LATEST extraction
+  const isShowingAllCombinations = filterDifference === null && selectedCombinationId === null;
+  const latestExtraction = sortedExtractions.length > 0 ? sortedExtractions[0] : null; // First is most recent (sorted descending)
+
+  // CRITICAL: For each saved combination, compare it with extractions that happened on or after its save date
   combos.forEach(combo => {
     const comboDate = new Date(combo.date);
     comboDate.setHours(0, 0, 0, 0);
@@ -229,8 +233,18 @@ const SavedCombinationsAnalysis: React.FC = () => {
       return extDate >= comboDate; // Only include extractions on or after combo save date
     });
     
-    // Compare this combination with all valid extractions
-    validExtractions.forEach(extraction => {
+    // If showing all combinations (Tutte selected), compare each with only the latest extraction
+    const extractionsToCompare = isShowingAllCombinations && latestExtraction 
+      ? (() => {
+          const latestDate = new Date(latestExtraction.date);
+          latestDate.setHours(0, 0, 0, 0);
+          // Only include latest extraction if it's after the combination's save date
+          return latestDate >= comboDate ? [latestExtraction] : [];
+        })()
+      : validExtractions; // Otherwise, compare with all valid extractions
+    
+    // Compare this combination with the selected extractions
+    extractionsToCompare.forEach(extraction => {
       // Get winning numbers based on game type and wheel
       let winningNumbers: number[];
       
