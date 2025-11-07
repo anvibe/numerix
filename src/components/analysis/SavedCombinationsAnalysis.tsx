@@ -227,16 +227,24 @@ const SavedCombinationsAnalysis: React.FC = () => {
     
     // Filter extractions to only include those on or after the combination's save date
     // This includes extractions on the same day (>= means on or after)
+    // sortedExtractions is already sorted by date descending (most recent first)
     const validExtractions = sortedExtractions.filter(ext => {
       const extDate = new Date(ext.date);
       extDate.setHours(0, 0, 0, 0);
       return extDate >= comboDate; // Include extractions on the same day or after combo save date
     });
     
+    // Skip this combination if no valid extractions exist (no point comparing)
+    if (validExtractions.length === 0) {
+      return;
+    }
+    
     // If showing all combinations (Tutte selected), compare each with only the LATEST extraction
     // Each combination gets compared with the most recent extraction available on or after its save date
+    // Since sortedExtractions is sorted descending, validExtractions[0] is the most recent extraction after combo date
     // Example: combo saved 4/11 → compared with latest extraction on/after 4/11 (could be 4/11, 5/11, 6/11, etc.)
-    const extractionsToCompare = isShowingAllCombinations && validExtractions.length > 0
+    // Example: combo saved 3/08 → compared with latest extraction on/after 3/08 (NOT the global latest from 6/11)
+    const extractionsToCompare = isShowingAllCombinations
       ? [validExtractions[0]] // Use the latest extraction on/after this combination's save date (first is most recent)
       : validExtractions; // Otherwise, compare with all valid extractions (respecting date filter)
     
