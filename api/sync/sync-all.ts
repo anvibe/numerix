@@ -117,77 +117,119 @@ async function scrapeSuperEnalottoExtractions(): Promise<ExtractedNumbers[]> {
       }
     }
     
-    // Add random delay to appear more human-like (1-3 seconds)
-    const delay = Math.floor(Math.random() * 2000) + 1000;
-    console.log(`[scrape] Waiting ${delay}ms before request...`);
-    await new Promise(resolve => setTimeout(resolve, delay));
-    
-    // Try multiple header configurations
-    const headerConfigs: Record<string, string>[] = [
-      // Config 1: Minimal headers
-      {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'it-IT,it;q=0.9,en;q=0.8',
-      },
-      // Config 2: Full browser headers
-      {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-        'Accept-Language': 'it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-        'Referer': 'https://www.google.com/',
-      },
-    ];
+    // Check if ScraperAPI is configured
+    const scraperApiKey = process.env.SCRAPER_API_KEY;
+    const useScraperAPI = !!scraperApiKey;
     
     let response: Response | null = null;
     let lastError: Error | null = null;
     
-    // Try each header configuration with retries
-    for (let configIndex = 0; configIndex < headerConfigs.length; configIndex++) {
-      const headers = headerConfigs[configIndex];
-      
-      for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-          if (attempt > 0) {
-            const retryDelay = Math.floor(Math.random() * 1000) + 500;
-            console.log(`[scrape] Retry attempt ${attempt + 1} with config ${configIndex + 1}, waiting ${retryDelay}ms...`);
-            await new Promise(resolve => setTimeout(resolve, retryDelay));
-          }
-          
-          console.log(`[scrape] Making fetch request (config ${configIndex + 1}, attempt ${attempt + 1})...`);
-          response = await fetchImpl(url, { headers });
-          
-          if (response.ok) {
-            console.log(`[scrape] Success with config ${configIndex + 1}`);
-            break;
-          } else if (response.status === 403) {
-            console.warn(`[scrape] Got 403 with config ${configIndex + 1}, trying next config...`);
-            lastError = new Error(`Lottologia request failed: ${response.status}`);
-            response = null;
-            continue;
-          } else {
-            const errorText = await response.text().catch(() => 'Unable to read error response');
-            throw new Error(`Lottologia request failed: ${response.status} - ${errorText.substring(0, 200)}`);
-          }
-        } catch (error) {
-          console.error(`[scrape] Request failed (config ${configIndex + 1}, attempt ${attempt + 1}):`, error);
-          lastError = error instanceof Error ? error : new Error(String(error));
-          response = null;
+    // If ScraperAPI is available, use it directly (it handles Cloudflare automatically)
+    if (useScraperAPI) {
+      console.log('[scrape] Using ScraperAPI to bypass Cloudflare protection...');
+      try {
+        const scraperApiUrl = `http://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(url)}&render=false`;
+        response = await fetchImpl(scraperApiUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          },
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => 'Unable to read error response');
+          throw new Error(`ScraperAPI request failed: ${response.status} - ${errorText.substring(0, 200)}`);
         }
+        console.log('[scrape] ScraperAPI request successful');
+      } catch (scraperError) {
+        console.error('[scrape] ScraperAPI failed, falling back to direct requests:', scraperError);
+        // Fall through to direct request attempts
       }
+    }
+    
+    // If ScraperAPI not used or failed, try direct requests
+    if (!response || !response.ok) {
+      console.log('[scrape] Attempting direct requests...');
       
-      if (response && response.ok) {
-        break;
+      // Add random delay to appear more human-like (1-3 seconds)
+      const delay = Math.floor(Math.random() * 2000) + 1000;
+      console.log(`[scrape] Waiting ${delay}ms before request...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      
+      // Try multiple header configurations
+      const headerConfigs: Record<string, string>[] = [
+        // Config 1: Minimal headers
+        {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'it-IT,it;q=0.9,en;q=0.8',
+        },
+        // Config 2: Full browser headers
+        {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+          'Accept-Language': 'it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
+          'Referer': 'https://www.google.com/',
+        },
+      ];
+      
+      // Try each header configuration with retries
+      for (let configIndex = 0; configIndex < headerConfigs.length; configIndex++) {
+        const headers = headerConfigs[configIndex];
+        
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            if (attempt > 0) {
+              const retryDelay = Math.floor(Math.random() * 1000) + 500;
+              console.log(`[scrape] Retry attempt ${attempt + 1} with config ${configIndex + 1}, waiting ${retryDelay}ms...`);
+              await new Promise(resolve => setTimeout(resolve, retryDelay));
+            }
+            
+            console.log(`[scrape] Making fetch request (config ${configIndex + 1}, attempt ${attempt + 1})...`);
+            response = await fetchImpl(url, { headers });
+            
+            if (response.ok) {
+              console.log(`[scrape] Success with config ${configIndex + 1}`);
+              break;
+            } else if (response.status === 403) {
+              console.warn(`[scrape] Got 403 with config ${configIndex + 1}, trying next config...`);
+              lastError = new Error(`Lottologia request failed: ${response.status}`);
+              response = null;
+              continue;
+            } else {
+              const errorText = await response.text().catch(() => 'Unable to read error response');
+              throw new Error(`Lottologia request failed: ${response.status} - ${errorText.substring(0, 200)}`);
+            }
+          } catch (error) {
+            console.error(`[scrape] Request failed (config ${configIndex + 1}, attempt ${attempt + 1}):`, error);
+            lastError = error instanceof Error ? error : new Error(String(error));
+            response = null;
+          }
+        }
+        
+        if (response && response.ok) {
+          break;
+        }
       }
     }
     
     if (!response || !response.ok) {
       const errorText = lastError?.message || 'All request attempts failed';
       console.error(`[scrape] All attempts failed: ${errorText}`);
-      throw new Error(`Lottologia request failed after all attempts: ${errorText}`);
+      
+      // Provide helpful error message
+      if (!useScraperAPI) {
+        throw new Error(
+          `Lottologia request failed after all attempts: ${errorText}. ` +
+          `Il sito ha protezioni anti-bot avanzate. ` +
+          `Per risolvere, configura SCRAPER_API_KEY in Vercel Environment Variables. ` +
+          `Ottieni una chiave gratuita su https://www.scraperapi.com/ (1000 richieste/mese gratuite)`
+        );
+      } else {
+        throw new Error(`Lottologia request failed after all attempts: ${errorText}`);
+      }
     }
     
     console.log('[scrape] Fetch successful, reading response...');

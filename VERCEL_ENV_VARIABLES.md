@@ -33,6 +33,15 @@ Devi configurare queste variabili in **Vercel Dashboard → Il tuo progetto → 
 - **Valore**: La tua API key di OpenAI
 - **Dove trovarla**: https://platform.openai.com/api-keys
 
+### 5. ScraperAPI Key (per scraping automatico - RACCOMANDATO se hai problemi con 403)
+- **Nome**: `SCRAPER_API_KEY`
+- **Valore**: La tua API key di ScraperAPI
+- **Dove trovarla**: https://www.scraperapi.com/ (registrazione gratuita, 1000 richieste/mese)
+- **⚠️ IMPORTANTE**: Questa chiave bypassa protezioni anti-bot come Cloudflare
+- **⚠️ NON deve iniziare con `VITE_`** (è solo server-side)
+- **Perché è necessaria**: Il sito `lottologia.com` ha protezioni anti-bot avanzate che bloccano le richieste dirette. ScraperAPI gestisce automaticamente queste protezioni.
+- **Piano gratuito**: 1000 richieste/mese (sufficiente per ~33 sincronizzazioni giornaliere)
+
 ## Come Configurare in Vercel
 
 1. Vai su **Vercel Dashboard** → Seleziona il tuo progetto **numerix**
@@ -73,6 +82,13 @@ Dopo aver configurato le variabili:
 - ✅ Verifica che i nomi delle variabili siano esatti (case-sensitive)
 - ✅ Fai un **Redeploy** dopo ogni modifica
 
+### Errore: "Lottologia request failed: 403" durante lo scraping
+- ✅ **Soluzione**: Aggiungi `SCRAPER_API_KEY` in Vercel Environment Variables
+- ✅ Ottieni una chiave gratuita su https://www.scraperapi.com/
+- ✅ Il piano gratuito include 1000 richieste/mese (sufficiente per ~33 sincronizzazioni giornaliere)
+- ✅ ScraperAPI gestisce automaticamente le protezioni anti-bot come Cloudflare
+- ✅ Fai un **Redeploy** dopo aver aggiunto la chiave
+
 ## Checklist Pre-Deploy
 
 Prima di fare deploy, assicurati di avere:
@@ -80,6 +96,7 @@ Prima di fare deploy, assicurati di avere:
 - [ ] `VITE_SUPABASE_URL` configurata
 - [ ] `VITE_SUPABASE_ANON_KEY` configurata
 - [ ] `SUPABASE_SERVICE_ROLE_KEY` configurata (raccomandato)
+- [ ] `SCRAPER_API_KEY` configurata (opzionale ma raccomandato se usi lo scraping automatico)
 - [ ] Tutte le variabili selezionate per **Production**
 - [ ] Fatto **Redeploy** dopo aver aggiunto le variabili
 
