@@ -3,14 +3,17 @@ import { createClient } from '@supabase/supabase-js';
 import { scrapeSuperEnalottoExtractions } from '../scrape/superenalotto';
 import { ExtractedNumbers } from '../../src/types';
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+// Get Supabase client (lazy initialization)
+function getSupabaseClient() {
+  const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+  const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing Supabase environment variables');
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Missing Supabase environment variables');
+  }
+
+  return createClient(supabaseUrl, supabaseKey);
 }
-
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Helper function to convert extraction to database format
 const convertExtractionToInsert = (gameType: string, extraction: ExtractedNumbers) => {
@@ -55,6 +58,7 @@ async function syncSuperEnalotto() {
     console.log(`Found ${extractions.length} extractions`);
     
     // Check for existing extractions to avoid duplicates
+    const supabase = getSupabaseClient();
     const existingDates = new Set<string>();
     const { data: existingExtractions } = await supabase
       .from('extractions')
@@ -128,15 +132,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   
   try {
-    // Verify environment variables
-    if (!supabaseUrl || !supabaseKey) {
-      console.error('Missing Supabase environment variables');
-      return res.status(500).json({
-        error: 'Configuration error',
-        message: 'Missing Supabase environment variables',
-      });
-    }
-    
     const gameType = (req.query.gameType as string) || req.body?.gameType || 'all';
     
     if (gameType === 'all') {

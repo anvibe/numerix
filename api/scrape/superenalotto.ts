@@ -3,18 +3,17 @@ import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
 import { ExtractedNumbers } from '../../src/types';
 
-// Use node-fetch for HTTP requests (ESM compatible)
-import fetch from 'node-fetch';
+// Get Supabase client (lazy initialization)
+function getSupabaseClient() {
+  const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+  const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 
-// Initialize Supabase client
-const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Missing Supabase environment variables');
+  }
 
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing Supabase environment variables');
+  return createClient(supabaseUrl, supabaseKey);
 }
-
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Helper function to convert extraction to database format
 const convertExtractionToInsert = (gameType: string, extraction: ExtractedNumbers) => {
@@ -86,6 +85,9 @@ async function scrapeLottologiaSuperEnalotto(): Promise<ExtractedNumbers[]> {
   const extractions: ExtractedNumbers[] = [];
   
   try {
+    // Dynamic import of node-fetch to avoid top-level issues
+    const { default: fetch } = await import('node-fetch');
+    
     const url = 'https://www.lottologia.com/superenalotto/archivio-estrazioni/';
     console.log('Scraping SuperEnalotto from Lottologia...', url);
     
@@ -273,15 +275,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   
   try {
-    // Verify environment variables
-    if (!supabaseUrl || !supabaseKey) {
-      console.error('Missing Supabase environment variables');
-      return res.status(500).json({
-        error: 'Configuration error',
-        message: 'Missing Supabase environment variables',
-      });
-    }
-    
     console.log('Starting SuperEnalotto scrape...');
     
     // Scrape extractions
@@ -307,6 +300,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log(`Found ${extractions.length} extractions`);
     
     // Check for existing extractions to avoid duplicates
+    const supabase = getSupabaseClient();
     const existingDates = new Set<string>();
     const { data: existingExtractions } = await supabase
       .from('extractions')
