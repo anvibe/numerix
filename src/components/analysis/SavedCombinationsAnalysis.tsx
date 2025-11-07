@@ -377,9 +377,14 @@ const SavedCombinationsAnalysis: React.FC = () => {
     // This ensures users can see all results for their selected combination
   } else {
     // No specific combination selected - apply difference filter normally
-    filteredResults = filterDifference === null 
-      ? analysisResults 
-      : analysisResults.filter(result => result.difference === filterDifference);
+    if (filterDifference === null) {
+      // When "Tutte" is selected, sort by date ascending (oldest first)
+      filteredResults = [...analysisResults].sort((a, b) => {
+        return new Date(a.extraction.date).getTime() - new Date(b.extraction.date).getTime();
+      });
+    } else {
+      filteredResults = analysisResults.filter(result => result.difference === filterDifference);
+    }
   }
 
   // If filtering by difference but NOT by a specific combination,
