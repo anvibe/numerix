@@ -85,14 +85,27 @@ async function scrapeLottologiaSuperEnalotto(): Promise<ExtractedNumbers[]> {
   const extractions: ExtractedNumbers[] = [];
   
   try {
-    // Dynamic import of node-fetch to avoid top-level issues
-    const { default: fetch } = await import('node-fetch');
-    
     const url = 'https://www.lottologia.com/superenalotto/archivio-estrazioni/';
     console.log('Scraping SuperEnalotto from Lottologia...', url);
     
-    // Use node-fetch for compatibility
-    const response = await fetch(url, {
+    // Use native fetch (Node 18+ on Vercel) or fallback to node-fetch
+    let fetchImpl: typeof fetch;
+    try {
+      // Try native fetch first (available in Node 18+)
+      if (typeof globalThis.fetch === 'function') {
+        fetchImpl = globalThis.fetch;
+        console.log('Using native fetch');
+      } else {
+        throw new Error('Native fetch not available');
+      }
+    } catch (e) {
+      // Fallback to node-fetch
+      console.log('Falling back to node-fetch');
+      const nodeFetch = await import('node-fetch');
+      fetchImpl = nodeFetch.default as typeof fetch;
+    }
+    
+    const response = await fetchImpl(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
