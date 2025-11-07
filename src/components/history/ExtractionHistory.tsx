@@ -25,15 +25,17 @@ const ExtractionHistory: React.FC = () => {
       const result = await ExtractionSyncService.syncExtractions(selectedGame);
       
       if (result.success) {
-        showToast.success(
-          result.new > 0
-            ? `Sincronizzazione completata! ${result.new} nuove estrazioni aggiunte.`
-            : result.message || 'Sincronizzazione completata. Nessuna nuova estrazione trovata.'
-        );
+        const message = result.new > 0
+          ? `Sincronizzazione completata! ${result.new} nuove estrazioni aggiunte.`
+          : result.message || 'Sincronizzazione completata. Nessuna nuova estrazione trovata.';
+        showToast.success(message);
         
         // Reload extractions from context
         // The context will automatically reload from Supabase
-        window.location.reload();
+        // Use a small delay to ensure the database has been updated
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
       } else {
         showToast.error(result.message || 'Errore durante la sincronizzazione');
       }

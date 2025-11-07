@@ -7,7 +7,44 @@ export class ExtractionSyncService {
         : '/sync/sync-all';
       
       const response = await ApiService.get(endpoint);
-      return await response.json();
+      const data = await response.json();
+      
+      // Handle different response formats
+      if (gameType && gameType !== 'all') {
+        // Single game response - check if response has gameType field or is direct result
+        if (data.gameType || data.total !== undefined) {
+          return {
+            success: data.success !== false,
+            message: data.message || 'Sync completed',
+            total: data.total || 0,
+            new: data.new || 0,
+          };
+        }
+        // If response is wrapped in results object
+        const gameResult = data.results?.[gameType];
+        if (gameResult) {
+          return {
+            success: gameResult.success !== false,
+            message: gameResult.message || 'Sync completed',
+            total: gameResult.total || 0,
+            new: gameResult.new || 0,
+          };
+        }
+        // Fallback
+        return {
+          success: data.success !== false,
+          message: data.message || 'Sync completed',
+          total: 0,
+          new: 0,
+        };
+      } else {
+        // All games response
+        return {
+          success: data.success !== false,
+          message: data.message || 'Sync completed',
+          results: data.results || {},
+        };
+      }
     } catch (error) {
       console.error('Failed to sync extractions:', error);
       throw error;

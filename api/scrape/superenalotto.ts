@@ -101,76 +101,117 @@ async function scrapeLottologiaSuperEnalotto(): Promise<ExtractedNumbers[]> {
     const html = await response.text();
     const $ = cheerio.load(html);
     
-    // Parse Lottologia HTML structure
-    // Common selectors for extraction tables
-    $('table tr, .estrazione-row, .draw-row, .risultato').each((i, elem) => {
+    // Parse Lottologia HTML structure - table with class "table table-balls"
+    $('table.table-balls tbody tr').each((i, elem) => {
       try {
-        const $elem = $(elem);
-        const rowText = $elem.text();
+        const $row = $(elem);
         
-        // Skip header rows
-        if (rowText.toLowerCase().includes('data') && rowText.toLowerCase().includes('numero')) {
+        // Skip header row
+        if ($row.find('th').length > 0) {
           return;
         }
         
-        // Try to find date in various formats
-        let dateText = '';
-        let numbersText = '';
-        let jollyText = '';
-        let superstarText = '';
+        // Extract date from link href (format: ../estrazione/?date=2025-11-06)
+        const dateLink = $row.find('td a').first().attr('href');
+        let date: string | null = null;
         
-        // Look for date patterns
-        const dateMatch = rowText.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/);
-        if (dateMatch) {
-          dateText = dateMatch[1];
-        }
-        
-        // Extract numbers - look for 6 numbers between 1-90
-        const numbers = parseNumbers(rowText);
-        if (numbers.length >= 6) {
-          numbersText = numbers.slice(0, 6).join(' ');
-        }
-        
-        // Look for jolly (usually after the 6 main numbers)
-        const jollyMatch = rowText.match(/jolly[:\s]*(\d+)/i) || rowText.match(/(?:^|\s)(\d{1,2})(?:\s|$)/g);
-        if (jollyMatch) {
-          const jollyNum = parseInt(jollyMatch[0].replace(/\D/g, ''), 10);
-          if (jollyNum > 0 && jollyNum <= 90) {
-            jollyText = jollyNum.toString();
+        if (dateLink) {
+          const dateMatch = dateLink.match(/date=(\d{4}-\d{2}-\d{2})/);
+          if (dateMatch) {
+            date = dateMatch[1];
           }
         }
         
-        // Look for superstar
-        const superstarMatch = rowText.match(/superstar[:\s]*(\d+)/i);
-        if (superstarMatch) {
-          superstarText = superstarMatch[1];
+        // If no date from link, try to parse from text
+        if (!date) {
+          const dateText = $row.find('td').first().text().trim();
+          date = parseDate(dateText);
         }
         
-        if (dateText && numbers.length >= 6) {
-          const date = parseDate(dateText);
-          const jolly = jollyText ? parseInt(jollyText, 10) : undefined;
-          const superstar = superstarText ? parseInt(superstarText, 10) : undefined;
+        // Extract numbers from SERIES column (divs with class ptnum_XX)
+        const numbers: number[] = [];
+        $row.find('td.SERIES div[class*="ptnum_"]').each((j, numElem) => {
+          const $numElem = $(numElem);
+          // First try to get from text content
+          const numText = $numElem.text().trim();
+          if (numText) {
+            const num = parseInt(numText, 10);
+            if (!isNaN(num) && num >= 1 && num <= 90) {
+              numbers.push(num);
+              return;
+            }
+          }
+          // If no text, extract from class name (ptnum_09, ptnum_48, etc.)
+          const className = $numElem.attr('class') || '';
+          const numMatch = className.match(/ptnum_(\d+)/);
+          if (numMatch) {
+            const num = parseInt(numMatch[1], 10);
+            if (!isNaN(num) && num >= 1 && num <= 90) {
+              numbers.push(num);
+            }
+          }
+        });
+        
+        // Extract Jolly from JOLLY column
+        let jolly: number | undefined;
+        const jollyElem = $row.find('td div.special.ball-gold2, td.JOLLY div.special');
+        if (jollyElem.length > 0) {
+          const jollyText = jollyElem.text().trim();
+          const jollyNum = parseInt(jollyText, 10);
+          if (!isNaN(jollyNum) && jollyNum >= 1 && jollyNum <= 90) {
+            jolly = jollyNum;
+          } else {
+            // Try to extract from class name
+            const jollyClass = jollyElem.attr('class') || '';
+            const jollyMatch = jollyClass.match(/ptnum_(\d+)/);
+            if (jollyMatch) {
+              const jollyNum = parseInt(jollyMatch[1], 10);
+              if (!isNaN(jollyNum) && jollyNum >= 1 && jollyNum <= 90) {
+                jolly = jollyNum;
+              }
+            }
+          }
+        }
+        
+        // Extract Superstar from Superstar column
+        let superstar: number | undefined;
+        const superstarElem = $row.find('td.Superstar div.special, td:last-child div.special').not('.ball-gold2');
+        if (superstarElem.length > 0) {
+          const superstarText = superstarElem.text().trim();
+          const superstarNum = parseInt(superstarText, 10);
+          if (!isNaN(superstarNum) && superstarNum >= 1 && superstarNum <= 90) {
+            superstar = superstarNum;
+          } else {
+            // Try to extract from class name
+            const superstarClass = superstarElem.attr('class') || '';
+            const superstarMatch = superstarClass.match(/ptnum_(\d+)/);
+            if (superstarMatch) {
+              const superstarNum = parseInt(superstarMatch[1], 10);
+              if (!isNaN(superstarNum) && superstarNum >= 1 && superstarNum <= 90) {
+                superstar = superstarNum;
+              }
+            }
+          }
+        }
+        
+        // Validate and add extraction
+        if (date && numbers.length === 6) {
+          // Sort numbers
+          const sortedNumbers = [...numbers].sort((a, b) => a - b);
           
-          if (date && numbers.length === 6) {
-            extractions.push({
-              date,
-              numbers: numbers.slice(0, 6).sort((a, b) => a - b),
-              jolly,
-              superstar,
-            });
-          }
+          extractions.push({
+            date,
+            numbers: sortedNumbers,
+            jolly,
+            superstar,
+          });
         }
       } catch (err) {
-        console.error('Error parsing extraction:', err);
+        console.error('Error parsing extraction row:', err);
       }
     });
     
-    // If table parsing didn't work, try alternative selectors
-    if (extractions.length === 0) {
-      $('.numero-estratto, .number, .ball').each((i, elem) => {
-        // Alternative parsing logic
-      });
-    }
+    console.log(`Parsed ${extractions.length} extractions from Lottologia`);
     
     return extractions;
   } catch (error) {
