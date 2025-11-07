@@ -217,9 +217,8 @@ const SavedCombinationsAnalysis: React.FC = () => {
   const results: MatchAnalysis[] = [];
 
   // When "Tutte" is selected and no specific combination is selected,
-  // compare all saved combinations with only the LATEST extraction
+  // compare each saved combination with the LATEST extraction that happened AFTER its save date
   const isShowingAllCombinations = filterDifference === null && selectedCombinationId === null;
-  const latestExtraction = sortedExtractions.length > 0 ? sortedExtractions[0] : null; // First is most recent (sorted descending)
 
   // CRITICAL: For each saved combination, compare it with extractions that happened on or after its save date
   combos.forEach(combo => {
@@ -227,16 +226,18 @@ const SavedCombinationsAnalysis: React.FC = () => {
     comboDate.setHours(0, 0, 0, 0);
     
     // Filter extractions to only include those on or after the combination's save date
+    // This includes extractions on the same day (>= means on or after)
     const validExtractions = sortedExtractions.filter(ext => {
       const extDate = new Date(ext.date);
       extDate.setHours(0, 0, 0, 0);
-      return extDate >= comboDate; // Only include extractions on or after combo save date
+      return extDate >= comboDate; // Include extractions on the same day or after combo save date
     });
     
-    // If showing all combinations (Tutte selected), compare each with only the latest extraction
-    // Show ALL combinations regardless of save date - compare all with the latest extraction
-    const extractionsToCompare = isShowingAllCombinations && latestExtraction 
-      ? [latestExtraction] // Always use latest extraction for all combinations when "Tutte" is selected
+    // If showing all combinations (Tutte selected), compare each with only the LATEST extraction
+    // Each combination gets compared with the most recent extraction available on or after its save date
+    // Example: combo saved 4/11 → compared with latest extraction on/after 4/11 (could be 4/11, 5/11, 6/11, etc.)
+    const extractionsToCompare = isShowingAllCombinations && validExtractions.length > 0
+      ? [validExtractions[0]] // Use the latest extraction on/after this combination's save date (first is most recent)
       : validExtractions; // Otherwise, compare with all valid extractions (respecting date filter)
     
     // Compare this combination with the selected extractions
