@@ -1,21 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
-
-// Lazy import to avoid top-level errors
-let scrapeSuperEnalottoExtractions: (() => Promise<any>) | null = null;
-
-async function getScraper() {
-  if (!scrapeSuperEnalottoExtractions) {
-    try {
-      const scraperModule = await import('../scrape/superenalotto');
-      scrapeSuperEnalottoExtractions = scraperModule.scrapeSuperEnalottoExtractions;
-    } catch (error) {
-      console.error('Failed to import scraper:', error);
-      throw new Error(`Failed to load scraper module: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-  return scrapeSuperEnalottoExtractions;
-}
+import { scrapeSuperEnalottoExtractions } from '../scrape/superenalotto';
 
 // Define types locally to avoid import issues
 interface ExtractedNumbers {
@@ -77,10 +62,8 @@ async function syncSuperEnalotto(): Promise<{
     // Scrape extractions with timeout protection
     let extractions;
     try {
-      const scraper = await getScraper();
-      
       // Add timeout wrapper
-      const scrapePromise = scraper();
+      const scrapePromise = scrapeSuperEnalottoExtractions();
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error('Scraping timeout after 30 seconds')), 30000);
       });
