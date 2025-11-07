@@ -257,6 +257,18 @@ const SavedCombinationsAnalysis: React.FC = () => {
       ? [validExtractions[0]] // Use the latest extraction on/after this combination's save date (first is most recent)
       : validExtractions; // Otherwise, compare with all valid extractions (respecting date filter)
     
+    // Debug log to verify the logic
+    if (process.env.NODE_ENV === 'development' && isShowingAllCombinations) {
+      console.log('Comparing combination:', {
+        comboId: combo.id,
+        comboDate: combo.date,
+        comboDateNormalized: comboDate.toISOString(),
+        validExtractionsCount: validExtractions.length,
+        extractionToCompare: extractionsToCompare[0]?.date,
+        extractionToCompareNormalized: extractionsToCompare[0] ? new Date(extractionsToCompare[0].date).toISOString() : 'none'
+      });
+    }
+    
     // Compare this combination with the selected extractions
     extractionsToCompare.forEach(extraction => {
       // Get winning numbers based on game type and wheel
@@ -420,9 +432,12 @@ const SavedCombinationsAnalysis: React.FC = () => {
   } else {
     // No specific combination selected - apply difference filter normally
     if (filterDifference === null) {
-      // When "Tutte" is selected, sort by date descending (most recent first)
+      // When "Tutte" is selected, sort by saved combination date descending (most recent first)
+      // This ensures that recently saved combinations appear first, each compared with its own latest extraction
       filteredResults = [...analysisResults].sort((a, b) => {
-        return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
+        const comboDateA = new Date(a.savedCombination.date).getTime();
+        const comboDateB = new Date(b.savedCombination.date).getTime();
+        return comboDateB - comboDateA; // Most recent saved combinations first
       });
     } else {
       filteredResults = analysisResults.filter(result => result.difference === filterDifference);
