@@ -25,6 +25,16 @@ Your app needs these environment variables to work. Follow these steps:
    Environment: Production, Preview, Development (select all)
    ```
 
+   ### Recommended (for server-side operations):
+   ```
+   Name: SUPABASE_SERVICE_ROLE_KEY
+   Value: your-service-role-key-here
+   Environment: Production, Preview, Development (select all)
+   ```
+   ⚠️ **IMPORTANTE**: Questa chiave bypassa RLS - usala SOLO per operazioni server-side
+   - Dove trovarla: Supabase Dashboard → Settings → API → service_role key
+   - ⚠️ NON deve iniziare con `VITE_` (è solo server-side)
+
    ### Optional:
    ```
    Name: VITE_OPENAI_API_KEY
