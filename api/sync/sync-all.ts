@@ -117,15 +117,14 @@ async function scrapeSuperEnalottoExtractions(): Promise<ExtractedNumbers[]> {
       }
     }
     
-    // Check if ScraperAPI is configured
+    // Check for ScraperAPI key (free tier: 1000 requests/month - sufficient for personal use)
     const scraperApiKey = process.env.SCRAPER_API_KEY;
-    const useScraperAPI = !!scraperApiKey;
     
     let response: Response | null = null;
     let lastError: Error | null = null;
     
-    // If ScraperAPI is available, use it directly (it handles Cloudflare automatically)
-    if (useScraperAPI) {
+    // Try ScraperAPI first (free tier: 1000 requests/month - sufficient for personal use)
+    if (scraperApiKey) {
       console.log('[scrape] Using ScraperAPI to bypass Cloudflare protection...');
       try {
         const scraperApiUrl = `http://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(url)}&render=false`;
@@ -141,7 +140,8 @@ async function scrapeSuperEnalottoExtractions(): Promise<ExtractedNumbers[]> {
         }
         console.log('[scrape] ScraperAPI request successful');
       } catch (scraperError) {
-        console.error('[scrape] ScraperAPI failed, falling back to direct requests:', scraperError);
+        console.error('[scrape] ScraperAPI failed, trying alternatives:', scraperError);
+        response = null;
         // Fall through to direct request attempts
       }
     }
@@ -220,12 +220,14 @@ async function scrapeSuperEnalottoExtractions(): Promise<ExtractedNumbers[]> {
       console.error(`[scrape] All attempts failed: ${errorText}`);
       
       // Provide helpful error message
-      if (!useScraperAPI) {
+      if (!scraperApiKey) {
         throw new Error(
           `Lottologia request failed after all attempts: ${errorText}. ` +
-          `Il sito ha protezioni anti-bot avanzate. ` +
-          `Per risolvere, configura SCRAPER_API_KEY in Vercel Environment Variables. ` +
-          `Ottieni una chiave gratuita su https://www.scraperapi.com/ (1000 richieste/mese gratuite)`
+          `Il sito ha protezioni anti-bot avanzate (Cloudflare). ` +
+          `Soluzione GRATUITA: configura SCRAPER_API_KEY in Vercel Environment Variables. ` +
+          `ScraperAPI offre un piano GRATUITO con 1000 richieste/mese (sufficiente per ~33 sincronizzazioni giornaliere). ` +
+          `Registrati su https://www.scraperapi.com/ e ottieni la chiave gratuita. ` +
+          `Non serve pagare $49/mese - il piano gratuito è più che sufficiente per uso personale!`
         );
       } else {
         throw new Error(`Lottologia request failed after all attempts: ${errorText}`);
