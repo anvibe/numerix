@@ -217,7 +217,19 @@ const SavedCombinationsAnalysis: React.FC = () => {
   const results: MatchAnalysis[] = [];
 
   combos.forEach(combo => {
-    sortedExtractions.forEach(extraction => {
+    // CRITICAL: Only compare with extractions that happened on or after the combination's save date
+    // This ensures we don't compare a combination saved on 5/11 with extractions from 4/11
+    const comboDate = new Date(combo.date);
+    comboDate.setHours(0, 0, 0, 0);
+    
+    // Filter extractions to only include those on or after the combination's save date
+    const validExtractions = sortedExtractions.filter(ext => {
+      const extDate = new Date(ext.date);
+      extDate.setHours(0, 0, 0, 0);
+      return extDate >= comboDate; // Only include extractions on or after combo save date
+    });
+    
+    validExtractions.forEach(extraction => {
       // Get winning numbers based on game type and wheel
       let winningNumbers: number[];
       
@@ -239,7 +251,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
       // Generate suggestions
       let suggestions: MatchAnalysis['suggestions'] = null;
       
-      if (matchCount >= 2 && matchCount < numbersToSelect && sortedExtractions.length > 0) {
+      if (matchCount >= 2 && matchCount < numbersToSelect && validExtractions.length > 0) {
         // Find numbers that appear frequently in winning but not in saved combination
         const numbersToRemove: number[] = [];
         const numbersToAdd: number[] = [];
@@ -249,15 +261,15 @@ const SavedCombinationsAnalysis: React.FC = () => {
         const nonMatchingNumbers = combo.numbers.filter(num => !matches.includes(num));
         
         nonMatchingNumbers.forEach(savedNum => {
-          const appearsInWins = sortedExtractions.filter(ext => {
+          const appearsInWins = validExtractions.filter(ext => {
             const winNums = selectedGame === 'lotto' && ext.wheels && selectedWheel
               ? ext.wheels[selectedWheel] || []
               : ext.numbers;
             return winNums.includes(savedNum);
           }).length;
           
-          const frequency = sortedExtractions.length > 0 
-            ? appearsInWins / sortedExtractions.length 
+          const frequency = validExtractions.length > 0 
+            ? appearsInWins / validExtractions.length 
             : 0;
           
           // If number appears in less than 15% of wins and didn't match, consider removing
@@ -276,7 +288,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
 
         // Also find numbers that appear frequently in wins but aren't in saved combo
         const allWinningNumbers: number[] = [];
-        sortedExtractions.forEach(ext => {
+        validExtractions.forEach(ext => {
           const winNums = selectedGame === 'lotto' && ext.wheels && selectedWheel
             ? ext.wheels[selectedWheel] || []
             : ext.numbers;
@@ -295,7 +307,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
             const num = parseInt(numStr);
             if (!combo.numbers.includes(num) && 
                 !numbersToAdd.includes(num) &&
-                count > sortedExtractions.length * 0.15) {
+                count > validExtractions.length * 0.15) {
               if (numbersToAdd.length < difference) {
                 numbersToAdd.push(num);
               }
