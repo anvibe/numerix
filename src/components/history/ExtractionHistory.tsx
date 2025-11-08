@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { History, Filter, Plus, Upload, RefreshCw } from 'lucide-react';
+import { History, Filter, Plus, Upload, RefreshCw, Trash2 } from 'lucide-react';
 import { useGame } from '../../context/GameContext';
 import NumberBubble from '../common/NumberBubble';
 import { LottoWheel } from '../../types';
@@ -15,6 +15,7 @@ const ExtractionHistory: React.FC = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [showCSVUploader, setShowCSVUploader] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isCleaning, setIsCleaning] = useState(false);
   
   const extractions = extractionsData[selectedGame];
   const displayExtractions = extractions.slice(0, limit);
@@ -63,6 +64,49 @@ const ExtractionHistory: React.FC = () => {
     }
   };
   
+  const handleCleanupDuplicates = async () => {
+    if (!confirm('Sei sicuro di voler rimuovere i duplicati? Verrà mantenuta solo la prima estrazione per ogni combinazione unica.')) {
+      return;
+    }
+    
+    setIsCleaning(true);
+    try {
+      const result = await ExtractionSyncService.cleanupDuplicates(selectedGame);
+      
+      if (result.success) {
+        const message = result.removed > 0
+          ? `Pulizia completata! Rimosse ${result.removed} estrazioni duplicate, mantenute ${result.kept} estrazioni uniche.`
+          : 'Nessun duplicato trovato.';
+        showToast.success(message);
+        
+        // Reload extractions from Supabase
+        setTimeout(async () => {
+          await reloadExtractions();
+        }, 1000);
+      } else {
+        const errorMsg = result.message || 'Errore durante la pulizia';
+        showToast.error(`Pulizia fallita: ${errorMsg}`);
+      }
+    } catch (error) {
+      console.error('Cleanup error:', error);
+      let errorMessage = 'Errore sconosciuto';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        if ('responseText' in error) {
+          try {
+            const parsed = JSON.parse((error as any).responseText);
+            errorMessage = parsed.error || parsed.message || errorMessage;
+          } catch (e) {
+            // Keep original message
+          }
+        }
+      }
+      showToast.error(`Pulizia fallita: ${errorMessage}`);
+    } finally {
+      setIsCleaning(false);
+    }
+  };
+  
   return (
     <div className="card mb-8">
       <div className="flex items-center justify-between mb-4">
@@ -74,12 +118,22 @@ const ExtractionHistory: React.FC = () => {
         <div className="flex space-x-2">
           <button
             onClick={handleSync}
-            disabled={isSyncing}
+            disabled={isSyncing || isCleaning}
             className="btn btn-primary flex items-center text-sm"
             title="Aggiorna le estrazioni dal web"
           >
             <RefreshCw className={`h-4 w-4 mr-1 ${isSyncing ? 'animate-spin' : ''}`} />
             {isSyncing ? 'Sincronizzazione...' : 'Aggiorna Estrazioni'}
+          </button>
+          
+          <button
+            onClick={handleCleanupDuplicates}
+            disabled={isSyncing || isCleaning}
+            className="btn btn-outline flex items-center text-sm text-warning hover:text-warning"
+            title="Rimuovi estrazioni duplicate"
+          >
+            <Trash2 className={`h-4 w-4 mr-1 ${isCleaning ? 'animate-spin' : ''}`} />
+            {isCleaning ? 'Pulizia...' : 'Rimuovi Duplicati'}
           </button>
           
           <button

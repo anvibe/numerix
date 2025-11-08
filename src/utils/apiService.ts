@@ -58,6 +58,25 @@ export class ExtractionSyncService {
   static async syncSuperEnalotto() {
     return this.syncExtractions('superenalotto');
   }
+  
+  static async cleanupDuplicates(gameType: 'superenalotto' | 'lotto' | '10elotto' | 'millionday') {
+    try {
+      const endpoint = `/cleanup-duplicates?gameType=${gameType}`;
+      const response = await ApiService.get(endpoint);
+      const data = await response.json();
+      
+      return {
+        success: data.success !== false,
+        message: data.message || 'Cleanup completed',
+        removed: data.removed || 0,
+        kept: data.kept || 0,
+        duplicatesFound: data.duplicatesFound || 0,
+      };
+    } catch (error) {
+      console.error('Failed to cleanup duplicates:', error);
+      throw error;
+    }
+  }
 }
 
 // API Service utility for handling backend communications
