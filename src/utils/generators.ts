@@ -337,15 +337,37 @@ export const generateAIRecommendation = (
   const game = getGameByType(gameType);
   const stats = wheel && statistics.wheelStats ? statistics.wheelStats[wheel] : statistics;
   
-  // If advanced statistics are available, use them
+  // If advanced statistics are available, use them with randomization
   if (advancedStats) {
     const optimalDist = calculateOptimalDistribution(gameType, game.maxNumber, game.numbersToSelect);
-    const combination = calculateOptimalCombination(
+    
+    // Use generateAdvancedCombination for randomization instead of deterministic calculateOptimalCombination
+    // This ensures different combinations each time
+    let combination = generateAdvancedCombination(
       advancedStats,
       game.numbersToSelect,
-      game.maxNumber,
-      advancedStats.coOccurrences
+      game.maxNumber
     );
+    
+    // Add some co-occurrence optimization with randomization
+    // Take top co-occurring pairs and randomly select from them
+    const topCoOccurrences = advancedStats.coOccurrences
+      .filter(co => co.correlation > 0)
+      .slice(0, 10);
+    
+    if (topCoOccurrences.length > 0) {
+      // Try to include at least one good co-occurring pair
+      const randomCoOcc = topCoOccurrences[Math.floor(Math.random() * Math.min(3, topCoOccurrences.length))];
+      if (randomCoOcc && !combination.includes(randomCoOcc.numbers[0]) && !combination.includes(randomCoOcc.numbers[1])) {
+        // Replace one number with a co-occurring number if beneficial
+        const replaceIndex = Math.floor(Math.random() * combination.length);
+        const candidate = Math.random() < 0.5 ? randomCoOcc.numbers[0] : randomCoOcc.numbers[1];
+        if (!combination.includes(candidate)) {
+          combination[replaceIndex] = candidate;
+          combination = combination.sort((a, b) => a - b);
+        }
+      }
+    }
     
     // Calculate distribution for generated combination
     const actualDist = calculateDistributionAnalysis(combination);
@@ -387,13 +409,15 @@ export const generateAIRecommendation = (
       // Use Bayesian probabilities for jolly and superstar too
       const topBayesian = advancedStats.bayesianProbabilities
         .filter(p => !combination.includes(p.number))
-        .slice(0, 5)
+        .slice(0, 10)
         .map(p => p.number);
       
-      const jolly = topBayesian[Math.floor(Math.random() * topBayesian.length)] || 
-        generateUniqueNumberExcluding(1, game.maxNumber, combination);
-      const superstar = topBayesian[Math.floor(Math.random() * topBayesian.length)] || 
-        getRandomNumber(1, game.maxNumber);
+      const jolly = topBayesian.length > 0 
+        ? topBayesian[Math.floor(Math.random() * topBayesian.length)]
+        : generateUniqueNumberExcluding(1, game.maxNumber, combination);
+      const superstar = topBayesian.length > 0
+        ? topBayesian[Math.floor(Math.random() * topBayesian.length)]
+        : getRandomNumber(1, game.maxNumber);
       
       reasons.push(`Jolly ${jolly}: Selezionato usando probabilità Bayesiane`);
       reasons.push(`SuperStar ${superstar}: Ottimizzato per pattern statistici avanzati`);

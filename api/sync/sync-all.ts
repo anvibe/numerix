@@ -458,13 +458,16 @@ async function syncSuperEnalotto(): Promise<{
     console.log(`Found ${extractions.length} extractions`);
     
     // Check for existing extractions to avoid duplicates
-    let existingDates = new Set<string>();
+    // We need to check both date AND numbers to prevent duplicates
+    let existingExtractionsMap = new Map<string, number[][]>(); // date -> numbers[]
+    let latestExtraction: { date: string; numbers: number[] } | null = null;
     try {
       const supabase = getSupabaseClient();
       const { data: existingExtractions, error: queryError } = await supabase
         .from('extractions')
-        .select('extraction_date')
+        .select('extraction_date, numbers')
         .eq('game_type', 'superenalotto')
+        .order('extraction_date', { ascending: false })
         .limit(10000); // Add limit to prevent huge queries
       
       if (queryError) {
@@ -472,9 +475,23 @@ async function syncSuperEnalotto(): Promise<{
         throw queryError;
       }
       
-      if (existingExtractions) {
+      if (existingExtractions && existingExtractions.length > 0) {
+        // Store the latest extraction separately for comparison
+        latestExtraction = {
+          date: existingExtractions[0].extraction_date,
+          numbers: existingExtractions[0].numbers || []
+        };
+        
+        // Build a map of date -> numbers arrays for duplicate checking
         existingExtractions.forEach((ext) => {
-          existingDates.add(ext.extraction_date);
+          const date = ext.extraction_date;
+          const numbers = ext.numbers || [];
+          const sortedNumbers = [...numbers].sort((a, b) => a - b);
+          
+          if (!existingExtractionsMap.has(date)) {
+            existingExtractionsMap.set(date, []);
+          }
+          existingExtractionsMap.get(date)!.push(sortedNumbers);
         });
       }
     } catch (dbError) {
@@ -488,17 +505,54 @@ async function syncSuperEnalotto(): Promise<{
       };
     }
     
-    // Filter out duplicates
-    const newExtractions = extractions.filter(
-      (ext) => !existingDates.has(ext.date)
-    );
+    // Check if the first scraped extraction matches the latest (new numbers not ready yet)
+    if (latestExtraction && extractions.length > 0) {
+      const firstScraped = extractions[0];
+      const scrapedNumbersSorted = [...firstScraped.numbers].sort((a, b) => a - b);
+      const latestNumbersSorted = [...latestExtraction.numbers].sort((a, b) => a - b);
+      
+      // Check if numbers match (same date or same numbers)
+      const numbersMatch = scrapedNumbersSorted.length === latestNumbersSorted.length &&
+        scrapedNumbersSorted.every((num, idx) => num === latestNumbersSorted[idx]);
+      
+      if (numbersMatch && firstScraped.date === latestExtraction.date) {
+        return {
+          success: true,
+          message: 'I nuovi numeri non sono ancora disponibili. L\'ultima estrazione disponibile è ancora la stessa.',
+          total: extractions.length,
+          new: 0,
+        };
+      }
+    }
+    
+    // Filter out duplicates - check both date AND numbers
+    const newExtractions = extractions.filter((ext) => {
+      const date = ext.date;
+      const sortedNumbers = [...ext.numbers].sort((a, b) => a - b);
+      
+      // Check if this date exists
+      const existingNumbersForDate = existingExtractionsMap.get(date);
+      if (!existingNumbersForDate) {
+        return true; // New date, definitely new
+      }
+      
+      // Check if these exact numbers already exist for this date
+      const isDuplicate = existingNumbersForDate.some(existingNumbers => {
+        if (existingNumbers.length !== sortedNumbers.length) {
+          return false;
+        }
+        return existingNumbers.every((num, idx) => num === sortedNumbers[idx]);
+      });
+      
+      return !isDuplicate;
+    });
     
     console.log(`${newExtractions.length} new extractions to insert`);
     
     if (newExtractions.length === 0) {
       return {
         success: true,
-        message: 'No new extractions found',
+        message: 'Nessuna nuova estrazione trovata. Tutte le estrazioni sono già presenti nel database.',
         total: extractions.length,
         new: 0,
       };
