@@ -33,6 +33,7 @@ const convertExtractionToInsert = (
 
 export const extractionService = {
   // Get all extractions for a specific game type
+  // Updated: Now uses pagination to load ALL extractions (not limited to 1000)
   async getExtractions(gameType: GameType): Promise<ExtractedNumbers[]> {
     try {
       // Supabase has a default limit of 1000 rows, so we need to paginate to get all
