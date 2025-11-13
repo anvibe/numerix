@@ -35,18 +35,39 @@ export const extractionService = {
   // Get all extractions for a specific game type
   async getExtractions(gameType: GameType): Promise<ExtractedNumbers[]> {
     try {
-      const { data, error } = await supabase
-        .from('extractions')
-        .select('*')
-        .eq('game_type', gameType)
-        .order('extraction_date', { ascending: false });
+      // Supabase has a default limit of 1000 rows, so we need to paginate to get all
+      let allData: ExtractionsRow[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      let hasMore = true;
 
-      if (error) {
-        console.error('Error fetching extractions:', error);
-        throw error;
+      while (hasMore) {
+        const { data, error, count } = await supabase
+          .from('extractions')
+          .select('*', { count: 'exact' })
+          .eq('game_type', gameType)
+          .order('extraction_date', { ascending: false })
+          .range(from, from + pageSize - 1);
+
+        if (error) {
+          console.error('Error fetching extractions:', error);
+          throw error;
+        }
+
+        if (data) {
+          allData = allData.concat(data);
+        }
+
+        // Check if we got all the data
+        if (!data || data.length < pageSize || (count !== null && allData.length >= count)) {
+          hasMore = false;
+        } else {
+          from += pageSize;
+        }
       }
 
-      return data.map(convertRowToExtraction);
+      console.log(`Loaded ${allData.length} extractions for ${gameType}`);
+      return allData.map(convertRowToExtraction);
     } catch (error) {
       console.error('Error in getExtractions:', error);
       return [];
