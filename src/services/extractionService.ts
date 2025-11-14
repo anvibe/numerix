@@ -36,6 +36,17 @@ export const extractionService = {
   // IMPORTANT: Uses pagination to load ALL extractions (overcomes Supabase 1000 row limit)
   async getExtractions(gameType: GameType): Promise<ExtractedNumbers[]> {
     try {
+      // First, get the total count
+      const { count: totalCount, error: countError } = await supabase
+        .from('extractions')
+        .select('*', { count: 'exact', head: true })
+        .eq('game_type', gameType);
+
+      if (countError) {
+        console.error('Error getting extraction count:', countError);
+        // Continue anyway, we'll paginate until we get no more data
+      }
+
       // Supabase has a default limit of 1000 rows, so we need to paginate to get all
       let allData: ExtractionsRow[] = [];
       let from = 0;
@@ -43,9 +54,9 @@ export const extractionService = {
       let hasMore = true;
 
       while (hasMore) {
-        const { data, error, count } = await supabase
+        const { data, error } = await supabase
           .from('extractions')
-          .select('*', { count: 'exact' })
+          .select('*')
           .eq('game_type', gameType)
           .order('extraction_date', { ascending: false })
           .range(from, from + pageSize - 1);
@@ -55,24 +66,30 @@ export const extractionService = {
           throw error;
         }
 
-        if (data) {
+        if (data && data.length > 0) {
           allData = allData.concat(data);
         }
 
         // Check if we got all the data
-        if (!data || data.length < pageSize || (count !== null && allData.length >= count)) {
+        const receivedCount = data?.length || 0;
+        if (receivedCount < pageSize) {
+          // Got less than a full page, we're done
+          hasMore = false;
+        } else if (totalCount !== null && allData.length >= totalCount) {
+          // Reached the total count
           hasMore = false;
         } else {
+          // Continue to next page
           from += pageSize;
         }
       }
 
-      const totalCount = count || allData.length;
-      console.log(`[ExtractionService] Loaded ${allData.length} extractions for ${gameType} (total in DB: ${totalCount})`);
+      const finalCount = totalCount || allData.length;
+      console.log(`[ExtractionService] Loaded ${allData.length} extractions for ${gameType} (total in DB: ${finalCount})`);
       
       // Verify we got all the data
-      if (count !== null && allData.length !== count) {
-        console.warn(`[ExtractionService] WARNING: Expected ${count} extractions but loaded ${allData.length} for ${gameType}`);
+      if (totalCount !== null && allData.length !== totalCount) {
+        console.warn(`[ExtractionService] WARNING: Expected ${totalCount} extractions but loaded ${allData.length} for ${gameType}`);
       }
       
       return allData.map(convertRowToExtraction);
