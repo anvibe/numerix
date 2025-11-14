@@ -67,7 +67,14 @@ export const extractionService = {
         }
       }
 
-      console.log(`Loaded ${allData.length} extractions for ${gameType}`);
+      const totalCount = count || allData.length;
+      console.log(`[ExtractionService] Loaded ${allData.length} extractions for ${gameType} (total in DB: ${totalCount})`);
+      
+      // Verify we got all the data
+      if (count !== null && allData.length !== count) {
+        console.warn(`[ExtractionService] WARNING: Expected ${count} extractions but loaded ${allData.length} for ${gameType}`);
+      }
+      
       return allData.map(convertRowToExtraction);
     } catch (error) {
       console.error('Error in getExtractions:', error);
@@ -160,6 +167,26 @@ export const extractionService = {
     } catch (error) {
       console.error('Error in hasExtractions:', error);
       return false;
+    }
+  },
+  
+  // Get total count of extractions for a game type (for diagnostics)
+  async getExtractionCount(gameType: GameType): Promise<number> {
+    try {
+      const { count, error } = await supabase
+        .from('extractions')
+        .select('*', { count: 'exact', head: true })
+        .eq('game_type', gameType);
+
+      if (error) {
+        console.error('Error getting extraction count:', error);
+        return 0;
+      }
+
+      return count || 0;
+    } catch (error) {
+      console.error('Error in getExtractionCount:', error);
+      return 0;
     }
   }
 };

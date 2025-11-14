@@ -10,6 +10,10 @@ export const calculateFrequencies = (
 ): { frequentNumbers: any[]; infrequentNumbers: any[] } => {
   const counts = new Array(maxNumber + 1).fill(0);
   let totalExtractions = extractions.length;
+  
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[calculateFrequencies] Processing ${totalExtractions} extractions${wheel ? ` for wheel ${wheel}` : ''}`);
+  }
 
   extractions.forEach((extraction) => {
     const numbers = wheel && extraction.wheels 

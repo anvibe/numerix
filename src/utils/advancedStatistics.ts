@@ -150,6 +150,10 @@ export function calculateCoOccurrences(
   const coOccurrenceMap = new Map<string, number>();
   const totalExtractions = extractions.length;
   
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[calculateCoOccurrences] Processing ${totalExtractions} extractions for co-occurrence analysis`);
+  }
+  
   // Count co-occurrences
   extractions.forEach(extraction => {
     const numbers = extraction.numbers;
@@ -204,6 +208,10 @@ export function calculateBayesianProbabilities(
 ): BayesianProbability[] {
   const totalExtractions = extractions.length;
   const recentCount = recentExtractions.length;
+  
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[calculateBayesianProbabilities] Using ${totalExtractions} total extractions, ${recentCount} recent extractions`);
+  }
   
   const probabilities: BayesianProbability[] = [];
   

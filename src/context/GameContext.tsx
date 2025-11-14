@@ -373,7 +373,21 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     const game = GAMES.find(g => g.id === selectedGame) || GAMES[0];
     setGameConfig(game);
     
+    const extractions = extractionsData[selectedGame];
+    console.log(`[GameContext] Calculating statistics for ${selectedGame} with ${extractions.length} extractions`);
+    
     const newStats = calculateGameStatistics(selectedGame, extractionsData, unsuccessfulCombinations);
+    
+    // Log statistics summary
+    if (newStats.advancedStatistics) {
+      console.log(`[GameContext] Advanced statistics calculated:`, {
+        totalExtractions: extractions.length,
+        bayesianProbabilities: newStats.advancedStatistics.bayesianProbabilities.length,
+        coOccurrences: newStats.advancedStatistics.coOccurrences.length,
+        patternScore: newStats.advancedStatistics.patternScore.toFixed(1)
+      });
+    }
+    
     setGameStats(newStats);
   }, [selectedGame, extractionsData, unsuccessfulCombinations]);
   
