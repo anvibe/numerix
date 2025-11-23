@@ -192,6 +192,9 @@ const SavedCombinations: React.FC = () => {
           <div className="mt-3 text-sm text-text-secondary">
             <span className="font-medium">Data:</span> {new Date(latestCombination.date).toLocaleDateString('it-IT')} | 
             <span className="font-medium ml-2">Strategia:</span> {getStrategyDisplay(latestCombination)}
+            {latestCombination.wheel && (
+              <> | <span className="font-medium ml-2">Ruota:</span> {latestCombination.wheel}</>
+            )}
           </div>
         </div>
       )}
@@ -201,6 +204,9 @@ const SavedCombinations: React.FC = () => {
           <thead>
             <tr className="bg-bg-secondary">
               <th className="py-2 px-4 text-left border-b border-gray-200 dark:border-gray-700">Gioco</th>
+              {selectedGame === 'lotto' && (
+                <th className="py-2 px-4 text-left border-b border-gray-200 dark:border-gray-700">Ruota</th>
+              )}
               <th className="py-2 px-4 text-left border-b border-gray-200 dark:border-gray-700">Numeri</th>
               <th className="py-2 px-4 text-left border-b border-gray-200 dark:border-gray-700">Jolly</th>
               <th className="py-2 px-4 text-left border-b border-gray-200 dark:border-gray-700">SuperStar</th>
@@ -225,6 +231,13 @@ const SavedCombinations: React.FC = () => {
                       )}
                     </div>
                   </td>
+                  {selectedGame === 'lotto' && (
+                    <td className="py-3 px-4 border-b border-gray-200 dark:border-gray-700">
+                      <span className="inline-flex items-center px-2 py-1 rounded-md bg-secondary/10 text-secondary text-xs font-medium">
+                        {combo.wheel || 'N/A'}
+                      </span>
+                    </td>
+                  )}
                   <td className="py-3 px-4 border-b border-gray-200 dark:border-gray-700">
                     <div className="flex flex-wrap gap-1.5">
                       {(combo.numbers || []).map((number, i) => (
