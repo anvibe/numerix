@@ -227,7 +227,7 @@ const SavedCombinations: React.FC = () => {
                   </td>
                   <td className="py-3 px-4 border-b border-gray-200 dark:border-gray-700">
                     <div className="flex flex-wrap gap-1.5">
-                      {combo.numbers.map((number, i) => (
+                      {(combo.numbers || []).map((number, i) => (
                         <span 
                           key={i} 
                           className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary text-xs font-medium"

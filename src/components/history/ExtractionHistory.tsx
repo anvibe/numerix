@@ -17,7 +17,7 @@ const ExtractionHistory: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isCleaning, setIsCleaning] = useState(false);
   
-  const extractions = extractionsData[selectedGame];
+  const extractions = extractionsData[selectedGame] || [];
   const displayExtractions = extractions.slice(0, limit);
   
   const handleSync = async () => {
@@ -210,8 +210,13 @@ const ExtractionHistory: React.FC = () => {
           <tbody>
             {displayExtractions.map((extraction, index) => {
               const numbers = selectedGame === 'lotto' && extraction.wheels
-                ? extraction.wheels[selectedWheel]
-                : extraction.numbers;
+                ? (extraction.wheels[selectedWheel] || extraction.numbers || [])
+                : (extraction.numbers || []);
+
+              // Safety check: ensure numbers is always an array
+              if (!Array.isArray(numbers) || numbers.length === 0) {
+                return null; // Skip rendering if no numbers
+              }
 
               return (
                 <tr 

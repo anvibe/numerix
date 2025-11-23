@@ -258,7 +258,7 @@ const AIRecommendation: React.FC = () => {
           </div>
           
           <div className="flex flex-wrap justify-center gap-3 mb-4">
-            {aiResult.numbers.map((number, index) => (
+            {(aiResult.numbers || []).map((number, index) => (
               <NumberBubble 
                 key={index} 
                 number={number} 

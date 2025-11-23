@@ -275,9 +275,9 @@ const SavedCombinationsAnalysis: React.FC = () => {
       let winningNumbers: number[];
       
       if (selectedGame === 'lotto' && extraction.wheels && selectedWheel) {
-        winningNumbers = extraction.wheels[selectedWheel] || [];
+        winningNumbers = extraction.wheels[selectedWheel] || extraction.numbers || [];
       } else {
-        winningNumbers = extraction.numbers;
+        winningNumbers = extraction.numbers || [];
       }
 
       if (winningNumbers.length === 0) return;
@@ -862,9 +862,9 @@ const SavedCombinationsAnalysis: React.FC = () => {
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {(selectedGame === 'lotto' && extraction.wheels && selectedWheel
-                        ? extraction.wheels[selectedWheel] || []
-                        : extraction.numbers
-                      ).map((num) => {
+                        ? (extraction.wheels[selectedWheel] || extraction.numbers || [])
+                        : (extraction.numbers || [])
+                      ).filter(num => num !== undefined && num !== null).map((num) => {
                         const isMatch = matches.includes(num);
                         return (
                           <NumberBubble
