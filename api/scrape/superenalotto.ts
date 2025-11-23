@@ -97,11 +97,11 @@ async function scrapeLottologiaSuperEnalotto(): Promise<ExtractedNumbers[]> {
     console.log('[scrape] Starting scrape from Lottologia...', url);
     
     // Use native fetch (Node 18+ on Vercel)
-    let fetchImpl: typeof fetch;
+    let fetchImpl: (url: string | URL | Request, init?: RequestInit) => Promise<Response>;
     try {
       // Try native fetch first (available in Node 18+)
       if (typeof globalThis.fetch === 'function') {
-        fetchImpl = globalThis.fetch;
+        fetchImpl = globalThis.fetch as typeof fetch;
         console.log('[scrape] Using native fetch');
       } else {
         throw new Error('Native fetch not available');
@@ -111,7 +111,8 @@ async function scrapeLottologiaSuperEnalotto(): Promise<ExtractedNumbers[]> {
       console.log('[scrape] Falling back to node-fetch');
       try {
         const nodeFetch = await import('node-fetch');
-        fetchImpl = nodeFetch.default as typeof fetch;
+        // Cast through unknown to avoid type incompatibility
+        fetchImpl = nodeFetch.default as unknown as typeof fetch;
       } catch (importError) {
         console.error('[scrape] Failed to import node-fetch:', importError);
         throw new Error(`Failed to load fetch implementation: ${importError instanceof Error ? importError.message : String(importError)}`);
@@ -142,7 +143,7 @@ async function scrapeLottologiaSuperEnalotto(): Promise<ExtractedNumbers[]> {
     }
     
     console.log('[scrape] Loading HTML with cheerio...');
-    let $: cheerio.CheerioAPI;
+    let $: ReturnType<typeof cheerio.load>;
     try {
       $ = cheerio.load(html);
       console.log('[scrape] Cheerio loaded successfully');
