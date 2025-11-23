@@ -84,6 +84,10 @@ class OpenAIService {
     );
 
     try {
+      // Add timestamp to prevent caching and encourage variation
+      const timestamp = new Date().toISOString();
+      const randomSeed = Math.floor(Math.random() * 1000);
+      
       const completion = await this.client.chat.completions.create({
         model: this.model,
         messages: [
@@ -130,14 +134,16 @@ Respond ONLY with a valid JSON object in this exact format:
     "bayesian_confidence": number between 0-100,
     "co_occurrence_score": number between 0-100
   }
-}`
+}
+
+IMPORTANT: Generate a DIFFERENT combination each time. Explore alternative statistically optimal solutions. Variation is key - there are many valid combinations that meet the statistical criteria.`
           },
           {
             role: "user",
-            content: context
+            content: `${context}\n\nRequest ID: ${timestamp}-${randomSeed}\nGenerate a unique combination - avoid repeating previous recommendations.`
           }
         ],
-        temperature: 0.5, // Lower temperature for more deterministic, data-driven results
+        temperature: 0.8, // Higher temperature for more variety while still being data-driven
         max_tokens: 1500, // Increased for more detailed analysis
         response_format: { type: "json_object" } // Force JSON response for better reliability
       });
@@ -327,6 +333,15 @@ Respond ONLY with a valid JSON object in this exact format:
     context += `7. Provide detailed reasoning for each number selection\n`;
     context += `8. Calculate confidence based on data quality and pattern strength\n`;
     context += `9. Include distribution_score, bayesian_confidence, and co_occurrence_score in analysis\n`;
+    context += `10. IMPORTANT: Generate a DIFFERENT combination each time - explore alternative optimal solutions\n`;
+    context += `11. Consider multiple valid approaches - there are many statistically sound combinations\n`;
+    context += `12. Vary your selection strategy - sometimes emphasize Bayesian probabilities, sometimes co-occurrences, sometimes distribution\n`;
+    
+    // Add a random seed/timestamp to encourage variation
+    const variationHint = Math.random() < 0.5 
+      ? `\nVARIATION HINT: Focus on exploring alternative statistically optimal combinations. Consider different number ranges and distributions.\n`
+      : `\nVARIATION HINT: Try a different approach this time - perhaps emphasize different statistical factors or explore less obvious but still valid combinations.\n`;
+    context += variationHint;
 
     return context;
   }
