@@ -22,9 +22,14 @@ const GameSelector: React.FC = () => {
               <div className="mr-4">
                 <IconComponent className="h-8 w-8 text-text-primary" />
               </div>
-              <div>
+              <div className="flex-1">
                 <h3 className="text-lg font-semibold">{game.name}</h3>
                 <p className="text-sm text-text-secondary">{game.description}</p>
+                {game.drawDays && (
+                  <p className="text-xs text-text-secondary mt-1">
+                    Estrazioni: {game.drawDays.join(', ')}
+                  </p>
+                )}
               </div>
             </div>
           </div>

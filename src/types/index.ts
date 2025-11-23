@@ -12,6 +12,7 @@ export interface Game {
   numbersToSelect: number;
   maxNumber: number;
   wheels?: LottoWheel[];
+  drawDays?: string[];
 }
 
 export interface ExtractedNumbers {

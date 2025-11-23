@@ -20,6 +20,7 @@ export const GAMES: Game[] = [
     color: 'border-primary',
     numbersToSelect: 6,
     maxNumber: 90,
+    drawDays: ['Martedì', 'Giovedì', 'Sabato'],
   },
   {
     id: 'lotto',
@@ -30,6 +31,7 @@ export const GAMES: Game[] = [
     numbersToSelect: 5,
     maxNumber: 90,
     wheels: LOTTO_WHEELS,
+    drawDays: ['Martedì', 'Giovedì', 'Sabato'],
   },
   {
     id: '10elotto',
