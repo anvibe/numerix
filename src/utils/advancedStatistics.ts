@@ -156,7 +156,11 @@ export function calculateCoOccurrences(
   
   // Count co-occurrences
   extractions.forEach(extraction => {
-    const numbers = extraction.numbers;
+    const numbers = extraction.numbers || [];
+    // Safety check: ensure numbers is an array
+    if (!Array.isArray(numbers) || numbers.length === 0) {
+      return; // Skip this extraction if no valid numbers
+    }
     for (let i = 0; i < numbers.length; i++) {
       for (let j = i + 1; j < numbers.length; j++) {
         const pair: [number, number] = [numbers[i], numbers[j]].sort((a, b) => a - b) as [number, number];
@@ -217,11 +221,17 @@ export function calculateBayesianProbabilities(
   
   for (let num = 1; num <= maxNumber; num++) {
     // Prior probability: historical frequency
-    const historicalCount = extractions.filter(ext => ext.numbers.includes(num)).length;
+    const historicalCount = extractions.filter(ext => {
+      const numbers = ext.numbers || [];
+      return Array.isArray(numbers) && numbers.includes(num);
+    }).length;
     const priorProbability = totalExtractions > 0 ? historicalCount / totalExtractions : 1 / maxNumber;
     
     // Likelihood: probability given recent patterns
-    const recentCount_num = recentExtractions.filter(ext => ext.numbers.includes(num)).length;
+    const recentCount_num = recentExtractions.filter(ext => {
+      const numbers = ext.numbers || [];
+      return Array.isArray(numbers) && numbers.includes(num);
+    }).length;
     const recentLikelihood = recentCount > 0 ? recentCount_num / recentCount : priorProbability;
     
     // Evidence: unsuccessful combinations (avoid numbers that appear frequently in losses)
@@ -270,7 +280,12 @@ export function calculateExpectedValue(
   const winProbabilities: number[] = Array(numbersToSelect + 1).fill(0);
   
   extractions.forEach(extraction => {
-    const matches = combination.filter(num => extraction.numbers.includes(num)).length;
+    const numbers = extraction.numbers || [];
+    // Safety check: ensure numbers is an array
+    if (!Array.isArray(numbers) || numbers.length === 0) {
+      return; // Skip this extraction if no valid numbers
+    }
+    const matches = combination.filter(num => numbers.includes(num)).length;
     if (matches <= numbersToSelect) {
       winProbabilities[matches]++;
     }

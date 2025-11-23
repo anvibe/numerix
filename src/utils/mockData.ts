@@ -17,11 +17,18 @@ export const calculateFrequencies = (
 
   extractions.forEach((extraction) => {
     const numbers = wheel && extraction.wheels 
-      ? extraction.wheels[wheel]
-      : extraction.numbers;
+      ? (extraction.wheels[wheel] || extraction.numbers || [])
+      : (extraction.numbers || []);
+    
+    // Safety check: ensure numbers is an array
+    if (!Array.isArray(numbers) || numbers.length === 0) {
+      return; // Skip this extraction if no valid numbers
+    }
       
     numbers.forEach((num) => {
-      counts[num]++;
+      if (num >= 1 && num <= maxNumber) {
+        counts[num]++;
+      }
     });
   });
 
@@ -56,8 +63,13 @@ export const calculateDelays = (
   // Find the last extraction each number appeared in
   extractions.forEach((extraction, index) => {
     const numbers = wheel && extraction.wheels 
-      ? extraction.wheels[wheel]
-      : extraction.numbers;
+      ? (extraction.wheels[wheel] || extraction.numbers || [])
+      : (extraction.numbers || []);
+    
+    // Safety check: ensure numbers is an array
+    if (!Array.isArray(numbers) || numbers.length === 0) {
+      return; // Skip this extraction if no valid numbers
+    }
       
     numbers.forEach((num) => {
       if (lastSeen[num] === -1) {
