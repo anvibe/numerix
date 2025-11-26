@@ -68,4 +68,4 @@ export const getIconComponent = (iconName: string) => {
   }
 };
 
-export const DISCLAIMER = "⚠️ Questo strumento fornisce solo suggerimenti basati su dati statistici. Non garantisce vincite. Giocare può causare dipendenza patologica. Gioca responsabilmente.";
+export const DISCLAIMER = "⚠️ Questo strumento fornisce suggerimenti basati su analisi statistica storica. Ogni combinazione ha la STESSA probabilità di vincita (SuperEnalotto: 1 su 622.614.630). Non è possibile \"battere\" una lotteria equa. Giocare può causare dipendenza patologica. Gioca responsabilmente.";

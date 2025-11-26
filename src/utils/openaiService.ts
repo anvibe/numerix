@@ -197,49 +197,51 @@ IMPORTANT: Generate a DIFFERENT combination each time. Explore alternative stati
 
     // Add advanced statistics if available
     if (advancedStats) {
-      context += `=== ADVANCED STATISTICAL ANALYSIS ===\n\n`;
+      context += `=== STATISTICAL ANALYSIS (for ranking, NOT prediction) ===\n`;
+      context += `NOTE: Every combination has the SAME probability of winning. These are ranking scores only.\n\n`;
       
       // Distribution Analysis
-      context += `OPTIMAL DISTRIBUTION PATTERNS:\n`;
-      context += `- Optimal Sum: ${advancedStats.distribution.sum.toFixed(1)}\n`;
-      context += `- Optimal Spread: ${advancedStats.distribution.spread.toFixed(1)}\n`;
-      context += `- Optimal Even/Odd Ratio: ${advancedStats.distribution.evenOddRatio.toFixed(2)}\n`;
-      context += `- Optimal Decade Distribution: ${advancedStats.distribution.decadeDistribution.map(d => d.toFixed(1)).join(', ')}\n`;
-      context += `- Optimal Number Density: ${advancedStats.distribution.numberDensity.toFixed(2)}\n`;
-      context += `- Pattern Score: ${advancedStats.patternScore.toFixed(1)}/100\n`;
+      context += `TARGET DISTRIBUTION PATTERNS (aesthetic criteria):\n`;
+      context += `- Target Sum: ${advancedStats.distribution.sum.toFixed(1)} (average for ${game.numbersToSelect} numbers from 1-${game.maxNumber})\n`;
+      context += `- Target Spread: ${advancedStats.distribution.spread.toFixed(1)} (numbers spread across range)\n`;
+      context += `- Target Even/Odd Ratio: ${advancedStats.distribution.evenOddRatio.toFixed(2)} (balanced)\n`;
+      context += `- Recommendation Fitness Score: ${advancedStats.patternScore.toFixed(1)}/100\n`;
       context += `\n`;
       
-      // Bayesian Probabilities
+      // Influence Scores (renamed from Bayesian Probabilities)
       if (advancedStats.bayesianProbabilities.length > 0) {
-        context += `BAYESIAN PROBABILITIES (Top 15):\n`;
-        context += `These probabilities incorporate historical frequency AND recent patterns:\n`;
+        context += `INFLUENCE SCORES (Top 15 - ranking metric, NOT probabilities):\n`;
+        context += `These combine historical frequency + recent patterns for recommendation:\n`;
         advancedStats.bayesianProbabilities.slice(0, 15).forEach(prob => {
-          context += `- Number ${prob.number}: Prior=${prob.priorProbability.toFixed(1)}%, `;
-          context += `Posterior=${prob.posteriorProbability.toFixed(1)}%, `;
+          context += `- Number ${prob.number}: Historical=${prob.priorProbability.toFixed(1)}%, `;
+          context += `Influence=${prob.posteriorProbability.toFixed(1)}, `;
           context += `Confidence=${prob.confidence.toFixed(1)}%\n`;
         });
         context += `\n`;
       }
       
-      // Co-occurrences
+      // Co-occurrences with Lift Score
       if (advancedStats.coOccurrences.length > 0) {
-        context += `STRONG CO-OCCURRENCES (Top 10 pairs that appear together frequently):\n`;
+        context += `CO-OCCURRENCE LIFT SCORES (pairs that appear together more than expected):\n`;
+        context += `Lift > 0 means they co-occur more often than random chance would predict.\n`;
         advancedStats.coOccurrences.slice(0, 10).forEach(co => {
           context += `- ${co.numbers[0]}-${co.numbers[1]}: `;
-          context += `Frequency=${co.frequency.toFixed(1)}%, `;
+          context += `Observed=${co.frequency.toFixed(1)}%, `;
           context += `Expected=${co.expectedFrequency.toFixed(1)}%, `;
-          context += `Correlation=${co.correlation.toFixed(2)}\n`;
+          context += `Lift=${co.lift?.toFixed(2) || 'N/A'}, `;
+          context += `LiftScore=${co.correlation.toFixed(2)}\n`;
         });
         context += `\n`;
       }
       
-      // Expected Values
+      // Impact Scores (renamed from Expected Values)
       if (advancedStats.expectedValues.length > 0) {
-        context += `EXPECTED VALUES (Top combinations):\n`;
+        context += `IMPACT SCORES (pattern quality, NOT monetary value):\n`;
+        context += `Measures how well combinations matched historical extractions.\n`;
         advancedStats.expectedValues.slice(0, 5).forEach(ev => {
           context += `- Combination [${ev.combination.join(', ')}]: `;
-          context += `Expected Matches=${ev.expectedMatches.toFixed(2)}, `;
-          context += `EV Score=${ev.expectedValue.toFixed(2)}\n`;
+          context += `Avg Matches=${ev.expectedMatches.toFixed(2)}, `;
+          context += `Impact=${ev.expectedValue.toFixed(2)}\n`;
         });
         context += `\n`;
       }

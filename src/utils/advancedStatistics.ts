@@ -1,5 +1,16 @@
 import { ExtractedNumbers, GameType, GameStatistics, Frequency } from '../types';
 
+/**
+ * IMPORTANT DISCLAIMER:
+ * These statistics are for ANALYSIS and VISUALIZATION purposes only.
+ * Every lottery combination has the SAME probability of winning.
+ * No statistical analysis can create a mathematical edge in a fair lottery.
+ * 
+ * SuperEnalotto: 6 numbers from 1-90
+ * Total combinations: C(90,6) = 622,614,630
+ * Probability of 6/6: ~1 in 622 million (same for ANY combination)
+ */
+
 // Advanced statistical analysis interfaces
 export interface DistributionAnalysis {
   sum: number;                    // Sum of all numbers
@@ -16,31 +27,58 @@ export interface CoOccurrence {
   numbers: [number, number];
   count: number;
   frequency: number;              // Percentage of extractions where both appear
-  expectedFrequency: number;       // Expected frequency if independent
-  correlation: number;           // Correlation coefficient (-1 to 1)
+  expectedFrequency: number;      // Expected frequency if independent
+  lift: number;                   // Lift metric: frequency / expectedFrequency (1.0 = independent)
+  liftScore: number;              // Bounded lift score using tanh (-1 to 1, smooth)
+  correlation: number;            // Alias for liftScore (backward compatibility)
 }
 
-export interface BayesianProbability {
+/**
+ * Influence Score (renamed from "Bayesian Probability")
+ * This is a RANKING SCORE, not a true probability.
+ * It combines historical frequency with recent patterns for recommendation purposes.
+ */
+export interface InfluenceScore {
   number: number;
-  priorProbability: number;       // Base probability from historical frequency
-  likelihood: number;            // Likelihood given recent patterns
-  posteriorProbability: number;  // Bayesian updated probability
-  confidence: number;            // Confidence in the prediction
+  historicalFrequency: number;    // Raw frequency from historical data (%)
+  recentFrequency: number;        // Frequency in recent extractions (%)
+  unsuccessfulPenalty: number;    // Penalty from unsuccessful combinations (0-1)
+  influenceScore: number;         // Combined ranking score (higher = more recommended)
+  normalizedScore: number;        // Normalized to sum to 100 across all numbers
+  confidence: number;             // Data quality confidence (0-100)
 }
 
-export interface ExpectedValue {
+// Keep old interface name for backward compatibility
+export type BayesianProbability = InfluenceScore & {
+  priorProbability: number;       // Alias for historicalFrequency
+  likelihood: number;             // Alias for recentFrequency  
+  posteriorProbability: number;   // Alias for normalizedScore
+};
+
+/**
+ * Impact Score (renamed from "Expected Value")
+ * This is a PATTERN QUALITY score, not a monetary expected value.
+ * It rewards combinations that would have matched more numbers historically.
+ */
+export interface ImpactScore {
   combination: number[];
-  expectedMatches: number;        // Expected number of matches
-  winProbability: number[];      // Probability of 0, 1, 2, ... matches
-  expectedValue: number;         // Expected monetary value (if prize data available)
+  expectedMatches: number;        // Average matches against historical extractions
+  matchDistribution: number[];    // Probability distribution of 0, 1, 2, ... matches
+  impactScore: number;            // Pattern quality score (higher matches weighted more)
 }
+
+// Keep old interface name for backward compatibility
+export type ExpectedValue = ImpactScore & {
+  winProbability: number[];       // Alias for matchDistribution
+  expectedValue: number;          // Alias for impactScore
+};
 
 export interface AdvancedStatistics {
   distribution: DistributionAnalysis;
   coOccurrences: CoOccurrence[];
-  bayesianProbabilities: BayesianProbability[];
-  expectedValues: ExpectedValue[];
-  patternScore: number;          // Overall pattern score (0-100)
+  bayesianProbabilities: BayesianProbability[];  // Actually InfluenceScores
+  expectedValues: ExpectedValue[];               // Actually ImpactScores
+  patternScore: number;           // Recommendation fitness score (0-100)
 }
 
 // Calculate distribution analysis for a combination
@@ -141,7 +179,17 @@ export function calculateOptimalDistribution(
   };
 }
 
-// Calculate co-occurrences between numbers
+/**
+ * Calculate co-occurrences between number pairs.
+ * Uses LIFT metric instead of raw correlation to avoid explosion with small expected frequencies.
+ * 
+ * Lift = observed_frequency / expected_frequency
+ * - Lift > 1: numbers appear together MORE than expected
+ * - Lift = 1: numbers appear together as expected (independent)
+ * - Lift < 1: numbers appear together LESS than expected
+ * 
+ * LiftScore uses tanh to bound the result smoothly between -1 and 1.
+ */
 export function calculateCoOccurrences(
   extractions: ExtractedNumbers[],
   maxNumber: number,
@@ -170,7 +218,7 @@ export function calculateCoOccurrences(
     }
   });
   
-  // Calculate frequencies and correlations
+  // Calculate frequencies and lift scores
   const coOccurrences: CoOccurrence[] = [];
   
   coOccurrenceMap.forEach((count, key) => {
@@ -182,28 +230,53 @@ export function calculateCoOccurrences(
       const num2Count = extractions.filter(ext => ext.numbers.includes(num2)).length;
       
       const frequency = (count / totalExtractions) * 100;
-      const expectedFrequency = ((num1Count / totalExtractions) * (num2Count / totalExtractions)) * 100;
+      // Prevent division by zero with small epsilon
+      const expectedFrequency = Math.max(0.0001, 
+        ((num1Count / totalExtractions) * (num2Count / totalExtractions)) * 100
+      );
       
-      // Correlation: positive if they appear together more than expected
-      const correlation = expectedFrequency > 0
-        ? (frequency - expectedFrequency) / expectedFrequency
-        : 0;
+      // Lift metric: observed / expected (1.0 = independent)
+      const lift = frequency / expectedFrequency;
+      
+      // Bounded lift score using tanh for smooth -1 to 1 range
+      // tanh(lift - 1) maps:
+      //   lift = 0.5 → ~-0.46 (appear together less than expected)
+      //   lift = 1.0 → 0 (independent)
+      //   lift = 1.5 → ~0.46 (appear together more than expected)
+      //   lift = 2.0 → ~0.76 (strongly co-occur)
+      const liftScore = Math.tanh(lift - 1);
       
       coOccurrences.push({
         numbers: [num1, num2],
         count,
         frequency,
         expectedFrequency,
-        correlation: Math.min(1, Math.max(-1, correlation)), // Clamp to -1, 1
+        lift,
+        liftScore,
+        correlation: liftScore,  // Backward compatibility alias
       });
     }
   });
   
-  // Sort by correlation (strongest correlations first)
-  return coOccurrences.sort((a, b) => b.correlation - a.correlation);
+  // Sort by lift score (strongest positive co-occurrences first)
+  return coOccurrences.sort((a, b) => b.liftScore - a.liftScore);
 }
 
-// Calculate Bayesian probabilities for numbers
+/**
+ * Calculate Influence Scores for numbers (renamed from "Bayesian Probabilities").
+ * 
+ * IMPORTANT: These are RANKING SCORES, not true probabilities!
+ * They combine historical frequency with recent patterns for recommendation purposes.
+ * 
+ * The lottery draw is uniformly random - every number has the same TRUE probability.
+ * These scores are for analysis and visualization only.
+ * 
+ * Score formula:
+ *   influenceScore = historicalFreq * recentFreq * (1 - unsuccessfulPenalty)
+ * 
+ * This is NOT a proper Bayesian posterior (which would require P(B) normalization),
+ * but it's useful as a ranking metric.
+ */
 export function calculateBayesianProbabilities(
   extractions: ExtractedNumbers[],
   maxNumber: number,
@@ -214,70 +287,91 @@ export function calculateBayesianProbabilities(
   const recentCount = recentExtractions.length;
   
   if (process.env.NODE_ENV === 'development') {
-    console.log(`[calculateBayesianProbabilities] Using ${totalExtractions} total extractions, ${recentCount} recent extractions`);
+    console.log(`[calculateInfluenceScores] Using ${totalExtractions} total extractions, ${recentCount} recent extractions`);
   }
   
-  const probabilities: BayesianProbability[] = [];
+  const scores: BayesianProbability[] = [];
   
   for (let num = 1; num <= maxNumber; num++) {
-    // Prior probability: historical frequency
+    // Historical frequency (how often this number appeared in all extractions)
     const historicalCount = extractions.filter(ext => {
       const numbers = ext.numbers || [];
       return Array.isArray(numbers) && numbers.includes(num);
     }).length;
-    const priorProbability = totalExtractions > 0 ? historicalCount / totalExtractions : 1 / maxNumber;
+    const historicalFrequency = totalExtractions > 0 
+      ? (historicalCount / totalExtractions) * 100 
+      : 100 / maxNumber;  // Uniform if no data
     
-    // Likelihood: probability given recent patterns
+    // Recent frequency (how often in last N extractions)
     const recentCount_num = recentExtractions.filter(ext => {
       const numbers = ext.numbers || [];
       return Array.isArray(numbers) && numbers.includes(num);
     }).length;
-    const recentLikelihood = recentCount > 0 ? recentCount_num / recentCount : priorProbability;
+    const recentFrequency = recentCount > 0 
+      ? (recentCount_num / recentCount) * 100 
+      : historicalFrequency;
     
-    // Evidence: unsuccessful combinations (avoid numbers that appear frequently in losses)
+    // Unsuccessful penalty (soft penalty for numbers in user's unsuccessful plays)
     const unsuccessfulCount = unsuccessfulCombinations.filter(combo => combo.numbers.includes(num)).length;
-    const unsuccessfulRate = unsuccessfulCombinations.length > 0
-      ? unsuccessfulCount / unsuccessfulCombinations.length
+    const unsuccessfulPenalty = unsuccessfulCombinations.length > 0
+      ? Math.min(0.5, unsuccessfulCount / unsuccessfulCombinations.length)  // Cap at 0.5 to prevent extreme penalty
       : 0;
     
-    // Adjust likelihood based on unsuccessful rate (lower unsuccessful rate = higher likelihood)
-    const adjustedLikelihood = recentLikelihood * (1 - unsuccessfulRate * 0.5);
+    // Influence score = product of factors (higher = more recommended)
+    // Note: This is a ranking metric, NOT a probability!
+    const influenceScore = (historicalFrequency / 100) * (recentFrequency / 100) * (1 - unsuccessfulPenalty);
     
-    // Bayesian update: P(A|B) = P(B|A) * P(A) / P(B)
-    // Simplified: posterior = likelihood * prior / normalization
-    const posteriorProbability = adjustedLikelihood * priorProbability;
-    
-    // Confidence based on data quality
+    // Confidence based on data quality (more data = higher confidence)
     const confidence = Math.min(100, Math.sqrt(totalExtractions + recentCount) * 10);
     
-    probabilities.push({
+    scores.push({
       number: num,
-      priorProbability: priorProbability * 100,
-      likelihood: adjustedLikelihood * 100,
-      posteriorProbability: posteriorProbability * 100,
+      // New clear names
+      historicalFrequency,
+      recentFrequency,
+      unsuccessfulPenalty,
+      influenceScore: influenceScore * 100,  // Scale for readability
+      normalizedScore: 0,  // Will be normalized below
       confidence,
+      // Backward compatibility aliases
+      priorProbability: historicalFrequency,
+      likelihood: recentFrequency,
+      posteriorProbability: 0,  // Will be set after normalization
     });
   }
   
-  // Normalize probabilities
-  const totalPosterior = probabilities.reduce((sum, p) => sum + p.posteriorProbability, 0);
-  if (totalPosterior > 0) {
-    probabilities.forEach(p => {
-      p.posteriorProbability = (p.posteriorProbability / totalPosterior) * 100;
+  // Normalize scores to sum to 100 (for comparison purposes only)
+  const totalScore = scores.reduce((sum, s) => sum + s.influenceScore, 0);
+  if (totalScore > 0) {
+    scores.forEach(s => {
+      s.normalizedScore = (s.influenceScore / totalScore) * 100;
+      s.posteriorProbability = s.normalizedScore;  // Backward compatibility
     });
   }
   
-  return probabilities.sort((a, b) => b.posteriorProbability - a.posteriorProbability);
+  // Sort by influence score (highest first)
+  return scores.sort((a, b) => b.normalizedScore - a.normalizedScore);
 }
 
-// Calculate expected value for a combination
+/**
+ * Calculate Impact Score for a combination (renamed from "Expected Value").
+ * 
+ * IMPORTANT: This is a PATTERN QUALITY score, NOT a monetary expected value!
+ * It measures how well this combination would have performed against historical extractions.
+ * 
+ * Impact Score formula: Σ P(k matches) * k²
+ * - Rewards combinations that historically would have matched more numbers
+ * - k² weighting means higher matches are valued exponentially more
+ * 
+ * This does NOT predict future performance - the lottery is random.
+ */
 export function calculateExpectedValue(
   combination: number[],
   extractions: ExtractedNumbers[],
   numbersToSelect: number
 ): ExpectedValue {
-  // Calculate probability of each match count
-  const winProbabilities: number[] = Array(numbersToSelect + 1).fill(0);
+  // Calculate distribution of match counts against historical extractions
+  const matchCounts: number[] = Array(numbersToSelect + 1).fill(0);
   
   extractions.forEach(extraction => {
     const numbers = extraction.numbers || [];
@@ -287,64 +381,100 @@ export function calculateExpectedValue(
     }
     const matches = combination.filter(num => numbers.includes(num)).length;
     if (matches <= numbersToSelect) {
-      winProbabilities[matches]++;
+      matchCounts[matches]++;
     }
   });
   
-  // Normalize to probabilities
+  // Normalize to distribution (what % of extractions had 0, 1, 2, ... matches)
   const total = extractions.length || 1;
-  const probabilities = winProbabilities.map(count => count / total);
+  const matchDistribution = matchCounts.map(count => count / total);
   
-  // Expected number of matches
-  const expectedMatches = probabilities.reduce((sum, prob, matches) => sum + prob * matches, 0);
+  // Expected number of matches = Σ P(k) * k
+  const expectedMatches = matchDistribution.reduce((sum, prob, k) => sum + prob * k, 0);
   
-  // Expected value (simplified - would need prize data for accurate calculation)
-  // Higher matches = higher value
-  const expectedValue = probabilities.reduce((sum, prob, matches) => {
-    // Simplified: value increases exponentially with matches
-    return sum + prob * Math.pow(matches, 2);
+  // Impact Score = Σ P(k) * k²
+  // This rewards combinations that achieve higher matches more heavily
+  // Note: This is a QUALITY SCORE, not monetary expected value!
+  const impactScore = matchDistribution.reduce((sum, prob, k) => {
+    return sum + prob * Math.pow(k, 2);
   }, 0);
   
   return {
     combination,
     expectedMatches,
-    winProbability: probabilities,
-    expectedValue,
+    // New clear names
+    matchDistribution,
+    impactScore,
+    // Backward compatibility aliases
+    winProbability: matchDistribution,
+    expectedValue: impactScore,
   };
 }
 
-// Calculate overall pattern score for a combination
+/**
+ * Calculate Recommendation Fitness Score (renamed from "Pattern Score").
+ * 
+ * This measures how well a combination matches aesthetic/statistical criteria:
+ * - Sum close to optimal (~273 for SuperEnalotto)
+ * - Good spread across number range
+ * - No consecutive sequences
+ * - Numbers with high influence scores
+ * - Balanced density (not too clustered)
+ * 
+ * IMPORTANT: A high score does NOT increase winning probability!
+ * The lottery is uniformly random. This is purely for recommendation quality.
+ * 
+ * Score breakdown:
+ * - Base: 100 points
+ * - Sum deviation: -20 max (further from optimal = worse)
+ * - Spread deviation: -15 max
+ * - Consecutive sequences: -10 per sequence
+ * - Influence score bonus: +30 max (higher influence = better)
+ * - Density deviation: -10 max
+ */
 export function calculatePatternScore(
   distribution: DistributionAnalysis,
   optimalDistribution: DistributionAnalysis,
-  bayesianProbabilities: BayesianProbability[],
+  influenceScores: BayesianProbability[],
   combination: number[]
 ): number {
   let score = 100;
   
-  // Compare distribution to optimal
-  const sumDiff = Math.abs(distribution.sum - optimalDistribution.sum) / optimalDistribution.sum;
-  score -= sumDiff * 20; // Max -20 points
+  // Sum deviation penalty (max -20 points)
+  // Measures how close the sum is to the optimal average
+  const sumDiff = optimalDistribution.sum > 0 
+    ? Math.abs(distribution.sum - optimalDistribution.sum) / optimalDistribution.sum
+    : 0;
+  score -= Math.min(20, sumDiff * 20);
   
-  const spreadDiff = Math.abs(distribution.spread - optimalDistribution.spread) / optimalDistribution.spread;
-  score -= spreadDiff * 15; // Max -15 points
+  // Spread deviation penalty (max -15 points)
+  // Measures if numbers are spread across the range
+  const spreadDiff = optimalDistribution.spread > 0
+    ? Math.abs(distribution.spread - optimalDistribution.spread) / optimalDistribution.spread
+    : 0;
+  score -= Math.min(15, spreadDiff * 15);
   
-  // Penalize consecutive sequences
-  score -= distribution.consecutiveSequences * 10; // -10 per sequence
+  // Consecutive sequence penalty (-10 per sequence, max -30)
+  // Sequences like 5,6,7 are common but no more likely to win
+  score -= Math.min(30, distribution.consecutiveSequences * 10);
   
-  // Reward good Bayesian probabilities
-  const avgBayesianProb = combination.reduce((sum, num) => {
-    const prob = bayesianProbabilities.find(p => p.number === num);
-    return sum + (prob?.posteriorProbability || 0);
+  // Influence score bonus (max +30 points)
+  // Rewards selecting numbers with high historical + recent frequency
+  const avgInfluenceScore = combination.reduce((sum, num) => {
+    const score = influenceScores.find(s => s.number === num);
+    return sum + (score?.normalizedScore || score?.posteriorProbability || 0);
   }, 0) / combination.length;
   
-  score += (avgBayesianProb / 100) * 30; // Max +30 points
+  // Normalize: if avg influence score is ~1.11 (100/90 numbers), give ~10 points
+  // If higher than average, give bonus up to 30 points
+  score += Math.min(30, (avgInfluenceScore / (100 / 90)) * 10);
   
-  // Reward good number density (not too clustered, not too spread)
+  // Density deviation penalty (max -10 points)
+  // Rewards balanced spacing (not too clustered, not too spread)
   const densityDiff = Math.abs(distribution.numberDensity - optimalDistribution.numberDensity);
-  score -= densityDiff * 10; // Max -10 points
+  score -= Math.min(10, densityDiff * 10);
   
-  // Ensure score is between 0-100
+  // Clamp to 0-100 range
   return Math.max(0, Math.min(100, score));
 }
 
