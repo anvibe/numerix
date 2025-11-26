@@ -219,17 +219,16 @@ const SavedCombinationsAnalysis: React.FC = () => {
   const results: MatchAnalysis[] = [];
 
   // When "Tutte" is selected and no specific combination is selected,
-  // compare each saved combination with the LATEST extraction that happened ON OR AFTER its save date
+  // compare each saved combination with ALL extractions that happened ON OR AFTER its save date
   const isShowingAllCombinations = filterDifference === null && selectedCombinationId === null;
 
   // CRITICAL: For each saved combination, compare it with extractions that happened on or after its save date
-  // When "Tutte" is selected, each combination is compared ONLY with the latest extraction available after its save date
+  // Compare with ALL valid extractions to find the best matches
   combos.forEach(combo => {
     const comboDate = new Date(combo.date);
     comboDate.setHours(0, 0, 0, 0);
     
-    // IMPORTANT: When "Tutte" is selected, use the FULL list of extractions (relevantExtractions)
-    // not the filtered one (sortedExtractions), so each combination can find its own latest extraction
+    // Use the FULL list of extractions so each combination can be compared with all relevant extractions
     const extractionsToSearch = isShowingAllCombinations 
       ? relevantExtractions  // Use full list for "Tutte" mode
       : sortedExtractions;   // Use filtered list for specific combination mode
@@ -248,14 +247,11 @@ const SavedCombinationsAnalysis: React.FC = () => {
       return;
     }
     
-    // If showing all combinations (Tutte selected), compare each with only the LATEST extraction
-    // Each combination gets compared with the most recent extraction available on or after its save date
-    // Since validExtractions is filtered from a descending-sorted list, validExtractions[0] is the most recent
-    // Example: combo saved 4/11 → compared with latest extraction on/after 4/11 (could be 4/11, 5/11, 6/11, etc.)
-    // Example: combo saved 3/08 → compared with latest extraction on/after 3/08 (NOT the global latest from 6/11)
-    const extractionsToCompare = isShowingAllCombinations
-      ? [validExtractions[0]] // Use the latest extraction on/after this combination's save date (first is most recent)
-      : validExtractions; // Otherwise, compare with all valid extractions (respecting date filter)
+    // Compare with ALL valid extractions to find best matches
+    // This allows finding higher match counts across multiple extractions
+    // For "Tutte" mode: compare with all extractions, then keep BEST match for display
+    // For specific combination: compare with all valid extractions
+    const extractionsToCompare = validExtractions; // Always compare with all valid extractions
     
     // Debug log to verify the logic
     if (process.env.NODE_ENV === 'development' && isShowingAllCombinations) {
@@ -264,8 +260,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
         comboDate: combo.date,
         comboDateNormalized: comboDate.toISOString(),
         validExtractionsCount: validExtractions.length,
-        extractionToCompare: extractionsToCompare[0]?.date,
-        extractionToCompareNormalized: extractionsToCompare[0] ? new Date(extractionsToCompare[0].date).toISOString() : 'none'
+        comparingWith: extractionsToCompare.length + ' extractions'
       });
     }
     
@@ -432,12 +427,34 @@ const SavedCombinationsAnalysis: React.FC = () => {
   } else {
     // No specific combination selected - apply difference filter normally
     if (filterDifference === null) {
-      // When "Tutte" is selected, sort by saved combination date descending (most recent first)
-      // This ensures that recently saved combinations appear first, each compared with its own latest extraction
-      filteredResults = [...analysisResults].sort((a, b) => {
+      // When "Tutte" is selected, keep only the BEST match for each combination
+      // This shows the highest match count found for each saved combination across all extractions
+      const bestMatchPerCombo = new Map<string, MatchAnalysis>();
+      
+      analysisResults.forEach(result => {
+        const comboId = result.savedCombination.id;
+        const existing = bestMatchPerCombo.get(comboId);
+        
+        // Keep the result with the highest match count
+        // If same match count, keep the most recent extraction
+        if (!existing || 
+            result.matchCount > existing.matchCount ||
+            (result.matchCount === existing.matchCount && 
+             new Date(result.extraction.date) > new Date(existing.extraction.date))) {
+          bestMatchPerCombo.set(comboId, result);
+        }
+      });
+      
+      // Sort by match count (best first), then by combination date (most recent first)
+      filteredResults = Array.from(bestMatchPerCombo.values()).sort((a, b) => {
+        // First sort by match count (highest first)
+        if (b.matchCount !== a.matchCount) {
+          return b.matchCount - a.matchCount;
+        }
+        // Then by combination date (most recent first)
         const comboDateA = new Date(a.savedCombination.date).getTime();
         const comboDateB = new Date(b.savedCombination.date).getTime();
-        return comboDateB - comboDateA; // Most recent saved combinations first
+        return comboDateB - comboDateA;
       });
     } else {
       filteredResults = analysisResults.filter(result => result.difference === filterDifference);
