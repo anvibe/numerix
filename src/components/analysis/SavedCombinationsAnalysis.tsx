@@ -266,16 +266,19 @@ const SavedCombinationsAnalysis: React.FC = () => {
     
     // Compare this combination with the selected extractions
     extractionsToCompare.forEach(extraction => {
-      // Get winning numbers based on game type and wheel
-      let winningNumbers: number[];
-      
-      if (selectedGame === 'lotto' && extraction.wheels && selectedWheel) {
-        winningNumbers = extraction.wheels[selectedWheel] || extraction.numbers || [];
-      } else {
-        winningNumbers = extraction.numbers || [];
-      }
+        // Get winning numbers based on game type and wheel
+        // IMPORTANT: For Lotto, DO NOT fall back to extraction.numbers to prevent data mixing
+        let winningNumbers: number[];
+        
+        if (selectedGame === 'lotto') {
+          // LOTTO: Only use wheel-specific data, no fallback to prevent data pollution
+          winningNumbers = extraction.wheels?.[selectedWheel] || [];
+        } else {
+          // NON-LOTTO (SuperEnalotto, etc.): Use main numbers
+          winningNumbers = extraction.numbers || [];
+        }
 
-      if (winningNumbers.length === 0) return;
+        if (winningNumbers.length === 0) return; // Skip if no valid winning numbers
 
       // Find matches
       const matches = combo.numbers.filter(num => winningNumbers.includes(num));
@@ -878,8 +881,9 @@ const SavedCombinationsAnalysis: React.FC = () => {
                       )}
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {(selectedGame === 'lotto' && extraction.wheels && selectedWheel
-                        ? (extraction.wheels[selectedWheel] || extraction.numbers || [])
+                      {/* LOTTO: Only wheel-specific data, no fallback to prevent mixing */}
+                      {(selectedGame === 'lotto'
+                        ? (extraction.wheels?.[selectedWheel] || [])
                         : (extraction.numbers || [])
                       ).filter(num => num !== undefined && num !== null).map((num) => {
                         const isMatch = matches.includes(num);

@@ -93,42 +93,43 @@ class OpenAIService {
         messages: [
           {
             role: "system",
-            content: `You are an expert lottery number analyst with deep knowledge of:
-- Statistical patterns and probability theory
-- Bayesian inference and conditional probability
-- Combinatorial analysis
+            content: `You are an expert lottery number analyst. IMPORTANT DISCLAIMER:
+⚠️ Every lottery combination has the SAME probability of winning. The lottery is uniformly random.
+⚠️ These statistics are for ANALYSIS and VISUALIZATION only - they cannot predict outcomes.
+⚠️ "Influence Scores" and "Pattern Scores" are RANKING metrics, NOT probabilities.
+
+Your expertise includes:
+- Statistical pattern recognition (historical trends, not predictions)
+- Influence score analysis (combining historical + recent frequency for ranking)
 - Distribution analysis (sum, spread, parity, decade distribution)
-- Co-occurrence patterns and correlations
-- Expected value calculations
-- Advanced lottery system strategies
+- Co-occurrence lift analysis (pairs that appear together more/less than expected)
+- Pattern quality scoring (aesthetic criteria for combinations)
 
-Your task is to analyze the provided lottery data and generate ${game.numbersToSelect} optimal numbers between 1 and ${game.maxNumber} for ${game.name}${wheel ? ` (wheel: ${wheel})` : ''}.
+Your task is to generate ${game.numbersToSelect} numbers between 1 and ${game.maxNumber} for ${game.name}${wheel ? ` (wheel: ${wheel})` : ''} based on statistical analysis.
 
-KEY PRINCIPLES:
-1. Use Bayesian probability to update predictions based on recent patterns
-2. Consider distribution analysis: optimal sum, spread, even/odd ratio, decade distribution
-3. Analyze co-occurrence patterns - prefer numbers that appear together frequently
-4. Avoid numbers that frequently appear in unsuccessful combinations
-5. Balance hot numbers (frequent) with due numbers (delayed) using Bayesian updates
-6. Avoid obvious patterns like consecutive sequences
-7. Consider expected value - maximize probability-weighted outcomes
-8. Ensure statistical diversity across number ranges
-9. Use correlation analysis to select complementary numbers
+ANALYSIS PRINCIPLES (for interesting combinations, NOT winning predictions):
+1. Use Influence Scores to rank numbers by historical + recent frequency
+2. Consider distribution: target sum ~${Math.round((game.numbersToSelect * (game.maxNumber + 1)) / 2)}, good spread, balanced even/odd
+3. Analyze co-occurrence lift - prefer numbers with positive lift scores
+4. Avoid numbers frequently in user's unsuccessful combinations (personal preference)
+5. Balance frequent numbers with delayed numbers for variety
+6. Avoid consecutive sequences (e.g., 5-6-7)
+7. Ensure statistical diversity across number ranges
+8. Use lift scores to select complementary pairs
 
-ADVANCED ANALYSIS:
-- Distribution Analysis: Analyze sum, spread, parity distribution, decade distribution
-- Bayesian Probabilities: Use posterior probabilities that incorporate historical data AND recent patterns
-- Co-occurrences: Select numbers that correlate positively with each other
-- Gap Analysis: Ensure optimal spacing between numbers
-- Pattern Score: Maximize overall pattern score
+HONEST TERMINOLOGY:
+- "Influence Score" = ranking metric combining historical + recent patterns (NOT probability)
+- "Lift Score" = how often pairs co-occur vs expected (NOT correlation of winning)
+- "Pattern Score" = aesthetic quality of combination (NOT winning likelihood)
+- "Confidence" = data quality indicator (NOT prediction confidence)
 
-Respond ONLY with a valid JSON object in this exact format:
+Respond ONLY with a valid JSON object:
 {
   "numbers": [array of ${game.numbersToSelect} unique numbers between 1-${game.maxNumber}],
   "jolly": ${gameType === 'superenalotto' ? 'number between 1-90 (different from main numbers)' : 'null'},
   "superstar": ${gameType === 'superenalotto' ? 'number between 1-90' : 'null'},
   "reasons": ["reason1", "reason2", "reason3", "reason4"],
-  "confidence": number between 0-100,
+  "confidence": number between 0-100 (data quality indicator),
   "analysis": {
     "distribution_score": number between 0-100,
     "bayesian_confidence": number between 0-100,
@@ -136,7 +137,7 @@ Respond ONLY with a valid JSON object in this exact format:
   }
 }
 
-IMPORTANT: Generate a DIFFERENT combination each time. Explore alternative statistically optimal solutions. Variation is key - there are many valid combinations that meet the statistical criteria.`
+Generate a DIFFERENT combination each time. There are many statistically interesting combinations.`
           },
           {
             role: "user",
@@ -324,20 +325,20 @@ IMPORTANT: Generate a DIFFERENT combination each time. Explore alternative stati
       context += `\n`;
     }
 
-    context += `INSTRUCTIONS:\n`;
-    context += `Generate ${game.numbersToSelect} optimal numbers using:\n`;
-    context += `1. Bayesian probability analysis (prior + likelihood → posterior)\n`;
-    context += `2. Distribution optimization (sum, spread, parity, decades)\n`;
-    context += `3. Co-occurrence patterns (select numbers with positive correlations)\n`;
-    context += `4. Expected value maximization\n`;
-    context += `5. Avoid unlucky patterns from unsuccessful combinations\n`;
-    context += `6. Balance statistical diversity with pattern optimization\n`;
-    context += `7. Provide detailed reasoning for each number selection\n`;
-    context += `8. Calculate confidence based on data quality and pattern strength\n`;
-    context += `9. Include distribution_score, bayesian_confidence, and co_occurrence_score in analysis\n`;
-    context += `10. IMPORTANT: Generate a DIFFERENT combination each time - explore alternative optimal solutions\n`;
-    context += `11. Consider multiple valid approaches - there are many statistically sound combinations\n`;
-    context += `12. Vary your selection strategy - sometimes emphasize Bayesian probabilities, sometimes co-occurrences, sometimes distribution\n`;
+    context += `INSTRUCTIONS (for analysis-based recommendation, NOT prediction):\n`;
+    context += `Generate ${game.numbersToSelect} statistically interesting numbers using:\n`;
+    context += `1. Influence score analysis (historical + recent frequency ranking)\n`;
+    context += `2. Distribution optimization (target sum, spread, parity, decades)\n`;
+    context += `3. Co-occurrence lift (select numbers with positive lift scores)\n`;
+    context += `4. Pattern quality maximization (aesthetic criteria)\n`;
+    context += `5. Avoid patterns from user's unsuccessful combinations (personal preference)\n`;
+    context += `6. Balance statistical diversity with pattern quality\n`;
+    context += `7. Provide clear reasoning (avoid claiming "higher probability")\n`;
+    context += `8. Data quality indicator based on sample size and consistency\n`;
+    context += `9. Include distribution_score, influence_confidence, and lift_score in analysis\n`;
+    context += `10. IMPORTANT: Generate a DIFFERENT combination each time\n`;
+    context += `11. Many combinations are statistically interesting - explore variety\n`;
+    context += `12. Vary approach: sometimes emphasize influence, sometimes lift, sometimes distribution\n`;
     
     // Add a random seed/timestamp to encourage variation
     const variationHint = Math.random() < 0.5 

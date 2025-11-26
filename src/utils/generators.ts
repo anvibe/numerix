@@ -78,6 +78,35 @@ const hasUnluckyPair = (numbers: number[], statistics: GameStatistics): boolean 
   return false;
 };
 
+/**
+ * Ensures a combination has exactly the required count of unique numbers.
+ * Deduplicates, fills missing spots with random numbers that aren't already in the set.
+ */
+const ensureUniqueCount = (
+  numbers: number[],
+  requiredCount: number,
+  maxNumber: number,
+  existingNumbers: number[] = []
+): number[] => {
+  // Deduplicate
+  const unique = [...new Set(numbers)];
+  
+  // Create a set of all numbers to exclude (existing + current)
+  const excludeSet = new Set([...existingNumbers, ...unique]);
+  
+  // Fill missing spots with random numbers not in the exclude set
+  while (unique.length < requiredCount) {
+    const randomNum = getRandomNumber(1, maxNumber);
+    if (!excludeSet.has(randomNum)) {
+      unique.push(randomNum);
+      excludeSet.add(randomNum);
+    }
+  }
+  
+  // Trim if somehow we have too many
+  return unique.slice(0, requiredCount).sort((a, b) => a - b);
+};
+
 // Generate unique random numbers with no consecutive sequences and avoiding unlucky patterns
 const generateUniqueRandomNumbers = (count: number, max: number, statistics?: GameStatistics): number[] => {
   const numbers: number[] = [];
@@ -228,7 +257,6 @@ export const generateCombination = (
     // Standard strategy: mix of frequent numbers and some with delays, avoiding unlucky patterns
     const frequentCount = Math.ceil(game.numbersToSelect * 0.6);
     const delayCount = Math.floor(game.numbersToSelect * 0.3);
-    const randomCount = game.numbersToSelect - frequentCount - delayCount;
     
     // Get frequent numbers (avoiding unlucky ones)
     const frequentNumbers = generateBasedOnFrequency(
@@ -237,29 +265,16 @@ export const generateCombination = (
       true
     );
     
-    // Get numbers with delays (avoiding unlucky ones)
+    // Get numbers with delays (avoiding unlucky ones), excluding already selected
     const delayNumbers = generateBasedOnDelays(delayCount, stats)
       .filter(num => !frequentNumbers.includes(num));
     
-    // Fill remaining with random numbers (avoiding unlucky patterns)
-    let remainingNumbers = generateUniqueRandomNumbers(
-      randomCount + (delayCount - delayNumbers.length),
-      game.maxNumber,
-      stats
-    ).filter(num => 
-      !frequentNumbers.includes(num) && 
-      !delayNumbers.includes(num)
-    );
+    // Combine what we have so far
+    combination = [...frequentNumbers, ...delayNumbers];
     
-    combination = [
-      ...frequentNumbers,
-      ...delayNumbers,
-      ...remainingNumbers.slice(0, game.numbersToSelect - frequentNumbers.length - delayNumbers.length)
-    ];
   } else {
     // High variability: more random with some infrequent numbers, still avoiding unlucky patterns
     const infrequentCount = Math.ceil(game.numbersToSelect * 0.4);
-    const randomCount = game.numbersToSelect - infrequentCount;
     
     // Get infrequent numbers (with some unlucky avoidance)
     const infrequentNumbers = generateBasedOnFrequency(
@@ -268,30 +283,11 @@ export const generateCombination = (
       false
     );
     
-    // Fill remaining with random numbers (avoiding unlucky patterns)
-    const randomNumbers = generateUniqueRandomNumbers(randomCount, game.maxNumber, stats)
-      .filter(num => !infrequentNumbers.includes(num));
-    
-    combination = [
-      ...infrequentNumbers,
-      ...randomNumbers
-    ];
+    combination = [...infrequentNumbers];
   }
   
-  // Ensure we have exactly the right number of selections
-  if (combination.length > game.numbersToSelect) {
-    combination = combination.slice(0, game.numbersToSelect);
-  }
-  
-  // Fill any remaining spots with random numbers if needed
-  while (combination.length < game.numbersToSelect) {
-    const randomNum = getRandomNumber(1, game.maxNumber);
-    if (!combination.includes(randomNum)) {
-      combination.push(randomNum);
-    }
-  }
-  
-  combination.sort((a, b) => a - b);
+  // GUARANTEE: Ensure exactly the right number of UNIQUE selections
+  combination = ensureUniqueCount(combination, game.numbersToSelect, game.maxNumber);
   
   // For SuperEnalotto, generate Jolly and Superstar numbers (also avoiding unlucky ones)
   if (gameType === 'superenalotto') {
@@ -337,21 +333,27 @@ export const generateAIRecommendation = (
   const game = getGameByType(gameType);
   const stats = wheel && statistics.wheelStats ? statistics.wheelStats[wheel] : statistics;
   
-  // If advanced statistics are available, use them with randomization
-  if (advancedStats) {
+  // For Lotto: Use PER-WHEEL advanced statistics if available
+  // This ensures co-occurrence, influence scores, etc. are wheel-specific
+  const effectiveAdvancedStats = (gameType === 'lotto' && wheel && statistics.wheelStats?.[wheel]?.advancedStatistics)
+    ? statistics.wheelStats[wheel].advancedStatistics
+    : advancedStats;
+  
+  // If advanced statistics are available (per-wheel for Lotto, global for others), use them with randomization
+  if (effectiveAdvancedStats) {
     const optimalDist = calculateOptimalDistribution(gameType, game.maxNumber, game.numbersToSelect);
     
     // Use generateAdvancedCombination for randomization instead of deterministic calculateOptimalCombination
     // This ensures different combinations each time
     let combination = generateAdvancedCombination(
-      advancedStats,
+      effectiveAdvancedStats,
       game.numbersToSelect,
       game.maxNumber
     );
     
     // Add some co-occurrence optimization with randomization
     // Take top co-occurring pairs and randomly select from them
-    const topCoOccurrences = advancedStats.coOccurrences
+    const topCoOccurrences = effectiveAdvancedStats.coOccurrences
       .filter(co => co.correlation > 0)
       .slice(0, 10);
     
@@ -374,53 +376,56 @@ export const generateAIRecommendation = (
     const patternScore = calculatePatternScore(
       actualDist,
       optimalDist,
-      advancedStats.bayesianProbabilities,
+      effectiveAdvancedStats.bayesianProbabilities,
       combination
     );
     
-    // Generate reasons based on advanced statistics
+    // Generate reasons based on advanced statistics (using honest terminology)
+    // Note: For Lotto, these are PER-WHEEL statistics
+    const wheelLabel = (gameType === 'lotto' && wheel) ? ` (Ruota: ${wheel})` : '';
     const reasons: string[] = combination.map(num => {
-      const bayesianProb = advancedStats.bayesianProbabilities.find(p => p.number === num);
-      const coOcc = advancedStats.coOccurrences.filter(co => 
+      const influenceScore = effectiveAdvancedStats.bayesianProbabilities.find(p => p.number === num);
+      const coOcc = effectiveAdvancedStats.coOccurrences.filter(co => 
         co.numbers.includes(num)
       ).slice(0, 2);
       
       let reason = '';
-      if (bayesianProb) {
-        reason = `Numero ${num}: Probabilità Bayesiana ${bayesianProb.posteriorProbability.toFixed(1)}% `;
-        reason += `(Prior: ${bayesianProb.priorProbability.toFixed(1)}%, `;
-        reason += `Likelihood: ${bayesianProb.likelihood.toFixed(1)}%)`;
+      if (influenceScore) {
+        // Use honest terminology: "Influence Score" (ranking), not "probability"
+        reason = `Numero ${num}: Punteggio Influenza ${influenceScore.posteriorProbability.toFixed(1)} `;
+        reason += `(Freq. Storica: ${influenceScore.priorProbability.toFixed(1)}%, `;
+        reason += `Freq. Recente: ${influenceScore.likelihood.toFixed(1)}%)`;
       } else {
         reason = `Numero ${num}: Selezionato per distribuzione ottimale`;
       }
       
       if (coOcc.length > 0) {
-        reason += `. Co-occorre positivamente con altri numeri selezionati.`;
+        reason += `. Lift positivo con altri numeri selezionati.`;
       }
       
       return reason;
     });
     
-    reasons.push(`Punteggio Pattern: ${patternScore.toFixed(1)}/100`);
+    reasons.push(`Punteggio Pattern: ${patternScore.toFixed(1)}/100${wheelLabel}`);
     reasons.push(`Distribuzione: Somma=${actualDist.sum.toFixed(0)}, Spread=${actualDist.spread}, Parità=${(actualDist.evenOddRatio * 100).toFixed(0)}%`);
     
     // For SuperEnalotto, generate Jolly and Superstar
     if (gameType === 'superenalotto') {
-      // Use Bayesian probabilities for jolly and superstar too
-      const topBayesian = advancedStats.bayesianProbabilities
+      // Use influence scores for jolly and superstar too
+      const topInfluence = effectiveAdvancedStats.bayesianProbabilities
         .filter(p => !combination.includes(p.number))
         .slice(0, 10)
         .map(p => p.number);
       
-      const jolly = topBayesian.length > 0 
-        ? topBayesian[Math.floor(Math.random() * topBayesian.length)]
+      const jolly = topInfluence.length > 0 
+        ? topInfluence[Math.floor(Math.random() * topInfluence.length)]
         : generateUniqueNumberExcluding(1, game.maxNumber, combination);
-      const superstar = topBayesian.length > 0
-        ? topBayesian[Math.floor(Math.random() * topBayesian.length)]
+      const superstar = topInfluence.length > 0
+        ? topInfluence[Math.floor(Math.random() * topInfluence.length)]
         : getRandomNumber(1, game.maxNumber);
       
-      reasons.push(`Jolly ${jolly}: Selezionato usando probabilità Bayesiane`);
-      reasons.push(`SuperStar ${superstar}: Ottimizzato per pattern statistici avanzati`);
+      reasons.push(`Jolly ${jolly}: Selezionato per alto punteggio di influenza`);
+      reasons.push(`SuperStar ${superstar}: Ottimizzato per pattern statistici`);
       
       return { numbers: combination, reasons, jolly, superstar };
     }
@@ -438,18 +443,11 @@ export const generateAIRecommendation = (
   const dueNumbers = generateBasedOnDelays(dueCount, stats)
     .filter(num => !hotNumbers.includes(num));
   
-  // Add some balancing numbers for variability, avoiding unlucky patterns
-  const balanceCount = game.numbersToSelect - hotNumbers.length - dueNumbers.length;
-  const balanceNumbers = generateUniqueRandomNumbers(balanceCount + 5, game.maxNumber, stats)
-    .filter(num => !hotNumbers.includes(num) && !dueNumbers.includes(num))
-    .slice(0, balanceCount);
+  // Combine initial selections
+  let combination = [...hotNumbers, ...dueNumbers];
   
-  // Combine all numbers
-  const combination = [
-    ...hotNumbers,
-    ...dueNumbers,
-    ...balanceNumbers
-  ].sort((a, b) => a - b);
+  // GUARANTEE: Ensure exactly the right number of UNIQUE selections
+  combination = ensureUniqueCount(combination, game.numbersToSelect, game.maxNumber);
   
   // Generate reasons for each number
   const reasons: string[] = combination.map(num => {

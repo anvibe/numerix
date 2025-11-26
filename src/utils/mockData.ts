@@ -2,6 +2,24 @@ import { ExtractedNumbers, GameStatistics, GameType, LottoWheel, UnsuccessfulCom
 import { GAMES, LOTTO_WHEELS } from './constants';
 import { calculateAdvancedStatistics } from './advancedStatistics';
 
+/**
+ * Helper to get numbers from an extraction based on game type.
+ * IMPORTANT: For Lotto (wheel-based), we DO NOT fall back to extraction.numbers
+ * to prevent mixing SuperEnalotto-style data with wheel-specific data.
+ */
+const getExtractionNumbers = (
+  extraction: ExtractedNumbers,
+  wheel?: LottoWheel
+): number[] => {
+  if (wheel) {
+    // LOTTO: Only use wheel-specific data, NO FALLBACK to extraction.numbers
+    // This prevents data pollution from mixed formats
+    return extraction.wheels?.[wheel] || [];
+  }
+  // NON-LOTTO (SuperEnalotto, 10eLotto, MillionDAY): Use main numbers
+  return extraction.numbers || [];
+};
+
 // Calculate number frequencies from extractions
 export const calculateFrequencies = (
   extractions: ExtractedNumbers[],
@@ -16,9 +34,8 @@ export const calculateFrequencies = (
   }
 
   extractions.forEach((extraction) => {
-    const numbers = wheel && extraction.wheels 
-      ? (extraction.wheels[wheel] || extraction.numbers || [])
-      : (extraction.numbers || []);
+    // Use strict helper to prevent Lotto/SuperEnalotto data mixing
+    const numbers = getExtractionNumbers(extraction, wheel);
     
     // Safety check: ensure numbers is an array
     if (!Array.isArray(numbers) || numbers.length === 0) {
@@ -58,13 +75,11 @@ export const calculateDelays = (
   wheel?: LottoWheel
 ): any[] => {
   const lastSeen = new Array(maxNumber + 1).fill(-1);
-  const currentExtraction = 0;
 
   // Find the last extraction each number appeared in
   extractions.forEach((extraction, index) => {
-    const numbers = wheel && extraction.wheels 
-      ? (extraction.wheels[wheel] || extraction.numbers || [])
-      : (extraction.numbers || []);
+    // Use strict helper to prevent Lotto/SuperEnalotto data mixing
+    const numbers = getExtractionNumbers(extraction, wheel);
     
     // Safety check: ensure numbers is an array
     if (!Array.isArray(numbers) || numbers.length === 0) {
@@ -176,6 +191,7 @@ export const calculateGameStatistics = (
       delays: any[];
       unluckyNumbers?: Frequency[];
       unluckyPairs?: { pair: [number, number]; count: number }[];
+      advancedStatistics?: ReturnType<typeof calculateAdvancedStatistics>;
     }> = {} as any;
     
     LOTTO_WHEELS.forEach(wheel => {
@@ -193,29 +209,42 @@ export const calculateGameStatistics = (
         wheel
       );
       
+      // Calculate PER-WHEEL advanced statistics for Lotto
+      // This ensures each wheel has its own co-occurrence, influence scores, etc.
+      const unsuccessfulForWheel = unsuccessfulCombinations.filter(
+        combo => combo.gameType === gameType && combo.wheel === wheel
+      );
+      
+      // Create wheel-specific extractions by extracting only that wheel's numbers
+      // This is needed because calculateAdvancedStatistics expects extraction.numbers
+      const wheelSpecificExtractions = extractions
+        .filter(ext => ext.wheels?.[wheel] && ext.wheels[wheel].length > 0)
+        .map(ext => ({
+          ...ext,
+          numbers: ext.wheels![wheel]  // Use wheel-specific numbers as main numbers
+        }));
+      
+      const wheelAdvancedStats = wheelSpecificExtractions.length > 0 
+        ? calculateAdvancedStatistics(
+            gameType,
+            wheelSpecificExtractions,
+            unsuccessfulForWheel,
+            game.maxNumber,
+            game.numbersToSelect
+          )
+        : undefined;
+      
       wheelStats[wheel] = {
         frequentNumbers,
         infrequentNumbers,
         delays,
         unluckyNumbers,
-        unluckyPairs
+        unluckyPairs,
+        advancedStatistics: wheelAdvancedStats
       };
     });
     
-    // Calculate advanced statistics for Bari (default wheel)
-    const unsuccessfulForWheel = unsuccessfulCombinations.filter(
-      combo => combo.gameType === gameType && (!combo.wheel || combo.wheel === 'Bari')
-    );
-    
-    const advancedStats = extractions.length > 0 ? calculateAdvancedStatistics(
-      gameType,
-      extractions,
-      unsuccessfulForWheel,
-      game.maxNumber,
-      game.numbersToSelect
-    ) : undefined;
-    
-    // Use Bari's stats as default
+    // Use Bari's stats as default (with its per-wheel advanced stats)
     return {
       frequentNumbers: wheelStats.Bari.frequentNumbers,
       infrequentNumbers: wheelStats.Bari.infrequentNumbers,
@@ -223,7 +252,7 @@ export const calculateGameStatistics = (
       unluckyNumbers: wheelStats.Bari.unluckyNumbers,
       unluckyPairs: wheelStats.Bari.unluckyPairs,
       wheelStats,
-      advancedStatistics: advancedStats
+      advancedStatistics: wheelStats.Bari.advancedStatistics
     };
   }
   

@@ -122,6 +122,9 @@ export interface GameStatistics {
     delays: Delay[];
     unluckyNumbers?: Frequency[];
     unluckyPairs?: { pair: [number, number]; count: number }[];
+    // Per-wheel advanced statistics for Lotto
+    // These are calculated independently for each wheel
+    advancedStatistics?: import('../utils/advancedStatistics').AdvancedStatistics;
   }>;
   advancedStatistics?: import('../utils/advancedStatistics').AdvancedStatistics;
 }
