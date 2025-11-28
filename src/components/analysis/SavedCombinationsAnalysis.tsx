@@ -588,14 +588,53 @@ const SavedCombinationsAnalysis: React.FC = () => {
   }
 
   if (relevantCombinations.length === 0) {
+    // Check if it's because of date filter
+    const hasDateFilter = dateFilterFrom || dateFilterTo;
+    const hasOtherFilters = selectedGame === 'lotto' && gameConfig?.wheels;
+    
+    // Count total combinations before date filter
+    const totalCombinationsBeforeDateFilter = savedCombinations.filter(combo => {
+      if (combo.gameType !== selectedGame) return false;
+      if (selectedGame === 'lotto' && combo.wheel) {
+        return combo.wheel === selectedWheel;
+      }
+      return true;
+    }).length;
+    
     return (
       <div className="card mb-8">
         <div className="text-center py-8">
           <Target className="h-12 w-12 text-text-secondary mx-auto mb-4" />
           <h3 className="text-lg font-semibold mb-2">Analisi Combinazioni</h3>
-          <p className="text-text-secondary">
-            Salva alcune combinazioni per vedere l'analisi comparativa con le estrazioni.
-          </p>
+          {hasDateFilter && totalCombinationsBeforeDateFilter > 0 ? (
+            <>
+              <p className="text-text-secondary mb-4">
+                Nessuna combinazione trovata per il periodo selezionato.
+                {dateFilterFrom && dateFilterTo && (
+                  <> Periodo: dal {new Date(dateFilterFrom).toLocaleDateString('it-IT')} al {new Date(dateFilterTo).toLocaleDateString('it-IT')}</>
+                )}
+                {dateFilterFrom && !dateFilterTo && (
+                  <> Dal {new Date(dateFilterFrom).toLocaleDateString('it-IT')} in poi</>
+                )}
+                {!dateFilterFrom && dateFilterTo && (
+                  <> Fino al {new Date(dateFilterTo).toLocaleDateString('it-IT')}</>
+                )}
+              </p>
+              <button
+                onClick={() => {
+                  setDateFilterFrom('');
+                  setDateFilterTo('');
+                }}
+                className="btn btn-primary"
+              >
+                Rimuovi Filtro Data
+              </button>
+            </>
+          ) : (
+            <p className="text-text-secondary">
+              Salva alcune combinazioni per vedere l'analisi comparativa con le estrazioni.
+            </p>
+          )}
         </div>
       </div>
     );
@@ -854,7 +893,37 @@ const SavedCombinationsAnalysis: React.FC = () => {
                 </div>
               </div>
             ) : (
-              'Nessun risultato trovato con i filtri selezionati.'
+              <div>
+                <div className="text-lg font-semibold mb-2">Nessun risultato trovato con i filtri selezionati</div>
+                {(dateFilterFrom || dateFilterTo || filterDifference !== null) && (
+                  <div className="mt-4">
+                    <p className="text-sm mb-3">
+                      Prova a modificare o rimuovere i filtri attivi:
+                    </p>
+                    <div className="flex gap-2 justify-center flex-wrap">
+                      {(dateFilterFrom || dateFilterTo) && (
+                        <button
+                          onClick={() => {
+                            setDateFilterFrom('');
+                            setDateFilterTo('');
+                          }}
+                          className="btn btn-outline btn-sm"
+                        >
+                          Rimuovi Filtro Data
+                        </button>
+                      )}
+                      {filterDifference !== null && (
+                        <button
+                          onClick={() => setFilterDifference(null)}
+                          className="btn btn-outline btn-sm"
+                        >
+                          Rimuovi Filtro Differenza
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         ) : (
