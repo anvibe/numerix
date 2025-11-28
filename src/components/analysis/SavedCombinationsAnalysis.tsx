@@ -31,6 +31,8 @@ const SavedCombinationsAnalysis: React.FC = () => {
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [selectedCombinationId, setSelectedCombinationId] = useState<string | null>(null);
   const [resultsLimit, setResultsLimit] = useState<number>(10);
+  const [dateFilterFrom, setDateFilterFrom] = useState<string>('');
+  const [dateFilterTo, setDateFilterTo] = useState<string>('');
 
   // Calculate combinations and extractions directly (no memoization to avoid React error #310)
   // Start with savedCombinations which should already be deduplicated, but apply additional safety checks
@@ -73,6 +75,28 @@ const SavedCombinationsAnalysis: React.FC = () => {
   });
   
   relevantCombinations = Array.from(finalUniqueNumbersMap.values());
+
+  // Apply date filter if set (after deduplication to filter final unique combinations)
+  if (dateFilterFrom || dateFilterTo) {
+    relevantCombinations = relevantCombinations.filter(combo => {
+      const comboDate = new Date(combo.date);
+      comboDate.setHours(0, 0, 0, 0);
+      
+      if (dateFilterFrom) {
+        const fromDate = new Date(dateFilterFrom);
+        fromDate.setHours(0, 0, 0, 0);
+        if (comboDate < fromDate) return false;
+      }
+      
+      if (dateFilterTo) {
+        const toDate = new Date(dateFilterTo);
+        toDate.setHours(23, 59, 59, 999); // Include the entire end date
+        if (comboDate > toDate) return false;
+      }
+      
+      return true;
+    });
+  }
 
   // Debug: Log to help identify mismatches
   // Always log (not just in development) to help diagnose the issue
@@ -672,9 +696,65 @@ const SavedCombinationsAnalysis: React.FC = () => {
                   {combo.wheel && ` (${combo.wheel})`}
                   {combo.jolly && ` - Jolly: ${combo.jolly}`}
                   {combo.superstar && ` - Superstar: ${combo.superstar}`}
+                  {` - ${new Date(combo.date).toLocaleDateString('it-IT')}`}
                 </option>
               ))}
             </select>
+          </div>
+        )}
+      </div>
+
+      {/* Filter by date range */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-text-secondary mb-2">
+          Filtra per Data di Salvataggio Combinazione
+        </label>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+          <div>
+            <label className="block text-xs text-text-secondary mb-1">
+              Da (data inizio)
+            </label>
+            <input
+              type="date"
+              value={dateFilterFrom}
+              onChange={(e) => setDateFilterFrom(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-bg-primary"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-text-secondary mb-1">
+              A (data fine)
+            </label>
+            <input
+              type="date"
+              value={dateFilterTo}
+              onChange={(e) => setDateFilterTo(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-bg-primary"
+            />
+          </div>
+          <div>
+            <button
+              onClick={() => {
+                setDateFilterFrom('');
+                setDateFilterTo('');
+              }}
+              className="btn btn-outline w-full"
+            >
+              Rimuovi Filtro Data
+            </button>
+          </div>
+        </div>
+        {(dateFilterFrom || dateFilterTo) && (
+          <div className="mt-2 text-xs text-text-secondary">
+            {dateFilterFrom && dateFilterTo && (
+              <>Mostrate combinazioni salvate dal {new Date(dateFilterFrom).toLocaleDateString('it-IT')} al {new Date(dateFilterTo).toLocaleDateString('it-IT')}</>
+            )}
+            {dateFilterFrom && !dateFilterTo && (
+              <>Mostrate combinazioni salvate dal {new Date(dateFilterFrom).toLocaleDateString('it-IT')} in poi</>
+            )}
+            {!dateFilterFrom && dateFilterTo && (
+              <>Mostrate combinazioni salvate fino al {new Date(dateFilterTo).toLocaleDateString('it-IT')}</>
+            )}
           </div>
         )}
       </div>
