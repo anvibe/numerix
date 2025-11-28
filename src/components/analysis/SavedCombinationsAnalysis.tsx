@@ -472,16 +472,17 @@ const SavedCombinationsAnalysis: React.FC = () => {
         }
       });
       
-      // Sort by match count (best first), then by combination date (most recent first)
+      // Sort by combination date (most recent first), then by match count (best first)
+      // This shows the latest saved combinations first by default
       filteredResults = Array.from(bestMatchPerCombo.values()).sort((a, b) => {
-        // First sort by match count (highest first)
-        if (b.matchCount !== a.matchCount) {
-          return b.matchCount - a.matchCount;
-        }
-        // Then by combination date (most recent first)
+        // First sort by combination save date (most recent first)
         const comboDateA = new Date(a.savedCombination.date).getTime();
         const comboDateB = new Date(b.savedCombination.date).getTime();
-        return comboDateB - comboDateA;
+        if (comboDateB !== comboDateA) {
+          return comboDateB - comboDateA;
+        }
+        // Then by match count (highest first) if same date
+        return b.matchCount - a.matchCount;
       });
     } else {
       filteredResults = analysisResults.filter(result => result.difference === filterDifference);
