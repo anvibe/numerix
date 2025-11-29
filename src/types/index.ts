@@ -127,4 +127,15 @@ export interface GameStatistics {
     advancedStatistics?: import('../utils/advancedStatistics').AdvancedStatistics;
   }>;
   advancedStatistics?: import('../utils/advancedStatistics').AdvancedStatistics;
+  // SuperEnalotto-specific statistics for Jolly and Superstar
+  jollyStats?: {
+    frequentNumbers: Frequency[];
+    infrequentNumbers: Frequency[];
+    delays: Delay[];
+  };
+  superstarStats?: {
+    frequentNumbers: Frequency[];
+    infrequentNumbers: Frequency[];
+    delays: Delay[];
+  };
 }

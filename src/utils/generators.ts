@@ -448,9 +448,29 @@ export const generateCombination = (
   // Apply balance criteria to improve combination quality
   combination = applyBalanceCriteria(combination, game.maxNumber, game.numbersToSelect);
   
-  // For SuperEnalotto, generate Jolly and Superstar numbers (also avoiding unlucky ones)
+  // For SuperEnalotto, generate Jolly and Superstar numbers using statistics
   if (gameType === 'superenalotto') {
-    let jolly = generateUniqueNumberExcluding(1, game.maxNumber, combination);
+    // Generate Jolly: prefer frequent numbers that aren't in the main combination
+    let jolly: number;
+    if (statistics.jollyStats && statistics.jollyStats.frequentNumbers.length > 0) {
+      // 70% chance to use a frequent jolly, 30% random
+      if (Math.random() < 0.7) {
+        const frequentJollies = statistics.jollyStats.frequentNumbers
+          .filter(f => !combination.includes(f.number))
+          .slice(0, 5)
+          .map(f => f.number);
+        
+        if (frequentJollies.length > 0) {
+          jolly = frequentJollies[Math.floor(Math.random() * frequentJollies.length)];
+        } else {
+          jolly = generateUniqueNumberExcluding(1, game.maxNumber, combination);
+        }
+      } else {
+        jolly = generateUniqueNumberExcluding(1, game.maxNumber, combination);
+      }
+    } else {
+      jolly = generateUniqueNumberExcluding(1, game.maxNumber, combination);
+    }
     
     // Try to avoid unlucky jolly numbers
     if (stats.unluckyNumbers && isUnluckyNumber(jolly, stats) && Math.random() < 0.7) {
@@ -463,7 +483,26 @@ export const generateCombination = (
       }
     }
     
-    let superstar = getRandomNumber(1, game.maxNumber);
+    // Generate Superstar: prefer numbers with delays (ritardatari) for variety
+    let superstar: number;
+    if (statistics.superstarStats && statistics.superstarStats.delays.length > 0) {
+      // 60% chance to use a delayed superstar, 40% random
+      if (Math.random() < 0.6) {
+        const delayedSuperstars = statistics.superstarStats.delays
+          .slice(0, 5)
+          .map(d => d.number);
+        
+        if (delayedSuperstars.length > 0) {
+          superstar = delayedSuperstars[Math.floor(Math.random() * delayedSuperstars.length)];
+        } else {
+          superstar = getRandomNumber(1, game.maxNumber);
+        }
+      } else {
+        superstar = getRandomNumber(1, game.maxNumber);
+      }
+    } else {
+      superstar = getRandomNumber(1, game.maxNumber);
+    }
     
     // Try to avoid unlucky superstar numbers
     if (stats.unluckyNumbers && isUnluckyNumber(superstar, stats) && Math.random() < 0.7) {
@@ -568,23 +607,82 @@ export const generateAIRecommendation = (
     reasons.push(`Punteggio Pattern: ${patternScore.toFixed(1)}/100${wheelLabel}`);
     reasons.push(`Distribuzione: Somma=${actualDist.sum.toFixed(0)}, Spread=${actualDist.spread}, Parità=${(actualDist.evenOddRatio * 100).toFixed(0)}%`);
     
-    // For SuperEnalotto, generate Jolly and Superstar
+    // For SuperEnalotto, generate Jolly and Superstar using statistics
     if (gameType === 'superenalotto') {
-      // Use influence scores for jolly and superstar too
-      const topInfluence = effectiveAdvancedStats.bayesianProbabilities
-        .filter(p => !combination.includes(p.number))
-        .slice(0, 10)
-        .map(p => p.number);
+      let jolly: number;
+      let jollyReason = '';
       
-      const jolly = topInfluence.length > 0 
-        ? topInfluence[Math.floor(Math.random() * topInfluence.length)]
-        : generateUniqueNumberExcluding(1, game.maxNumber, combination);
-      const superstar = topInfluence.length > 0
-        ? topInfluence[Math.floor(Math.random() * topInfluence.length)]
-        : getRandomNumber(1, game.maxNumber);
+      // Generate Jolly: prefer frequent jolly numbers
+      if (statistics.jollyStats && statistics.jollyStats.frequentNumbers.length > 0) {
+        const frequentJollies = statistics.jollyStats.frequentNumbers
+          .filter(f => !combination.includes(f.number))
+          .slice(0, 5);
+        
+        if (frequentJollies.length > 0) {
+          const selected = frequentJollies[Math.floor(Math.random() * frequentJollies.length)];
+          jolly = selected.number;
+          jollyReason = `Jolly ${jolly}: Numero frequente (apparso ${selected.count} volte, ${selected.percentage.toFixed(1)}%)`;
+        } else {
+          // Fallback to influence scores
+          const topInfluence = effectiveAdvancedStats.bayesianProbabilities
+            .filter(p => !combination.includes(p.number))
+            .slice(0, 10)
+            .map(p => p.number);
+          
+          jolly = topInfluence.length > 0 
+            ? topInfluence[Math.floor(Math.random() * topInfluence.length)]
+            : generateUniqueNumberExcluding(1, game.maxNumber, combination);
+          jollyReason = `Jolly ${jolly}: Selezionato per alto punteggio di influenza`;
+        }
+      } else {
+        // Fallback to influence scores
+        const topInfluence = effectiveAdvancedStats.bayesianProbabilities
+          .filter(p => !combination.includes(p.number))
+          .slice(0, 10)
+          .map(p => p.number);
+        
+        jolly = topInfluence.length > 0 
+          ? topInfluence[Math.floor(Math.random() * topInfluence.length)]
+          : generateUniqueNumberExcluding(1, game.maxNumber, combination);
+        jollyReason = `Jolly ${jolly}: Selezionato per alto punteggio di influenza`;
+      }
       
-      reasons.push(`Jolly ${jolly}: Selezionato per alto punteggio di influenza`);
-      reasons.push(`SuperStar ${superstar}: Ottimizzato per pattern statistici`);
+      let superstar: number;
+      let superstarReason = '';
+      
+      // Generate Superstar: prefer delayed numbers for variety
+      if (statistics.superstarStats && statistics.superstarStats.delays.length > 0) {
+        const delayedSuperstars = statistics.superstarStats.delays.slice(0, 5);
+        
+        if (delayedSuperstars.length > 0) {
+          const selected = delayedSuperstars[Math.floor(Math.random() * delayedSuperstars.length)];
+          superstar = selected.number;
+          superstarReason = `SuperStar ${superstar}: Numero ritardatario (ritardo: ${selected.delay} estrazioni)`;
+        } else {
+          // Fallback to influence scores
+          const topInfluence = effectiveAdvancedStats.bayesianProbabilities
+            .slice(0, 10)
+            .map(p => p.number);
+          
+          superstar = topInfluence.length > 0
+            ? topInfluence[Math.floor(Math.random() * topInfluence.length)]
+            : getRandomNumber(1, game.maxNumber);
+          superstarReason = `SuperStar ${superstar}: Ottimizzato per pattern statistici`;
+        }
+      } else {
+        // Fallback to influence scores
+        const topInfluence = effectiveAdvancedStats.bayesianProbabilities
+          .slice(0, 10)
+          .map(p => p.number);
+        
+        superstar = topInfluence.length > 0
+          ? topInfluence[Math.floor(Math.random() * topInfluence.length)]
+          : getRandomNumber(1, game.maxNumber);
+        superstarReason = `SuperStar ${superstar}: Ottimizzato per pattern statistici`;
+      }
+      
+      reasons.push(jollyReason);
+      reasons.push(superstarReason);
       
       return { numbers: combination, reasons, jolly, superstar };
     }
@@ -628,10 +726,49 @@ export const generateAIRecommendation = (
     reasons.push(`L'AI ha evitato numeri e combinazioni che sono apparsi frequentemente nelle tue combinazioni non vincenti.`);
   }
   
-  // For SuperEnalotto, generate and explain Jolly and Superstar numbers
+  // For SuperEnalotto, generate and explain Jolly and Superstar numbers using statistics
   if (gameType === 'superenalotto') {
-    let jolly = generateUniqueNumberExcluding(1, game.maxNumber, combination);
-    let superstar = getRandomNumber(1, game.maxNumber);
+    let jolly: number;
+    let jollyReason = '';
+    
+    // Generate Jolly: prefer frequent jolly numbers
+    if (statistics.jollyStats && statistics.jollyStats.frequentNumbers.length > 0) {
+      const frequentJollies = statistics.jollyStats.frequentNumbers
+        .filter(f => !combination.includes(f.number))
+        .slice(0, 5);
+      
+      if (frequentJollies.length > 0 && Math.random() < 0.7) {
+        const selected = frequentJollies[Math.floor(Math.random() * frequentJollies.length)];
+        jolly = selected.number;
+        jollyReason = `Jolly ${jolly}: Numero frequente (apparso ${selected.count} volte, ${selected.percentage.toFixed(1)}%)`;
+      } else {
+        jolly = generateUniqueNumberExcluding(1, game.maxNumber, combination);
+        jollyReason = `Jolly ${jolly}: Selezionato come numero complementare`;
+      }
+    } else {
+      jolly = generateUniqueNumberExcluding(1, game.maxNumber, combination);
+      jollyReason = `Jolly ${jolly}: Selezionato come numero complementare`;
+    }
+    
+    let superstar: number;
+    let superstarReason = '';
+    
+    // Generate Superstar: prefer delayed numbers for variety
+    if (statistics.superstarStats && statistics.superstarStats.delays.length > 0) {
+      const delayedSuperstars = statistics.superstarStats.delays.slice(0, 5);
+      
+      if (delayedSuperstars.length > 0 && Math.random() < 0.6) {
+        const selected = delayedSuperstars[Math.floor(Math.random() * delayedSuperstars.length)];
+        superstar = selected.number;
+        superstarReason = `SuperStar ${superstar}: Numero ritardatario (ritardo: ${selected.delay} estrazioni)`;
+      } else {
+        superstar = getRandomNumber(1, game.maxNumber);
+        superstarReason = `SuperStar ${superstar}: Generato considerando i pattern di successo`;
+      }
+    } else {
+      superstar = getRandomNumber(1, game.maxNumber);
+      superstarReason = `SuperStar ${superstar}: Generato considerando i pattern di successo`;
+    }
     
     // Try to avoid unlucky numbers for jolly and superstar
     if (stats.unluckyNumbers) {
@@ -656,8 +793,8 @@ export const generateAIRecommendation = (
       }
     }
     
-    reasons.push(`Il numero Jolly ${jolly} è stato selezionato come numero complementare.`);
-    reasons.push(`Il numero SuperStar ${superstar} è stato generato considerando i pattern di successo.`);
+    reasons.push(jollyReason);
+    reasons.push(superstarReason);
     
     return { numbers: combination, reasons, jolly, superstar };
   }

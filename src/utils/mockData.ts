@@ -107,6 +107,64 @@ export const calculateDelays = (
   return delays.sort((a, b) => b.delay - a.delay).slice(0, 10);
 };
 
+// Calculate Jolly or Superstar statistics from SuperEnalotto extractions
+export const calculateJollySuperstarStats = (
+  extractions: ExtractedNumbers[],
+  maxNumber: number,
+  type: 'jolly' | 'superstar'
+): {
+  frequentNumbers: Frequency[];
+  infrequentNumbers: Frequency[];
+  delays: Delay[];
+} => {
+  const counts = new Array(maxNumber + 1).fill(0);
+  const lastSeen = new Array(maxNumber + 1).fill(-1);
+  let totalExtractions = 0;
+
+  // Count occurrences and track last seen
+  extractions.forEach((extraction, index) => {
+    const number = type === 'jolly' ? extraction.jolly : extraction.superstar;
+    if (number && number >= 1 && number <= maxNumber) {
+      counts[number]++;
+      totalExtractions++;
+      if (lastSeen[number] === -1) {
+        lastSeen[number] = index;
+      }
+    }
+  });
+
+  // Calculate frequencies
+  const frequencies = counts
+    .map((count, number) => {
+      if (number === 0) return null;
+      return {
+        number,
+        count,
+        percentage: totalExtractions > 0 ? (count / totalExtractions) * 100 : 0,
+      };
+    })
+    .filter(Boolean) as Frequency[];
+
+  const sortedFrequencies = [...frequencies].sort((a, b) => b.count - a.count);
+
+  // Calculate delays
+  const delays = lastSeen
+    .map((lastIndex, number) => {
+      if (number === 0 || lastIndex === -1) return null;
+      return {
+        number,
+        delay: lastIndex,
+      };
+    })
+    .filter(Boolean) as Delay[];
+
+  return {
+    frequentNumbers: sortedFrequencies.slice(0, 10),
+    infrequentNumbers: [...sortedFrequencies].reverse().slice(0, 10),
+    delays: delays.sort((a, b) => b.delay - a.delay).slice(0, 10),
+  };
+};
+
 // Calculate unlucky number statistics from unsuccessful combinations
 export const calculateUnluckyStatistics = (
   unsuccessfulCombinations: UnsuccessfulCombination[],
@@ -277,13 +335,30 @@ export const calculateGameStatistics = (
     game.numbersToSelect
   ) : undefined;
   
+  // Calculate Jolly and Superstar statistics for SuperEnalotto
+  let jollyStats, superstarStats;
+  if (gameType === 'superenalotto' && extractions.length > 0) {
+    const extractionsWithJolly = extractions.filter(ext => ext.jolly !== undefined);
+    const extractionsWithSuperstar = extractions.filter(ext => ext.superstar !== undefined);
+    
+    if (extractionsWithJolly.length > 0) {
+      jollyStats = calculateJollySuperstarStats(extractions, game.maxNumber, 'jolly');
+    }
+    
+    if (extractionsWithSuperstar.length > 0) {
+      superstarStats = calculateJollySuperstarStats(extractions, game.maxNumber, 'superstar');
+    }
+  }
+  
   return {
     frequentNumbers,
     infrequentNumbers,
     delays,
     unluckyNumbers,
     unluckyPairs,
-    advancedStatistics: advancedStats
+    advancedStatistics: advancedStats,
+    jollyStats,
+    superstarStats
   };
 };
 
