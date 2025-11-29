@@ -1107,9 +1107,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           
           console.log('[sync-all] About to call syncSuperEnalotto with year:', requestedYear);
           
+          // Test if the scraping function can be imported/called
+          try {
+            console.log('[sync-all] Testing scrapeSuperEnalottoExtractions import...');
+            const testImport = await import('../scrape/superenalotto.js');
+            console.log('[sync-all] Import successful, function available:', typeof testImport.scrapeSuperEnalottoExtractions);
+          } catch (importError) {
+            console.error('[sync-all] Import test failed:', importError);
+            return res.status(500).json({
+              success: false,
+              error: 'Import failed',
+              message: importError instanceof Error ? importError.message : 'Failed to import scraping function',
+              gameType,
+            });
+          }
+          
           // Wrap in try-catch with detailed error logging
           let result;
           try {
+            console.log('[sync-all] Calling syncSuperEnalotto...');
             result = await syncSuperEnalotto(requestedYear);
             console.log('[sync-all] syncSuperEnalotto completed successfully');
           } catch (innerError) {
