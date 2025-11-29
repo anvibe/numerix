@@ -7,19 +7,6 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
-  server: {
-    proxy: {
-      // Proxy API requests to Vercel deployment during local development
-      // Use this when running `npm run dev` (Vite only, no serverless functions)
-      // For full local development with API routes, use `npm run dev:vercel` instead
-      '/api': {
-        target: process.env.VITE_VERCEL_URL || 'https://numerix-kappa.vercel.app',
-        changeOrigin: true,
-        secure: true,
-        timeout: 600000, // 10 minute timeout for historical data sync
-      },
-    },
-  },
   build: {
     rollupOptions: {
       output: {
