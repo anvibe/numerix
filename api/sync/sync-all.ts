@@ -687,36 +687,6 @@ async function syncSuperEnalotto(): Promise<{
     }
     
     console.log(`[sync] Scraped ${extractions.length} extractions`);
-    } catch (scrapeError) {
-      console.error('[sync] Error scraping SuperEnalotto:', scrapeError);
-      const errorMessage = scrapeError instanceof Error ? scrapeError.message : 'Scraping failed';
-      const errorStack = scrapeError instanceof Error ? scrapeError.stack : String(scrapeError);
-      const errorName = scrapeError instanceof Error ? scrapeError.name : 'Unknown';
-      
-      console.error('[sync] Scrape error details:', { 
-        errorMessage, 
-        errorStack,
-        errorName
-      });
-      
-      // Return a more user-friendly error message
-      let userMessage = errorMessage;
-      if (errorMessage.includes('Cloudflare') || errorMessage.includes('403') || errorMessage.includes('Lottologia request failed')) {
-        userMessage = 'Il sito ha bloccato la richiesta. Configura SCRAPER_API_KEY in Vercel per bypassare le protezioni anti-bot.';
-      } else if (errorMessage.includes('timeout')) {
-        userMessage = 'Il scraping ha impiegato troppo tempo. Riprova più tardi.';
-      } else if (errorMessage.includes('fetch') || errorMessage.includes('network')) {
-        userMessage = 'Errore di connessione durante lo scraping. Riprova più tardi.';
-      }
-      
-      return {
-        success: false,
-        message: userMessage,
-        total: 0,
-        new: 0,
-        error: errorStack,
-      };
-    }
     
     if (extractions.length === 0) {
       return {
