@@ -658,7 +658,15 @@ async function syncSuperEnalotto(year?: number): Promise<{
   error?: string;
 }> {
   try {
-    console.log('[sync] Starting SuperEnalotto sync...', { year });
+    console.log('[sync] Starting SuperEnalotto sync...', { year: year || 'all years' });
+    
+    // Validate year parameter if provided
+    if (year !== undefined) {
+      const currentYear = new Date().getFullYear();
+      if (isNaN(year) || year < 1997 || year > currentYear) {
+        throw new Error(`Invalid year: ${year}. Must be between 1997 and ${currentYear}`);
+      }
+    }
     
     const currentYear = new Date().getFullYear();
     const startYear = 1997;
@@ -733,8 +741,20 @@ async function syncSuperEnalotto(year?: number): Promise<{
     for (const year of yearsToFetch) {
       try {
         console.log(`[sync] Fetching year ${year}...`);
-        const yearExtractions = await scrapeSuperEnalottoExtractions(year);
-        if (yearExtractions && yearExtractions.length > 0) {
+        
+        // Call the scraping function with error handling
+        let yearExtractions: ExtractedNumbers[] = [];
+        try {
+          yearExtractions = await scrapeSuperEnalottoExtractions(year);
+        } catch (scrapeErr) {
+          console.error(`[sync] Scraping error for year ${year}:`, scrapeErr);
+          const errMsg = scrapeErr instanceof Error ? scrapeErr.message : String(scrapeErr);
+          console.error(`[sync] Scraping error details:`, errMsg);
+          // Continue to next year instead of failing
+          continue;
+        }
+        
+        if (yearExtractions && Array.isArray(yearExtractions) && yearExtractions.length > 0) {
           allExtractions = allExtractions.concat(yearExtractions);
           totalScraped += yearExtractions.length;
           console.log(`[sync] Year ${year}: ${yearExtractions.length} extractions`);
@@ -749,7 +769,8 @@ async function syncSuperEnalotto(year?: number): Promise<{
       } catch (yearError) {
         console.error(`[sync] Error fetching year ${year}:`, yearError);
         const errorMsg = yearError instanceof Error ? yearError.message : String(yearError);
-        console.error(`[sync] Year ${year} error details:`, errorMsg);
+        const errorStack = yearError instanceof Error ? yearError.stack : undefined;
+        console.error(`[sync] Year ${year} error details:`, { errorMsg, errorStack });
         // Continue with next year instead of failing completely
         continue;
       }

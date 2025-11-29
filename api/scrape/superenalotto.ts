@@ -86,10 +86,17 @@ function parseNumbers(numbersText: string): number[] {
 // Export scraping function for use by other modules
 // Optionally accepts a year parameter to fetch only specific year
 export async function scrapeSuperEnalottoExtractions(year?: number): Promise<ExtractedNumbers[]> {
-  if (year) {
-    return await scrapeLottologiaSuperEnalottoByYear(year);
+  try {
+    if (year !== undefined && year !== null && !isNaN(year)) {
+      console.log(`[scrape] Using year-specific scraper for year ${year}`);
+      return await scrapeLottologiaSuperEnalottoByYear(year);
+    }
+    console.log('[scrape] Using full historical scraper');
+    return await scrapeLottologiaSuperEnalotto();
+  } catch (error) {
+    console.error('[scrape] Error in scrapeSuperEnalottoExtractions:', error);
+    throw error;
   }
-  return await scrapeLottologiaSuperEnalotto();
 }
 
 // Scrape a specific year only (faster, for incremental syncing)
