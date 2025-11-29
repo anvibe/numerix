@@ -1058,7 +1058,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (gameType === 'superenalotto') {
         try {
           // Check if a specific year was requested
-          const requestedYear = req.query.year ? parseInt(req.query.year as string, 10) : undefined;
+          let requestedYear: number | undefined = undefined;
+          if (req.query.year) {
+            const yearParam = req.query.year as string;
+            const parsedYear = parseInt(yearParam, 10);
+            if (!isNaN(parsedYear) && parsedYear >= 1997 && parsedYear <= new Date().getFullYear()) {
+              requestedYear = parsedYear;
+            } else {
+              return res.status(400).json({
+                success: false,
+                error: 'Invalid year parameter',
+                message: `Year must be between 1997 and ${new Date().getFullYear()}`,
+                gameType,
+              });
+            }
+          }
+          
+          console.log('[sync-all] Calling syncSuperEnalotto with year:', requestedYear);
           const result = await syncSuperEnalotto(requestedYear);
           return res.status(200).json({
             gameType,
@@ -1066,13 +1082,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             ...result,
           });
         } catch (syncError) {
-          console.error('Error in syncSuperEnalotto:', syncError);
+          console.error('[sync-all] Error in syncSuperEnalotto:', syncError);
+          const errorMessage = syncError instanceof Error ? syncError.message : 'Unknown error';
+          const errorStack = syncError instanceof Error ? syncError.stack : String(syncError);
+          
           return res.status(500).json({
             success: false,
             error: 'Sync failed',
-            message: syncError instanceof Error ? syncError.message : 'Unknown error',
+            message: errorMessage,
             gameType,
-            details: process.env.NODE_ENV === 'development' ? (syncError instanceof Error ? syncError.stack : String(syncError)) : undefined,
+            details: process.env.NODE_ENV === 'development' ? errorStack : undefined,
           });
         }
       }
