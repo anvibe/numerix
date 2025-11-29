@@ -660,10 +660,30 @@ async function syncSuperEnalotto(): Promise<{
   try {
     console.log('[sync] Starting SuperEnalotto sync (latest extractions only)...');
     
+    // Test import first
+    let scrapeFunction;
+    try {
+      const scrapeModule = await import('../scrape/superenalotto.js');
+      scrapeFunction = scrapeModule.scrapeSuperEnalottoExtractions;
+      if (typeof scrapeFunction !== 'function') {
+        throw new Error('scrapeSuperEnalottoExtractions is not a function');
+      }
+      console.log('[sync] Import successful');
+    } catch (importError) {
+      console.error('[sync] Import error:', importError);
+      return {
+        success: false,
+        message: `Import error: ${importError instanceof Error ? importError.message : String(importError)}`,
+        total: 0,
+        new: 0,
+        error: importError instanceof Error ? importError.stack : String(importError),
+      };
+    }
+    
     // Scrape only the latest extractions (first page)
     let extractions: ExtractedNumbers[] = [];
     try {
-      extractions = await scrapeSuperEnalottoExtractions();
+      extractions = await scrapeFunction();
     } catch (scrapeErr) {
       console.error('[sync] Scraping error:', scrapeErr);
       const errMsg = scrapeErr instanceof Error ? scrapeErr.message : String(scrapeErr);
