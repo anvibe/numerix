@@ -660,20 +660,74 @@ async function syncSuperEnalotto(): Promise<{
   try {
     console.log('[sync] Starting SuperEnalotto sync...');
     
-    // Scrape extractions with timeout protection
-    let extractions: ExtractedNumbers[] = [];
-    try {
-      console.log('[sync] Calling scrapeSuperEnalottoExtractions...');
-      
-      // Add timeout wrapper - increased to 10 minutes for historical data scraping
-      const scrapePromise = scrapeSuperEnalottoExtractions();
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Scraping timeout after 10 minutes')), 600000);
+    // First, check which years we already have in the database
+    const supabase = getSupabaseClient();
+    const currentYear = new Date().getFullYear();
+    const startYear = 1997;
+    
+    // Get existing years from database
+    const { data: existingYearsData } = await supabase
+      .from('extractions')
+      .select('extraction_date')
+      .eq('game_type', 'superenalotto')
+      .order('extraction_date', { ascending: false })
+      .limit(10000);
+    
+    const existingYears = new Set<number>();
+    if (existingYearsData) {
+      existingYearsData.forEach(ext => {
+        const year = new Date(ext.extraction_date).getFullYear();
+        existingYears.add(year);
       });
-      
-      console.log('[sync] Waiting for scrape to complete...');
-      extractions = await Promise.race([scrapePromise, timeoutPromise]);
-      console.log(`[sync] Scrape completed, got ${extractions.length} extractions`);
+    }
+    
+    console.log(`[sync] Found data for years: ${Array.from(existingYears).sort((a, b) => b - a).join(', ')}`);
+    
+    // Determine which years to fetch
+    // Always fetch current year and last 2 years (for new extractions)
+    // Then fetch older years that are missing
+    const yearsToFetch: number[] = [];
+    for (let year = currentYear; year >= Math.max(currentYear - 2, startYear); year--) {
+      yearsToFetch.push(year); // Always fetch recent years
+    }
+    
+    // Add missing older years (limit to 5 years per sync to avoid timeout)
+    let missingYearsAdded = 0;
+    for (let year = currentYear - 3; year >= startYear && missingYearsAdded < 5; year--) {
+      if (!existingYears.has(year)) {
+        yearsToFetch.push(year);
+        missingYearsAdded++;
+      }
+    }
+    
+    yearsToFetch.sort((a, b) => b - a); // Sort newest first
+    console.log(`[sync] Will fetch years: ${yearsToFetch.join(', ')}`);
+    
+    // Scrape extractions for each year (incremental approach)
+    let allExtractions: ExtractedNumbers[] = [];
+    let totalScraped = 0;
+    
+    for (const year of yearsToFetch) {
+      try {
+        console.log(`[sync] Fetching year ${year}...`);
+        const yearExtractions = await scrapeSuperEnalottoExtractions(year);
+        allExtractions = allExtractions.concat(yearExtractions);
+        totalScraped += yearExtractions.length;
+        console.log(`[sync] Year ${year}: ${yearExtractions.length} extractions`);
+        
+        // Small delay between years
+        if (year !== yearsToFetch[yearsToFetch.length - 1]) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      } catch (yearError) {
+        console.error(`[sync] Error fetching year ${year}:`, yearError);
+        // Continue with next year
+        continue;
+      }
+    }
+    
+    const extractions = allExtractions;
+    console.log(`[sync] Total scraped: ${extractions.length} extractions from ${yearsToFetch.length} years`);
     } catch (scrapeError) {
       console.error('[sync] Error scraping SuperEnalotto:', scrapeError);
       const errorMessage = scrapeError instanceof Error ? scrapeError.message : 'Scraping failed';
