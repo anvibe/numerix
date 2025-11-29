@@ -138,13 +138,20 @@ async function scrapeLottologiaSuperEnalottoByYear(year: number): Promise<Extrac
         console.log(`[scrape] Year ${year}, page ${page}: Added ${newExtractions} extractions (total: ${extractions.length})`);
         
         // Check if there are more pages
-        const $ = cheerio.load(html);
-        const nextButton = $('a').filter((_, el) => {
-          const text = $(el).text().trim().toLowerCase();
-          return text.includes('next') || text.includes('succ') || text.includes('avanti') || text === '>';
-        });
+        let hasMorePages = false;
+        try {
+          const $ = cheerio.load(html);
+          const nextButton = $('a').filter((_, el) => {
+            const text = $(el).text().trim().toLowerCase();
+            return text.includes('next') || text.includes('succ') || text.includes('avanti') || text === '>';
+          });
+          hasMorePages = nextButton.length > 0 && newExtractions > 0;
+        } catch (cheerioError) {
+          console.error(`[scrape] Error parsing HTML for pagination check:`, cheerioError);
+          hasMorePages = false; // Assume no more pages if parsing fails
+        }
         
-        hasMore = nextButton.length > 0 && newExtractions > 0;
+        hasMore = hasMorePages;
         page++;
         
         if (hasMore) {
