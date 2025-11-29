@@ -665,10 +665,10 @@ async function syncSuperEnalotto(): Promise<{
     try {
       console.log('[sync] Calling scrapeSuperEnalottoExtractions...');
       
-      // Add timeout wrapper - 2 minutes should be enough for recent years scraping
+      // Add timeout wrapper - increased to 10 minutes for historical data scraping
       const scrapePromise = scrapeSuperEnalottoExtractions();
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Scraping timeout after 2 minutes')), 120000);
+        setTimeout(() => reject(new Error('Scraping timeout after 10 minutes')), 600000);
       });
       
       console.log('[sync] Waiting for scrape to complete...');
