@@ -88,190 +88,196 @@ export async function scrapeSuperEnalottoExtractions(): Promise<ExtractedNumbers
   return await scrapeLottologiaSuperEnalotto();
 }
 
-// Scrape SuperEnalotto from Lottologia (more reliable than ADM for now)
-async function scrapeLottologiaSuperEnalotto(): Promise<ExtractedNumbers[]> {
-  const extractions: ExtractedNumbers[] = [];
+// Helper function to fetch a single page with ScraperAPI support
+async function fetchPage(url: string, fetchImpl: typeof fetch, useScraperAPI: boolean = false): Promise<string> {
+  let response: Response;
   
-  try {
-    const url = 'https://www.lottologia.com/superenalotto/archivio-estrazioni/';
-    console.log('[scrape] Starting scrape from Lottologia...', url);
-    
-    // Use native fetch (Node 18+ on Vercel)
-    let fetchImpl: (url: string | URL | Request, init?: RequestInit) => Promise<Response>;
+  // Try ScraperAPI if available and requested
+  const scraperApiKey = process.env.SCRAPER_API_KEY;
+  if (useScraperAPI && scraperApiKey) {
     try {
-      // Try native fetch first (available in Node 18+)
-      if (typeof globalThis.fetch === 'function') {
-        fetchImpl = globalThis.fetch as typeof fetch;
-        console.log('[scrape] Using native fetch');
+      const scraperApiUrl = `http://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(url)}&render=false`;
+      response = await fetchImpl(scraperApiUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+      });
+      
+      if (response.ok) {
+        return await response.text();
+      }
+    } catch (scraperError) {
+      console.warn('[scrape] ScraperAPI failed, falling back to direct request:', scraperError);
+    }
+  }
+  
+  // Direct request with headers
+  const headerConfigs: Record<string, string>[] = [
+    {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'it-IT,it;q=0.9,en;q=0.8',
+    },
+    {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+      'Accept-Language': 'it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7',
+      'Accept-Encoding': 'gzip, deflate, br',
+      'Connection': 'keep-alive',
+      'Upgrade-Insecure-Requests': '1',
+      'Referer': 'https://www.google.com/',
+    },
+  ];
+  
+  let lastError: Error | null = null;
+  for (const headers of headerConfigs) {
+    try {
+      response = await fetchImpl(url, { headers });
+      if (response.ok) {
+        return await response.text();
+      } else if (response.status === 403) {
+        lastError = new Error(`Lottologia request failed: ${response.status}`);
+        continue;
       } else {
-        throw new Error('Native fetch not available');
+        const errorText = await response.text().catch(() => 'Unable to read error response');
+        throw new Error(`Lottologia request failed: ${response.status} - ${errorText.substring(0, 200)}`);
       }
-    } catch (e) {
-      // Fallback to node-fetch
-      console.log('[scrape] Falling back to node-fetch');
-      try {
-        const nodeFetch = await import('node-fetch');
-        // Cast through unknown to avoid type incompatibility
-        fetchImpl = nodeFetch.default as unknown as typeof fetch;
-      } catch (importError) {
-        console.error('[scrape] Failed to import node-fetch:', importError);
-        throw new Error(`Failed to load fetch implementation: ${importError instanceof Error ? importError.message : String(importError)}`);
-      }
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      continue;
     }
-    
-    console.log('[scrape] Making fetch request...');
-    const response = await fetchImpl(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'it-IT,it;q=0.9,en;q=0.8',
-      },
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unable to read error response');
-      console.error(`Lottologia request failed: ${response.status}`, errorText);
-      throw new Error(`Lottologia request failed: ${response.status} - ${errorText.substring(0, 200)}`);
+  }
+  
+  if (lastError) {
+    if (!scraperApiKey) {
+      throw new Error(
+        `Lottologia request failed: ${lastError.message}. ` +
+        `Il sito ha protezioni anti-bot avanzate (Cloudflare). ` +
+        `Soluzione GRATUITA: configura SCRAPER_API_KEY in Vercel Environment Variables. ` +
+        `ScraperAPI offre un piano GRATUITO con 1000 richieste/mese.`
+      );
+    } else {
+      throw lastError;
     }
-    
-    console.log('[scrape] Fetch successful, reading response...');
-    const html = await response.text();
-    console.log(`[scrape] Fetched HTML, length: ${html.length}`);
-    
-    if (!html || html.length < 100) {
-      throw new Error('Received empty or too short HTML response');
-    }
-    
-    console.log('[scrape] Loading HTML with cheerio...');
-    let $: ReturnType<typeof cheerio.load>;
-    try {
-      $ = cheerio.load(html);
-      console.log('[scrape] Cheerio loaded successfully');
-    } catch (cheerioError) {
-      console.error('[scrape] Cheerio load error:', cheerioError);
-      throw new Error(`Failed to parse HTML with cheerio: ${cheerioError instanceof Error ? cheerioError.message : String(cheerioError)}`);
-    }
-    
-    // Parse Lottologia HTML structure - table with class "table table-balls"
-    let tableRows = $('table.table-balls tbody tr');
-    console.log(`Found ${tableRows.length} table rows with selector 'table.table-balls tbody tr'`);
-    
+  }
+  
+  throw new Error('All request attempts failed');
+}
+
+// Parse extractions from HTML
+function parseExtractionsFromHTML(html: string, extractions: ExtractedNumbers[]): void {
+  const $ = cheerio.load(html);
+  
+  // Parse Lottologia HTML structure - table with class "table table-balls"
+  let tableRows = $('table.table-balls tbody tr');
+  
+  if (tableRows.length === 0) {
+    tableRows = $('table tbody tr');
     if (tableRows.length === 0) {
-      // Try alternative selectors
-      tableRows = $('table tbody tr');
-      console.log(`Trying 'table tbody tr', found ${tableRows.length} rows`);
-      
-      if (tableRows.length === 0) {
-        tableRows = $('table tr');
-        console.log(`Trying 'table tr', found ${tableRows.length} rows`);
-      }
-      
-      if (tableRows.length === 0) {
-        console.error('No table rows found in HTML');
-        // Log a sample of the HTML for debugging
-        const sampleHtml = html.substring(0, 1000);
-        console.error('HTML sample:', sampleHtml);
-        return [];
-      }
+      tableRows = $('table tr');
     }
-    
-    tableRows.each((i, elem) => {
-      try {
-        const $row = $(elem);
-        
-        // Skip header row
-        if ($row.find('th').length > 0) {
-          return;
+  }
+  
+  tableRows.each((i, elem) => {
+    try {
+      const $row = $(elem);
+      
+      // Skip header row
+      if ($row.find('th').length > 0) {
+        return;
+      }
+      
+      // Extract date from link href (format: ../estrazione/?date=2025-11-06)
+      const dateLink = $row.find('td a').first().attr('href');
+      let date: string | null = null;
+      
+      if (dateLink) {
+        const dateMatch = dateLink.match(/date=(\d{4}-\d{2}-\d{2})/);
+        if (dateMatch) {
+          date = dateMatch[1];
         }
-        
-        // Extract date from link href (format: ../estrazione/?date=2025-11-06)
-        const dateLink = $row.find('td a').first().attr('href');
-        let date: string | null = null;
-        
-        if (dateLink) {
-          const dateMatch = dateLink.match(/date=(\d{4}-\d{2}-\d{2})/);
-          if (dateMatch) {
-            date = dateMatch[1];
+      }
+      
+      // If no date from link, try to parse from text
+      if (!date) {
+        const dateText = $row.find('td').first().text().trim();
+        date = parseDate(dateText);
+      }
+      
+      // Extract numbers from SERIES column (divs with class ptnum_XX)
+      const numbers: number[] = [];
+      $row.find('td.SERIES div[class*="ptnum_"]').each((j, numElem) => {
+        const $numElem = $(numElem);
+        const numText = $numElem.text().trim();
+        if (numText) {
+          const num = parseInt(numText, 10);
+          if (!isNaN(num) && num >= 1 && num <= 90) {
+            numbers.push(num);
+            return;
           }
         }
-        
-        // If no date from link, try to parse from text
-        if (!date) {
-          const dateText = $row.find('td').first().text().trim();
-          date = parseDate(dateText);
+        const className = $numElem.attr('class') || '';
+        const numMatch = className.match(/ptnum_(\d+)/);
+        if (numMatch) {
+          const num = parseInt(numMatch[1], 10);
+          if (!isNaN(num) && num >= 1 && num <= 90) {
+            numbers.push(num);
+          }
         }
-        
-        // Extract numbers from SERIES column (divs with class ptnum_XX)
-        const numbers: number[] = [];
-        $row.find('td.SERIES div[class*="ptnum_"]').each((j, numElem) => {
-          const $numElem = $(numElem);
-          // First try to get from text content
-          const numText = $numElem.text().trim();
-          if (numText) {
-            const num = parseInt(numText, 10);
-            if (!isNaN(num) && num >= 1 && num <= 90) {
-              numbers.push(num);
-              return;
-            }
-          }
-          // If no text, extract from class name (ptnum_09, ptnum_48, etc.)
-          const className = $numElem.attr('class') || '';
-          const numMatch = className.match(/ptnum_(\d+)/);
-          if (numMatch) {
-            const num = parseInt(numMatch[1], 10);
-            if (!isNaN(num) && num >= 1 && num <= 90) {
-              numbers.push(num);
-            }
-          }
-        });
-        
-        // Extract Jolly from JOLLY column
-        let jolly: number | undefined;
-        const jollyElem = $row.find('td div.special.ball-gold2, td.JOLLY div.special');
-        if (jollyElem.length > 0) {
-          const jollyText = jollyElem.text().trim();
-          const jollyNum = parseInt(jollyText, 10);
-          if (!isNaN(jollyNum) && jollyNum >= 1 && jollyNum <= 90) {
-            jolly = jollyNum;
-          } else {
-            // Try to extract from class name
-            const jollyClass = jollyElem.attr('class') || '';
-            const jollyMatch = jollyClass.match(/ptnum_(\d+)/);
-            if (jollyMatch) {
-              const jollyNum = parseInt(jollyMatch[1], 10);
-              if (!isNaN(jollyNum) && jollyNum >= 1 && jollyNum <= 90) {
-                jolly = jollyNum;
-              }
+      });
+      
+      // Extract Jolly from JOLLY column
+      let jolly: number | undefined;
+      const jollyElem = $row.find('td div.special.ball-gold2, td.JOLLY div.special');
+      if (jollyElem.length > 0) {
+        const jollyText = jollyElem.text().trim();
+        const jollyNum = parseInt(jollyText, 10);
+        if (!isNaN(jollyNum) && jollyNum >= 1 && jollyNum <= 90) {
+          jolly = jollyNum;
+        } else {
+          const jollyClass = jollyElem.attr('class') || '';
+          const jollyMatch = jollyClass.match(/ptnum_(\d+)/);
+          if (jollyMatch) {
+            const jollyNum = parseInt(jollyMatch[1], 10);
+            if (!isNaN(jollyNum) && jollyNum >= 1 && jollyNum <= 90) {
+              jolly = jollyNum;
             }
           }
         }
-        
-        // Extract Superstar from Superstar column
-        let superstar: number | undefined;
-        const superstarElem = $row.find('td.Superstar div.special, td:last-child div.special').not('.ball-gold2');
-        if (superstarElem.length > 0) {
-          const superstarText = superstarElem.text().trim();
-          const superstarNum = parseInt(superstarText, 10);
-          if (!isNaN(superstarNum) && superstarNum >= 1 && superstarNum <= 90) {
-            superstar = superstarNum;
-          } else {
-            // Try to extract from class name
-            const superstarClass = superstarElem.attr('class') || '';
-            const superstarMatch = superstarClass.match(/ptnum_(\d+)/);
-            if (superstarMatch) {
-              const superstarNum = parseInt(superstarMatch[1], 10);
-              if (!isNaN(superstarNum) && superstarNum >= 1 && superstarNum <= 90) {
-                superstar = superstarNum;
-              }
+      }
+      
+      // Extract Superstar from Superstar column
+      let superstar: number | undefined;
+      const superstarElem = $row.find('td.Superstar div.special, td:last-child div.special').not('.ball-gold2');
+      if (superstarElem.length > 0) {
+        const superstarText = superstarElem.text().trim();
+        const superstarNum = parseInt(superstarText, 10);
+        if (!isNaN(superstarNum) && superstarNum >= 1 && superstarNum <= 90) {
+          superstar = superstarNum;
+        } else {
+          const superstarClass = superstarElem.attr('class') || '';
+          const superstarMatch = superstarClass.match(/ptnum_(\d+)/);
+          if (superstarMatch) {
+            const superstarNum = parseInt(superstarMatch[1], 10);
+            if (!isNaN(superstarNum) && superstarNum >= 1 && superstarNum <= 90) {
+              superstar = superstarNum;
             }
           }
         }
+      }
+      
+      // Validate and add extraction
+      if (date && numbers.length === 6) {
+        const sortedNumbers = [...numbers].sort((a, b) => a - b);
         
-        // Validate and add extraction
-        if (date && numbers.length === 6) {
-          // Sort numbers
-          const sortedNumbers = [...numbers].sort((a, b) => a - b);
-          
+        // Check for duplicates before adding
+        const isDuplicate = extractions.some(
+          ext => ext.date === date && 
+          ext.numbers.length === sortedNumbers.length &&
+          ext.numbers.every((num, idx) => num === sortedNumbers[idx])
+        );
+        
+        if (!isDuplicate) {
           extractions.push({
             date,
             numbers: sortedNumbers,
@@ -279,12 +285,157 @@ async function scrapeLottologiaSuperEnalotto(): Promise<ExtractedNumbers[]> {
             superstar,
           });
         }
-      } catch (err) {
-        console.error('Error parsing extraction row:', err);
+      }
+    } catch (err) {
+      console.error('Error parsing extraction row:', err);
+    }
+  });
+}
+
+// Scrape SuperEnalotto from Lottologia with pagination support
+async function scrapeLottologiaSuperEnalotto(): Promise<ExtractedNumbers[]> {
+  const extractions: ExtractedNumbers[] = [];
+  const baseUrl = 'https://www.lottologia.com/superenalotto/archivio-estrazioni/';
+  
+  try {
+    console.log('[scrape] Starting scrape from Lottologia with pagination...', baseUrl);
+    
+    // Use native fetch (Node 18+ on Vercel)
+    let fetchImpl: (url: string | URL | Request, init?: RequestInit) => Promise<Response>;
+    try {
+      if (typeof globalThis.fetch === 'function') {
+        fetchImpl = globalThis.fetch as typeof fetch;
+        console.log('[scrape] Using native fetch');
+      } else {
+        throw new Error('Native fetch not available');
+      }
+    } catch (e) {
+      console.log('[scrape] Falling back to node-fetch');
+      try {
+        const nodeFetch = await import('node-fetch');
+        fetchImpl = nodeFetch.default as unknown as typeof fetch;
+      } catch (importError) {
+        console.error('[scrape] Failed to import node-fetch:', importError);
+        throw new Error(`Failed to load fetch implementation: ${importError instanceof Error ? importError.message : String(importError)}`);
+      }
+    }
+    
+    // Fetch first page to get pagination info
+    console.log('[scrape] Fetching first page...');
+    const scraperApiKey = process.env.SCRAPER_API_KEY;
+    let html = await fetchPage(baseUrl, fetchImpl, !!scraperApiKey);
+    
+    if (!html || html.length < 100) {
+      throw new Error('Received empty or too short HTML response');
+    }
+    
+    // Parse first page
+    parseExtractionsFromHTML(html, extractions);
+    console.log(`[scrape] Parsed ${extractions.length} extractions from first page`);
+    
+    // Check for pagination
+    const $ = cheerio.load(html);
+    
+    // Look for pagination links - common patterns:
+    // - Links with "page" in href or text
+    // - Next/Previous buttons
+    // - Page numbers
+    const paginationLinks = new Set<string>();
+    
+    // Find all links that might be pagination
+    $('a').each((i, elem) => {
+      const href = $(elem).attr('href');
+      const text = $(elem).text().trim().toLowerCase();
+      
+      if (href) {
+        // Check for page parameter in URL
+        if (href.includes('page=') || href.includes('pagina=') || href.match(/\/\d+\//)) {
+          // Make absolute URL if relative
+          const absoluteUrl = href.startsWith('http') ? href : new URL(href, baseUrl).href;
+          paginationLinks.add(absoluteUrl);
+        }
+        
+        // Check for page numbers in text (1, 2, 3, etc.)
+        if (text.match(/^\d+$/) && parseInt(text, 10) > 1) {
+          const absoluteUrl = href.startsWith('http') ? href : new URL(href, baseUrl).href;
+          paginationLinks.add(absoluteUrl);
+        }
       }
     });
     
-    console.log(`Parsed ${extractions.length} extractions from Lottologia`);
+    // Also try to find "next" or "succ" links
+    $('a').each((i, elem) => {
+      const text = $(elem).text().trim().toLowerCase();
+      const href = $(elem).attr('href');
+      
+      if (href && (text.includes('next') || text.includes('succ') || text.includes('avanti') || text === '>')) {
+        const absoluteUrl = href.startsWith('http') ? href : new URL(href, baseUrl).href;
+        paginationLinks.add(absoluteUrl);
+      }
+    });
+    
+    console.log(`[scrape] Found ${paginationLinks.size} potential pagination links`);
+    
+    // Try to scrape all pages
+    const visitedUrls = new Set<string>([baseUrl]);
+    const urlsToVisit = Array.from(paginationLinks);
+    
+    // Also try year-based URLs (1997-2025)
+    const currentYear = new Date().getFullYear();
+    for (let year = 1997; year <= currentYear; year++) {
+      const yearUrl = `${baseUrl}?anno=${year}`;
+      if (!visitedUrls.has(yearUrl) && !urlsToVisit.includes(yearUrl)) {
+        urlsToVisit.push(yearUrl);
+      }
+    }
+    
+    // Scrape all pages with rate limiting
+    let pageCount = 1;
+    const maxPages = 100; // Safety limit
+    
+    for (const url of urlsToVisit) {
+      if (visitedUrls.has(url) || pageCount >= maxPages) {
+        continue;
+      }
+      
+      try {
+        console.log(`[scrape] Fetching page ${pageCount + 1}: ${url}`);
+        visitedUrls.add(url);
+        
+        // Add small delay to avoid overwhelming the server
+        if (pageCount > 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+        }
+        
+        const pageHtml = await fetchPage(url, fetchImpl, !!scraperApiKey);
+        const beforeCount = extractions.length;
+        parseExtractionsFromHTML(pageHtml, extractions);
+        const newExtractions = extractions.length - beforeCount;
+        
+        console.log(`[scrape] Page ${pageCount + 1}: Added ${newExtractions} new extractions (total: ${extractions.length})`);
+        
+        pageCount++;
+        
+        // If we got no new extractions, might have reached the end
+        if (newExtractions === 0 && pageCount > 5) {
+          console.log('[scrape] No new extractions found, might have reached the end');
+          // Continue anyway in case different pages have different data
+        }
+      } catch (pageError) {
+        console.error(`[scrape] Error fetching page ${url}:`, pageError);
+        // Continue with next page
+        continue;
+      }
+    }
+    
+    console.log(`[scrape] Completed: Parsed ${extractions.length} total extractions from ${pageCount} pages`);
+    
+    // Sort by date (newest first)
+    extractions.sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return dateB - dateA;
+    });
     
     if (extractions.length === 0) {
       console.warn('No extractions parsed - this might indicate a parsing issue');
@@ -297,7 +448,7 @@ async function scrapeLottologiaSuperEnalotto(): Promise<ExtractedNumbers[]> {
       console.error('Error message:', error.message);
       console.error('Error stack:', error.stack);
     }
-    throw error; // Re-throw to let the caller handle it
+    throw error;
   }
 }
 

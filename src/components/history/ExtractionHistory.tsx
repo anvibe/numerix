@@ -112,18 +112,25 @@ const ExtractionHistory: React.FC = () => {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center">
           <History className="h-6 w-6 text-primary mr-3" />
-          <h2 className="text-xl font-semibold">Cronologia Estrazioni</h2>
+          <div>
+            <h2 className="text-xl font-semibold">Cronologia Estrazioni</h2>
+            <p className="text-sm text-text-secondary mt-1">
+              {extractions.length > 0 
+                ? `${extractions.length} estrazioni salvate nel database`
+                : 'Nessuna estrazione salvata. Clicca "Sincronizza Storico" per scaricare tutte le estrazioni dal 1997.'}
+            </p>
+          </div>
         </div>
         
-        <div className="flex space-x-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <button
             onClick={handleSync}
             disabled={isSyncing || isCleaning}
-            className="btn btn-primary flex items-center text-sm"
-            title="Aggiorna le estrazioni dal web"
+            className="btn btn-primary flex items-center text-sm font-semibold"
+            title="Sincronizza tutte le estrazioni storiche (1997-2025) dal web e salva in Supabase"
           >
             <RefreshCw className={`h-4 w-4 mr-1 ${isSyncing ? 'animate-spin' : ''}`} />
-            {isSyncing ? 'Sincronizzazione...' : 'Aggiorna Estrazioni'}
+            {isSyncing ? 'Sincronizzazione...' : 'Sincronizza Storico'}
           </button>
           
           <button
