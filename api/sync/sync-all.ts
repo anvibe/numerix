@@ -658,30 +658,45 @@ async function syncSuperEnalotto(year?: number): Promise<{
   error?: string;
 }> {
   try {
-    console.log('[sync] Starting SuperEnalotto sync...');
+    console.log('[sync] Starting SuperEnalotto sync...', { year });
     
-    // First, check which years we already have in the database
-    const supabase = getSupabaseClient();
     const currentYear = new Date().getFullYear();
     const startYear = 1997;
     
-    // Get existing years from database
-    const { data: existingYearsData } = await supabase
-      .from('extractions')
-      .select('extraction_date')
-      .eq('game_type', 'superenalotto')
-      .order('extraction_date', { ascending: false })
-      .limit(10000);
-    
-    const existingYears = new Set<number>();
-    if (existingYearsData) {
-      existingYearsData.forEach(ext => {
-        const year = new Date(ext.extraction_date).getFullYear();
-        existingYears.add(year);
-      });
+    // First, check which years we already have in the database
+    let existingYears = new Set<number>();
+    try {
+      const supabase = getSupabaseClient();
+      
+      // Get existing years from database
+      const { data: existingYearsData, error: dbError } = await supabase
+        .from('extractions')
+        .select('extraction_date')
+        .eq('game_type', 'superenalotto')
+        .order('extraction_date', { ascending: false })
+        .limit(10000);
+      
+      if (dbError) {
+        console.error('[sync] Database error when checking existing years:', dbError);
+        // Continue anyway - we'll just fetch the requested year
+      } else if (existingYearsData) {
+        existingYearsData.forEach(ext => {
+          try {
+            const year = new Date(ext.extraction_date).getFullYear();
+            if (!isNaN(year)) {
+              existingYears.add(year);
+            }
+          } catch (e) {
+            // Skip invalid dates
+          }
+        });
+      }
+      
+      console.log(`[sync] Found data for years: ${Array.from(existingYears).sort((a, b) => b - a).join(', ') || 'none'}`);
+    } catch (dbCheckError) {
+      console.error('[sync] Error checking existing years, continuing anyway:', dbCheckError);
+      // Continue - we'll just fetch the requested year
     }
-    
-    console.log(`[sync] Found data for years: ${Array.from(existingYears).sort((a, b) => b - a).join(', ')}`);
     
     // Determine which years to fetch
     let yearsToFetch: number[] = [];
