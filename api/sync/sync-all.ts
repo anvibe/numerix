@@ -1,7 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
-import { scrapeSuperEnalottoExtractions } from '../scrape/superenalotto';
+import { scrapeSuperEnalottoExtractions } from '../scrape/superenalotto.js';
 
 // Define types locally to avoid import issues
 interface ExtractedNumbers {
