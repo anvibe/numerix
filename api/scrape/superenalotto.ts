@@ -380,9 +380,13 @@ async function scrapeLottologiaSuperEnalotto(): Promise<ExtractedNumbers[]> {
     const visitedUrls = new Set<string>([baseUrl]);
     const urlsToVisit = Array.from(paginationLinks);
     
-    // Also try year-based URLs (1997-2025)
+    // Also try year-based URLs - limit to recent years to avoid timeout
+    // Start with current year and go back a few years
     const currentYear = new Date().getFullYear();
-    for (let year = 1997; year <= currentYear; year++) {
+    const yearsToScrape = 3; // Only scrape last 3 years to avoid timeout
+    const startYear = Math.max(1997, currentYear - yearsToScrape + 1);
+    
+    for (let year = currentYear; year >= startYear; year--) {
       const yearUrl = `${baseUrl}?anno=${year}`;
       if (!visitedUrls.has(yearUrl) && !urlsToVisit.includes(yearUrl)) {
         urlsToVisit.push(yearUrl);
@@ -391,7 +395,7 @@ async function scrapeLottologiaSuperEnalotto(): Promise<ExtractedNumbers[]> {
     
     // Scrape all pages with rate limiting
     let pageCount = 1;
-    const maxPages = 100; // Safety limit
+    const maxPages = 20; // Reduced limit to avoid timeout (20 pages should be enough for recent years)
     
     for (const url of urlsToVisit) {
       if (visitedUrls.has(url) || pageCount >= maxPages) {
@@ -402,9 +406,9 @@ async function scrapeLottologiaSuperEnalotto(): Promise<ExtractedNumbers[]> {
         console.log(`[scrape] Fetching page ${pageCount + 1}: ${url}`);
         visitedUrls.add(url);
         
-        // Add small delay to avoid overwhelming the server
+        // Add small delay to avoid overwhelming the server (reduced for faster scraping)
         if (pageCount > 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+          await new Promise(resolve => setTimeout(resolve, 500)); // 0.5 second delay
         }
         
         const pageHtml = await fetchPage(url, fetchImpl, !!scraperApiKey);

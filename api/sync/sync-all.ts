@@ -664,10 +664,10 @@ async function syncSuperEnalotto(): Promise<{
     let extractions;
     try {
       console.log('[sync] Calling scrapeSuperEnalottoExtractions (with pagination)...');
-      // Add timeout wrapper - increased to 5 minutes for historical data scraping
+      // Add timeout wrapper - 2 minutes should be enough for recent years scraping
       const scrapePromise = scrapeSuperEnalottoExtractions();
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Scraping timeout after 5 minutes')), 300000);
+        setTimeout(() => reject(new Error('Scraping timeout after 2 minutes')), 120000);
       });
       
       console.log('[sync] Waiting for scrape to complete (this may take a while for historical data)...');
@@ -706,15 +706,17 @@ async function syncSuperEnalotto(): Promise<{
     try {
       const supabase = getSupabaseClient();
       
-      // For historical sync, we need to check ALL existing extractions, not just the last 10k
-      // Use pagination to get all extractions
+      // For historical sync, we need to check existing extractions
+      // Use pagination with safety limits to prevent timeouts
       let allExistingExtractions: Array<{ extraction_date: string; numbers: number[] }> = [];
       let from = 0;
       const pageSize = 1000;
+      const maxPages = 50; // Safety limit: max 50k extractions (should be more than enough)
       let hasMore = true;
+      let pageCount = 0;
       
       console.log('[sync] Loading existing extractions from database...');
-      while (hasMore) {
+      while (hasMore && pageCount < maxPages) {
         const { data, error: queryError } = await supabase
           .from('extractions')
           .select('extraction_date, numbers')
@@ -729,6 +731,7 @@ async function syncSuperEnalotto(): Promise<{
         
         if (data && data.length > 0) {
           allExistingExtractions = allExistingExtractions.concat(data);
+          pageCount++;
           
           if (data.length < pageSize) {
             hasMore = false;
@@ -738,6 +741,10 @@ async function syncSuperEnalotto(): Promise<{
         } else {
           hasMore = false;
         }
+      }
+      
+      if (pageCount >= maxPages) {
+        console.warn(`[sync] Reached safety limit of ${maxPages} pages. Loaded ${allExistingExtractions.length} extractions.`);
       }
       
       console.log(`[sync] Loaded ${allExistingExtractions.length} existing extractions from database`);
