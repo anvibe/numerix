@@ -7,7 +7,32 @@ export class ExtractionSyncService {
         : '/sync/sync-all';
       
       const response = await ApiService.get(endpoint);
-      const data = await response.json();
+      
+      // Check content type before parsing
+      const contentType = response.headers.get('content-type') || '';
+      let data: any;
+      
+      try {
+        if (!contentType.includes('application/json')) {
+          // Try to read as text first to check if we got source code
+          const text = await response.clone().text();
+          if (text.trim().startsWith('import ') || text.trim().startsWith('export ') || text.includes('from \'@')) {
+            throw new Error('API routing error: received source code instead of JSON. This is likely a Vercel configuration issue. Check vercel.json rewrites.');
+          }
+          throw new Error(`Expected JSON but got ${contentType}. Response preview: ${text.substring(0, 200)}`);
+        }
+        data = await response.json();
+      } catch (parseError) {
+        if (parseError instanceof Error && parseError.message.includes('routing error')) {
+          throw parseError;
+        }
+        // If JSON parsing fails, try to get the text to see what we got
+        const text = await response.text();
+        if (text.trim().startsWith('import ') || text.trim().startsWith('export ')) {
+          throw new Error('API routing error: received source code instead of JSON. This is likely a Vercel configuration issue. Check vercel.json rewrites.');
+        }
+        throw new Error(`Failed to parse JSON response: ${parseError instanceof Error ? parseError.message : String(parseError)}. Response: ${text.substring(0, 200)}`);
+      }
       
       // Handle different response formats
       if (gameType && gameType !== 'all') {
@@ -108,16 +133,27 @@ export class ApiService {
         console.log(`API Response: ${response.status} ${response.statusText}`);
         
         if (!response.ok) {
-          const isJson = response.headers.get('content-type')?.includes('application/json');
+          const contentType = response.headers.get('content-type') || '';
+          const isJson = contentType.includes('application/json');
           let errorData: any = null;
           let errorText = '';
           
           try {
-            if (isJson) {
-              errorData = await response.json();
-              errorText = errorData?.error || errorData?.message || JSON.stringify(errorData);
+            const text = await response.text();
+            
+            // Check if we got source code instead of JSON (common Vercel routing issue)
+            if (text.trim().startsWith('import ') || text.trim().startsWith('export ') || text.includes('from \'@')) {
+              console.error('API returned source code instead of JSON. This is likely a Vercel routing issue.');
+              errorText = 'API routing error: received source code instead of JSON response. Please check Vercel configuration.';
+            } else if (isJson) {
+              try {
+                errorData = JSON.parse(text);
+                errorText = errorData?.error || errorData?.message || JSON.stringify(errorData);
+              } catch (parseError) {
+                errorText = text.substring(0, 200);
+              }
             } else {
-              errorText = await response.text();
+              errorText = text.substring(0, 200);
             }
           } catch (e) {
             errorText = `HTTP ${response.status} ${response.statusText}`;
