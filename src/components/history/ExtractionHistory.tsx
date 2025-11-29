@@ -16,14 +16,19 @@ const ExtractionHistory: React.FC = () => {
   const [showCSVUploader, setShowCSVUploader] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isCleaning, setIsCleaning] = useState(false);
+  const [syncYear, setSyncYear] = useState<number | undefined>(undefined);
   
   const extractions = extractionsData[selectedGame] || [];
   const displayExtractions = extractions.slice(0, limit);
   
+  // Generate year options (1997 to current year)
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: currentYear - 1996 }, (_, i) => currentYear - i);
+  
   const handleSync = async () => {
     setIsSyncing(true);
     try {
-      const result = await ExtractionSyncService.syncExtractions(selectedGame);
+      const result = await ExtractionSyncService.syncExtractions(selectedGame, syncYear);
       
       if (result.success) {
         const message = result.new > 0
@@ -123,14 +128,33 @@ const ExtractionHistory: React.FC = () => {
         </div>
         
         <div className="flex flex-col sm:flex-row gap-2">
+          {selectedGame === 'superenalotto' && (
+            <select
+              value={syncYear || ''}
+              onChange={(e) => setSyncYear(e.target.value ? parseInt(e.target.value, 10) : undefined)}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-text-primary text-sm"
+              disabled={isSyncing || isCleaning}
+            >
+              <option value="">Tutti gli anni</option>
+              {years.map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          )}
           <button
             onClick={handleSync}
             disabled={isSyncing || isCleaning}
             className="btn btn-primary flex items-center text-sm font-semibold"
-            title="Sincronizza tutte le estrazioni storiche (1997-2025) dal web e salva in Supabase"
+            title={syncYear ? `Sincronizza solo l'anno ${syncYear}` : "Sincronizza tutte le estrazioni storiche (1997-2025) dal web e salva in Supabase"}
           >
             <RefreshCw className={`h-4 w-4 mr-1 ${isSyncing ? 'animate-spin' : ''}`} />
-            {isSyncing ? 'Sincronizzazione...' : 'Sincronizza Storico'}
+            {isSyncing 
+              ? syncYear 
+                ? `Sincronizzazione ${syncYear}...` 
+                : 'Sincronizzazione...' 
+              : syncYear 
+                ? `Sincronizza ${syncYear}` 
+                : 'Sincronizza Storico'}
           </button>
           
           <button

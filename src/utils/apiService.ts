@@ -1,10 +1,15 @@
 // Extraction sync service
 export class ExtractionSyncService {
-  static async syncExtractions(gameType?: 'superenalotto' | 'lotto' | '10elotto' | 'millionday' | 'all') {
+  static async syncExtractions(gameType?: 'superenalotto' | 'lotto' | '10elotto' | 'millionday' | 'all', year?: number) {
     try {
-      const endpoint = gameType && gameType !== 'all' 
+      let endpoint = gameType && gameType !== 'all' 
         ? `/sync/sync-all?gameType=${gameType}`
         : '/sync/sync-all';
+      
+      // Add year parameter if specified
+      if (year) {
+        endpoint += endpoint.includes('?') ? `&year=${year}` : `?year=${year}`;
+      }
       
       const response = await ApiService.get(endpoint);
       

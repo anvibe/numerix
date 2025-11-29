@@ -650,7 +650,7 @@ async function syncLotto(): Promise<{
   }
 }
 
-async function syncSuperEnalotto(): Promise<{
+async function syncSuperEnalotto(year?: number): Promise<{
   success: boolean;
   message: string;
   total: number;
@@ -684,23 +684,31 @@ async function syncSuperEnalotto(): Promise<{
     console.log(`[sync] Found data for years: ${Array.from(existingYears).sort((a, b) => b - a).join(', ')}`);
     
     // Determine which years to fetch
-    // Always fetch current year and last 2 years (for new extractions)
-    // Then fetch older years that are missing
-    const yearsToFetch: number[] = [];
-    for (let year = currentYear; year >= Math.max(currentYear - 2, startYear); year--) {
-      yearsToFetch.push(year); // Always fetch recent years
-    }
+    let yearsToFetch: number[] = [];
     
-    // Add missing older years (limit to 5 years per sync to avoid timeout)
-    let missingYearsAdded = 0;
-    for (let year = currentYear - 3; year >= startYear && missingYearsAdded < 5; year--) {
-      if (!existingYears.has(year)) {
+    if (year && year >= startYear && year <= currentYear) {
+      // Sync specific year if requested
+      yearsToFetch = [year];
+      console.log(`[sync] Fetching specific year: ${year}`);
+    } else {
+      // Default behavior: fetch current year + last 2 years + missing years
+      // Always fetch current year and last 2 years (for new extractions)
+      for (let year = currentYear; year >= Math.max(currentYear - 2, startYear); year--) {
         yearsToFetch.push(year);
-        missingYearsAdded++;
       }
+      
+      // Add missing older years (limit to 5 years per sync to avoid timeout)
+      let missingYearsAdded = 0;
+      for (let year = currentYear - 3; year >= startYear && missingYearsAdded < 5; year--) {
+        if (!existingYears.has(year)) {
+          yearsToFetch.push(year);
+          missingYearsAdded++;
+        }
+      }
+      
+      yearsToFetch.sort((a, b) => b - a); // Sort newest first
     }
     
-    yearsToFetch.sort((a, b) => b - a); // Sort newest first
     console.log(`[sync] Will fetch years: ${yearsToFetch.join(', ')}`);
     
     // Scrape extractions for each year (incremental approach)
@@ -1028,9 +1036,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Sync single game (already validated above)
       if (gameType === 'superenalotto') {
         try {
-          const result = await syncSuperEnalotto();
+          // Check if a specific year was requested
+          const requestedYear = req.query.year ? parseInt(req.query.year as string, 10) : undefined;
+          const result = await syncSuperEnalotto(requestedYear);
           return res.status(200).json({
             gameType,
+            year: requestedYear,
             ...result,
           });
         } catch (syncError) {
