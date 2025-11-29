@@ -84,14 +84,10 @@ function parseNumbers(numbersText: string): number[] {
 }
 
 // Export scraping function for use by other modules
-// Optionally accepts a year parameter to fetch only specific year
-export async function scrapeSuperEnalottoExtractions(year?: number): Promise<ExtractedNumbers[]> {
+// Fetches only the latest extractions (first page)
+export async function scrapeSuperEnalottoExtractions(): Promise<ExtractedNumbers[]> {
   try {
-    if (year !== undefined && year !== null && !isNaN(year)) {
-      console.log(`[scrape] Using year-specific scraper for year ${year}`);
-      return await scrapeLottologiaSuperEnalottoByYear(year);
-    }
-    console.log('[scrape] Using full historical scraper');
+    console.log('[scrape] Fetching latest SuperEnalotto extractions...');
     return await scrapeLottologiaSuperEnalotto();
   } catch (error) {
     console.error('[scrape] Error in scrapeSuperEnalottoExtractions:', error);
@@ -383,13 +379,13 @@ function parseExtractionsFromHTML(html: string, extractions: ExtractedNumbers[])
   });
 }
 
-// Scrape SuperEnalotto from Lottologia with pagination support
+// Scrape SuperEnalotto from Lottologia - only latest extractions (first page)
 async function scrapeLottologiaSuperEnalotto(): Promise<ExtractedNumbers[]> {
   const extractions: ExtractedNumbers[] = [];
   const baseUrl = 'https://www.lottologia.com/superenalotto/archivio-estrazioni/';
   
   try {
-    console.log('[scrape] Starting scrape from Lottologia with pagination...', baseUrl);
+    console.log('[scrape] Starting scrape from Lottologia (latest extractions only)...', baseUrl);
     
     // Use native fetch (Node 18+ on Vercel)
     let fetchImpl: (url: string | URL | Request, init?: RequestInit) => Promise<Response>;
@@ -411,118 +407,18 @@ async function scrapeLottologiaSuperEnalotto(): Promise<ExtractedNumbers[]> {
       }
     }
     
-    // Fetch first page to get pagination info
-    console.log('[scrape] Fetching first page...');
+    // Fetch only the first page (latest extractions)
+    console.log('[scrape] Fetching latest extractions (first page only)...');
     const scraperApiKey = process.env.SCRAPER_API_KEY;
-    let html = await fetchPage(baseUrl, fetchImpl, !!scraperApiKey);
+    const html = await fetchPage(baseUrl, fetchImpl, !!scraperApiKey);
     
     if (!html || html.length < 100) {
       throw new Error('Received empty or too short HTML response');
     }
     
-    // Parse first page
+    // Parse first page only (latest extractions)
     parseExtractionsFromHTML(html, extractions);
-    console.log(`[scrape] Parsed ${extractions.length} extractions from first page`);
-    
-    // Check for pagination
-    const $ = cheerio.load(html);
-    
-    // Look for pagination links - common patterns:
-    // - Links with "page" in href or text
-    // - Next/Previous buttons
-    // - Page numbers
-    const paginationLinks = new Set<string>();
-    
-    // Find all links that might be pagination
-    $('a').each((i, elem) => {
-      const href = $(elem).attr('href');
-      const text = $(elem).text().trim().toLowerCase();
-      
-      if (href) {
-        // Check for page parameter in URL
-        if (href.includes('page=') || href.includes('pagina=') || href.match(/\/\d+\//)) {
-          // Make absolute URL if relative
-          const absoluteUrl = href.startsWith('http') ? href : new URL(href, baseUrl).href;
-          paginationLinks.add(absoluteUrl);
-        }
-        
-        // Check for page numbers in text (1, 2, 3, etc.)
-        if (text.match(/^\d+$/) && parseInt(text, 10) > 1) {
-          const absoluteUrl = href.startsWith('http') ? href : new URL(href, baseUrl).href;
-          paginationLinks.add(absoluteUrl);
-        }
-      }
-    });
-    
-    // Also try to find "next" or "succ" links
-    $('a').each((i, elem) => {
-      const text = $(elem).text().trim().toLowerCase();
-      const href = $(elem).attr('href');
-      
-      if (href && (text.includes('next') || text.includes('succ') || text.includes('avanti') || text === '>')) {
-        const absoluteUrl = href.startsWith('http') ? href : new URL(href, baseUrl).href;
-        paginationLinks.add(absoluteUrl);
-      }
-    });
-    
-    console.log(`[scrape] Found ${paginationLinks.size} potential pagination links`);
-    
-    // Try to scrape all pages
-    const visitedUrls = new Set<string>([baseUrl]);
-    const urlsToVisit = Array.from(paginationLinks);
-    
-    // Also try year-based URLs - fetch all historical data (1997 to current year)
-    // This will fetch both old and new data
-    const currentYear = new Date().getFullYear();
-    const startYear = 1997; // Data available from 1997
-    
-    for (let year = currentYear; year >= startYear; year--) {
-      const yearUrl = `${baseUrl}?anno=${year}`;
-      if (!visitedUrls.has(yearUrl) && !urlsToVisit.includes(yearUrl)) {
-        urlsToVisit.push(yearUrl);
-      }
-    }
-    
-    // Scrape all pages with rate limiting
-    let pageCount = 1;
-    const maxPages = 200; // Increased limit to fetch all historical data (200 pages should cover all years)
-    
-    for (const url of urlsToVisit) {
-      if (visitedUrls.has(url) || pageCount >= maxPages) {
-        continue;
-      }
-      
-      try {
-        console.log(`[scrape] Fetching page ${pageCount + 1}: ${url}`);
-        visitedUrls.add(url);
-        
-        // Add small delay to avoid overwhelming the server
-        if (pageCount > 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay for historical scraping
-        }
-        
-        const pageHtml = await fetchPage(url, fetchImpl, !!scraperApiKey);
-        const beforeCount = extractions.length;
-        parseExtractionsFromHTML(pageHtml, extractions);
-        const newExtractions = extractions.length - beforeCount;
-        
-        console.log(`[scrape] Page ${pageCount + 1}: Added ${newExtractions} new extractions (total: ${extractions.length})`);
-        
-        pageCount++;
-        
-        // If we got no new extractions, might have reached the end
-        if (newExtractions === 0 && pageCount > 5) {
-          console.log('[scrape] No new extractions found, might have reached the end');
-          // Continue anyway in case different pages have different data
-        }
-      } catch (pageError) {
-        console.error(`[scrape] Error fetching page ${url}:`, pageError);
-        // Continue with next page
-        continue;
-      }
-    }
-    
-    console.log(`[scrape] Completed: Parsed ${extractions.length} total extractions from ${pageCount} pages`);
+    console.log(`[scrape] Parsed ${extractions.length} extractions from latest page`);
     
     // Sort by date (newest first)
     extractions.sort((a, b) => {

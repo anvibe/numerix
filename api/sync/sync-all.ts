@@ -650,7 +650,7 @@ async function syncLotto(): Promise<{
   }
 }
 
-async function syncSuperEnalotto(year?: number): Promise<{
+async function syncSuperEnalotto(): Promise<{
   success: boolean;
   message: string;
   total: number;
@@ -658,131 +658,35 @@ async function syncSuperEnalotto(year?: number): Promise<{
   error?: string;
 }> {
   try {
-    console.log('[sync] Starting SuperEnalotto sync...', { year: year || 'all years' });
+    console.log('[sync] Starting SuperEnalotto sync (latest extractions only)...');
     
-    // Validate year parameter if provided
-    if (year !== undefined && year !== null) {
-      const currentYear = new Date().getFullYear();
-      if (isNaN(year) || year < 1997 || year > currentYear) {
-        return {
-          success: false,
-          message: `Invalid year: ${year}. Must be between 1997 and ${currentYear}`,
-          total: 0,
-          new: 0,
-        };
-      }
-    }
-    
-    const currentYear = new Date().getFullYear();
-    const startYear = 1997;
-    
-    // First, check which years we already have in the database
-    let existingYears = new Set<number>();
+    // Scrape only the latest extractions (first page)
+    let extractions: ExtractedNumbers[] = [];
     try {
-      const supabase = getSupabaseClient();
+      extractions = await scrapeSuperEnalottoExtractions();
+    } catch (scrapeErr) {
+      console.error('[sync] Scraping error:', scrapeErr);
+      const errMsg = scrapeErr instanceof Error ? scrapeErr.message : String(scrapeErr);
+      console.error('[sync] Scraping error details:', errMsg);
       
-      // Get existing years from database
-      const { data: existingYearsData, error: dbError } = await supabase
-        .from('extractions')
-        .select('extraction_date')
-        .eq('game_type', 'superenalotto')
-        .order('extraction_date', { ascending: false })
-        .limit(10000);
-      
-      if (dbError) {
-        console.error('[sync] Database error when checking existing years:', dbError);
-        // Continue anyway - we'll just fetch the requested year
-      } else if (existingYearsData) {
-        existingYearsData.forEach(ext => {
-          try {
-            const year = new Date(ext.extraction_date).getFullYear();
-            if (!isNaN(year)) {
-              existingYears.add(year);
-            }
-          } catch (e) {
-            // Skip invalid dates
-          }
-        });
+      // Return a more user-friendly error message
+      let userMessage = errMsg;
+      if (errMsg.includes('Cloudflare') || errMsg.includes('403') || errMsg.includes('Lottologia request failed')) {
+        userMessage = 'Il sito ha bloccato la richiesta. Configura SCRAPER_API_KEY in Vercel per bypassare le protezioni anti-bot.';
+      } else if (errMsg.includes('timeout')) {
+        userMessage = 'Timeout durante lo scraping. Riprova più tardi.';
       }
       
-      console.log(`[sync] Found data for years: ${Array.from(existingYears).sort((a, b) => b - a).join(', ') || 'none'}`);
-    } catch (dbCheckError) {
-      console.error('[sync] Error checking existing years, continuing anyway:', dbCheckError);
-      // Continue - we'll just fetch the requested year
+      return {
+        success: false,
+        message: userMessage,
+        total: 0,
+        new: 0,
+        error: errMsg,
+      };
     }
     
-    // Determine which years to fetch
-    let yearsToFetch: number[] = [];
-    
-    if (year && year >= startYear && year <= currentYear) {
-      // Sync specific year if requested
-      yearsToFetch = [year];
-      console.log(`[sync] Fetching specific year: ${year}`);
-    } else {
-      // Default behavior: fetch current year + last 2 years + missing years
-      // Always fetch current year and last 2 years (for new extractions)
-      for (let year = currentYear; year >= Math.max(currentYear - 2, startYear); year--) {
-        yearsToFetch.push(year);
-      }
-      
-      // Add missing older years (limit to 5 years per sync to avoid timeout)
-      let missingYearsAdded = 0;
-      for (let year = currentYear - 3; year >= startYear && missingYearsAdded < 5; year--) {
-        if (!existingYears.has(year)) {
-          yearsToFetch.push(year);
-          missingYearsAdded++;
-        }
-      }
-      
-      yearsToFetch.sort((a, b) => b - a); // Sort newest first
-    }
-    
-    console.log(`[sync] Will fetch years: ${yearsToFetch.join(', ')}`);
-    
-    // Scrape extractions for each year (incremental approach)
-    let allExtractions: ExtractedNumbers[] = [];
-    let totalScraped = 0;
-    
-    for (const year of yearsToFetch) {
-      try {
-        console.log(`[sync] Fetching year ${year}...`);
-        
-        // Call the scraping function with error handling
-        let yearExtractions: ExtractedNumbers[] = [];
-        try {
-          yearExtractions = await scrapeSuperEnalottoExtractions(year);
-        } catch (scrapeErr) {
-          console.error(`[sync] Scraping error for year ${year}:`, scrapeErr);
-          const errMsg = scrapeErr instanceof Error ? scrapeErr.message : String(scrapeErr);
-          console.error(`[sync] Scraping error details:`, errMsg);
-          // Continue to next year instead of failing
-          continue;
-        }
-        
-        if (yearExtractions && Array.isArray(yearExtractions) && yearExtractions.length > 0) {
-          allExtractions = allExtractions.concat(yearExtractions);
-          totalScraped += yearExtractions.length;
-          console.log(`[sync] Year ${year}: ${yearExtractions.length} extractions`);
-        } else {
-          console.log(`[sync] Year ${year}: No extractions found`);
-        }
-        
-        // Small delay between years
-        if (year !== yearsToFetch[yearsToFetch.length - 1]) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-      } catch (yearError) {
-        console.error(`[sync] Error fetching year ${year}:`, yearError);
-        const errorMsg = yearError instanceof Error ? yearError.message : String(yearError);
-        const errorStack = yearError instanceof Error ? yearError.stack : undefined;
-        console.error(`[sync] Year ${year} error details:`, { errorMsg, errorStack });
-        // Continue with next year instead of failing completely
-        continue;
-      }
-    }
-    
-    const extractions = allExtractions;
-    console.log(`[sync] Total scraped: ${extractions.length} extractions from ${yearsToFetch.length} years`);
+    console.log(`[sync] Scraped ${extractions.length} extractions`);
     } catch (scrapeError) {
       console.error('[sync] Error scraping SuperEnalotto:', scrapeError);
       const errorMessage = scrapeError instanceof Error ? scrapeError.message : 'Scraping failed';
@@ -1088,57 +992,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Sync single game (already validated above)
       if (gameType === 'superenalotto') {
         try {
-          // Check if a specific year was requested
-          let requestedYear: number | undefined = undefined;
-          if (req.query.year) {
-            const yearParam = req.query.year as string;
-            const parsedYear = parseInt(yearParam, 10);
-            if (!isNaN(parsedYear) && parsedYear >= 1997 && parsedYear <= new Date().getFullYear()) {
-              requestedYear = parsedYear;
-            } else {
-              return res.status(400).json({
-                success: false,
-                error: 'Invalid year parameter',
-                message: `Year must be between 1997 and ${new Date().getFullYear()}`,
-                gameType,
-              });
-            }
-          }
-          
-          console.log('[sync-all] About to call syncSuperEnalotto with year:', requestedYear);
-          
-          // Test if the scraping function can be imported/called
-          try {
-            console.log('[sync-all] Testing scrapeSuperEnalottoExtractions import...');
-            const testImport = await import('../scrape/superenalotto.js');
-            console.log('[sync-all] Import successful, function available:', typeof testImport.scrapeSuperEnalottoExtractions);
-          } catch (importError) {
-            console.error('[sync-all] Import test failed:', importError);
-            return res.status(500).json({
-              success: false,
-              error: 'Import failed',
-              message: importError instanceof Error ? importError.message : 'Failed to import scraping function',
-              gameType,
-            });
-          }
-          
-          // Wrap in try-catch with detailed error logging
-          let result;
-          try {
-            console.log('[sync-all] Calling syncSuperEnalotto...');
-            result = await syncSuperEnalotto(requestedYear);
-            console.log('[sync-all] syncSuperEnalotto completed successfully');
-          } catch (innerError) {
-            console.error('[sync-all] Inner error in syncSuperEnalotto:', innerError);
-            const innerMsg = innerError instanceof Error ? innerError.message : String(innerError);
-            const innerStack = innerError instanceof Error ? innerError.stack : undefined;
-            console.error('[sync-all] Inner error details:', { innerMsg, innerStack });
-            throw innerError; // Re-throw to outer catch
-          }
+          console.log('[sync-all] Calling syncSuperEnalotto (latest extractions only)...');
+          const result = await syncSuperEnalotto();
+          console.log('[sync-all] syncSuperEnalotto completed successfully');
           
           return res.status(200).json({
             gameType,
-            year: requestedYear,
             ...result,
           });
         } catch (syncError) {
