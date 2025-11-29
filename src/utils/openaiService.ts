@@ -266,6 +266,48 @@ Generate a DIFFERENT combination each time. There are many statistically interes
       context += `\n`;
     }
 
+    // Add Jolly statistics for SuperEnalotto
+    if (gameType === 'superenalotto' && statistics.jollyStats) {
+      if (statistics.jollyStats.frequentNumbers.length > 0) {
+        context += `JOLLY STATISTICS - FREQUENT NUMBERS:\n`;
+        context += `These are the most frequently drawn Jolly numbers historically:\n`;
+        statistics.jollyStats.frequentNumbers.slice(0, 10).forEach(item => {
+          context += `- Jolly ${item.number}: ${item.count} times (${item.percentage.toFixed(1)}%)\n`;
+        });
+        context += `\n`;
+      }
+      
+      if (statistics.jollyStats.delays.length > 0) {
+        context += `JOLLY STATISTICS - DELAYED NUMBERS:\n`;
+        context += `These Jolly numbers haven't appeared recently:\n`;
+        statistics.jollyStats.delays.slice(0, 5).forEach(item => {
+          context += `- Jolly ${item.number}: ${item.delay} extractions ago\n`;
+        });
+        context += `\n`;
+      }
+    }
+
+    // Add Superstar statistics for SuperEnalotto
+    if (gameType === 'superenalotto' && statistics.superstarStats) {
+      if (statistics.superstarStats.frequentNumbers.length > 0) {
+        context += `SUPERSTAR STATISTICS - FREQUENT NUMBERS:\n`;
+        context += `These are the most frequently drawn SuperStar numbers historically:\n`;
+        statistics.superstarStats.frequentNumbers.slice(0, 10).forEach(item => {
+          context += `- SuperStar ${item.number}: ${item.count} times (${item.percentage.toFixed(1)}%)\n`;
+        });
+        context += `\n`;
+      }
+      
+      if (statistics.superstarStats.delays.length > 0) {
+        context += `SUPERSTAR STATISTICS - DELAYED NUMBERS:\n`;
+        context += `These SuperStar numbers haven't appeared recently (good for variety):\n`;
+        statistics.superstarStats.delays.slice(0, 5).forEach(item => {
+          context += `- SuperStar ${item.number}: ${item.delay} extractions ago\n`;
+        });
+        context += `\n`;
+      }
+    }
+
     // Add unlucky patterns from unsuccessful combinations
     if (statistics.unluckyNumbers && statistics.unluckyNumbers.length > 0) {
       context += `UNLUCKY NUMBERS (frequently in unsuccessful combinations):\n`;
@@ -336,9 +378,17 @@ Generate a DIFFERENT combination each time. There are many statistically interes
     context += `7. Provide clear reasoning (avoid claiming "higher probability")\n`;
     context += `8. Data quality indicator based on sample size and consistency\n`;
     context += `9. Include distribution_score, influence_confidence, and lift_score in analysis\n`;
-    context += `10. IMPORTANT: Generate a DIFFERENT combination each time\n`;
-    context += `11. Many combinations are statistically interesting - explore variety\n`;
-    context += `12. Vary approach: sometimes emphasize influence, sometimes lift, sometimes distribution\n`;
+    if (gameType === 'superenalotto') {
+      context += `10. For JOLLY: Prefer frequent Jolly numbers (see Jolly Statistics above) - these appear more often historically\n`;
+      context += `11. For SUPERSTAR: Consider delayed SuperStar numbers for variety (see SuperStar Statistics above) - these haven't appeared recently\n`;
+      context += `12. IMPORTANT: Generate a DIFFERENT combination each time\n`;
+      context += `13. Many combinations are statistically interesting - explore variety\n`;
+      context += `14. Vary approach: sometimes emphasize influence, sometimes lift, sometimes distribution\n`;
+    } else {
+      context += `10. IMPORTANT: Generate a DIFFERENT combination each time\n`;
+      context += `11. Many combinations are statistically interesting - explore variety\n`;
+      context += `12. Vary approach: sometimes emphasize influence, sometimes lift, sometimes distribution\n`;
+    }
     
     // Add a random seed/timestamp to encourage variation
     const variationHint = Math.random() < 0.5 

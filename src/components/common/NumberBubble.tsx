@@ -2,7 +2,7 @@ import React from 'react';
 
 interface NumberBubbleProps {
   number: number;
-  type?: 'default' | 'hot' | 'cold' | 'due' | 'selected';
+  type?: 'default' | 'hot' | 'cold' | 'due' | 'selected' | 'jolly' | 'superstar';
   size?: 'sm' | 'md' | 'lg';
 }
 
@@ -21,6 +21,10 @@ const NumberBubble: React.FC<NumberBubbleProps> = ({
         return 'number-bubble-due';
       case 'selected':
         return 'number-bubble-selected';
+      case 'jolly':
+        return 'number-bubble-jolly';
+      case 'superstar':
+        return 'number-bubble-superstar';
       default:
         return 'number-bubble';
     }

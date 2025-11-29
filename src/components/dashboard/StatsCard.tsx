@@ -6,7 +6,7 @@ interface StatsCardProps {
   title: string;
   icon: React.ReactNode;
   data: Frequency[] | Delay[];
-  type: 'hot' | 'cold' | 'due';
+  type: 'hot' | 'cold' | 'due' | 'jolly' | 'superstar';
 }
 
 const StatsCard: React.FC<StatsCardProps> = ({ title, icon, data, type }) => {

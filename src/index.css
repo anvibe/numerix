@@ -89,6 +89,16 @@
     border-radius: 10px;
   }
 
+  .number-bubble-jolly {
+    @apply flex items-center justify-center font-medium text-gray-900 bg-yellow-500 shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl;
+    border-radius: 10px;
+  }
+
+  .number-bubble-superstar {
+    @apply flex items-center justify-center font-medium text-white bg-purple-500 shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl;
+    border-radius: 10px;
+  }
+
   .game-card {
     @apply card cursor-pointer hover:shadow-lg;
   }
