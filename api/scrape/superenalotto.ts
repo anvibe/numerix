@@ -104,14 +104,8 @@ async function scrapeLottologiaSuperEnalottoByYear(year: number): Promise<Extrac
   const extractions: ExtractedNumbers[] = [];
   const baseUrl = `https://www.lottologia.com/superenalotto/archivio-estrazioni/?anno=${year}`;
   
-  // Add timeout protection (2 minutes max per year)
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error(`Scraping year ${year} timeout after 2 minutes`)), 120000);
-  });
-  
-  const scrapePromise = (async () => {
-    try {
-      console.log(`[scrape] Starting scrape for year ${year}...`, baseUrl);
+  try {
+    console.log(`[scrape] Starting scrape for year ${year}...`, baseUrl);
     
     // Use native fetch (Node 18+ on Vercel)
     let fetchImpl: (url: string | URL | Request, init?: RequestInit) => Promise<Response>;
