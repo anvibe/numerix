@@ -106,9 +106,10 @@ export class ExtractionSyncService {
 
 // API Service utility for handling backend communications
 export class ApiService {
-  private static baseUrl = process.env.VITE_VERCEL_URL 
-    ? `${process.env.VITE_VERCEL_URL}/api` 
-    : 'https://numerix-kappa.vercel.app/api';
+  // Use production URL when running locally, relative URL when deployed
+  private static baseUrl = import.meta.env.DEV 
+    ? 'https://numerix-kappa.vercel.app/api'
+    : '/api';
   
   static async makeRequest(endpoint: string, options: RequestInit = {}, retries = 3): Promise<Response> {
     const url = `${this.baseUrl}${endpoint}`;
