@@ -1105,8 +1105,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
           }
           
-          console.log('[sync-all] Calling syncSuperEnalotto with year:', requestedYear);
-          const result = await syncSuperEnalotto(requestedYear);
+          console.log('[sync-all] About to call syncSuperEnalotto with year:', requestedYear);
+          
+          // Wrap in try-catch with detailed error logging
+          let result;
+          try {
+            result = await syncSuperEnalotto(requestedYear);
+            console.log('[sync-all] syncSuperEnalotto completed successfully');
+          } catch (innerError) {
+            console.error('[sync-all] Inner error in syncSuperEnalotto:', innerError);
+            const innerMsg = innerError instanceof Error ? innerError.message : String(innerError);
+            const innerStack = innerError instanceof Error ? innerError.stack : undefined;
+            console.error('[sync-all] Inner error details:', { innerMsg, innerStack });
+            throw innerError; // Re-throw to outer catch
+          }
+          
           return res.status(200).json({
             gameType,
             year: requestedYear,
@@ -1116,12 +1129,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           console.error('[sync-all] Error in syncSuperEnalotto:', syncError);
           const errorMessage = syncError instanceof Error ? syncError.message : 'Unknown error';
           const errorStack = syncError instanceof Error ? syncError.stack : String(syncError);
+          const errorName = syncError instanceof Error ? syncError.name : 'Error';
+          
+          console.error('[sync-all] Full error details:', {
+            name: errorName,
+            message: errorMessage,
+            stack: errorStack,
+          });
           
           return res.status(500).json({
             success: false,
             error: 'Sync failed',
             message: errorMessage,
             gameType,
+            errorName,
             details: process.env.NODE_ENV === 'development' ? errorStack : undefined,
           });
         }
