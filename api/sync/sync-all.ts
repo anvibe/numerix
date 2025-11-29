@@ -661,10 +661,15 @@ async function syncSuperEnalotto(year?: number): Promise<{
     console.log('[sync] Starting SuperEnalotto sync...', { year: year || 'all years' });
     
     // Validate year parameter if provided
-    if (year !== undefined) {
+    if (year !== undefined && year !== null) {
       const currentYear = new Date().getFullYear();
       if (isNaN(year) || year < 1997 || year > currentYear) {
-        throw new Error(`Invalid year: ${year}. Must be between 1997 and ${currentYear}`);
+        return {
+          success: false,
+          message: `Invalid year: ${year}. Must be between 1997 and ${currentYear}`,
+          total: 0,
+          new: 0,
+        };
       }
     }
     
@@ -1016,7 +1021,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).end();
     }
     
-    console.log('[sync-all] Handler called', { method: req.method, query: req.query, body: req.body });
+    console.log('[sync-all] Handler called', { 
+      method: req.method, 
+      query: req.query, 
+      body: req.body,
+      url: req.url 
+    });
     
     // Validate environment variables upfront
     const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
