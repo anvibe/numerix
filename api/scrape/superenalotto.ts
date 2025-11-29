@@ -84,8 +84,85 @@ function parseNumbers(numbersText: string): number[] {
 }
 
 // Export scraping function for use by other modules
-export async function scrapeSuperEnalottoExtractions(): Promise<ExtractedNumbers[]> {
+// Optionally accepts a year parameter to fetch only specific year
+export async function scrapeSuperEnalottoExtractions(year?: number): Promise<ExtractedNumbers[]> {
+  if (year) {
+    return await scrapeLottologiaSuperEnalottoByYear(year);
+  }
   return await scrapeLottologiaSuperEnalotto();
+}
+
+// Scrape a specific year only (faster, for incremental syncing)
+async function scrapeLottologiaSuperEnalottoByYear(year: number): Promise<ExtractedNumbers[]> {
+  const extractions: ExtractedNumbers[] = [];
+  const baseUrl = `https://www.lottologia.com/superenalotto/archivio-estrazioni/?anno=${year}`;
+  
+  try {
+    console.log(`[scrape] Starting scrape for year ${year}...`, baseUrl);
+    
+    // Use native fetch (Node 18+ on Vercel)
+    let fetchImpl: (url: string | URL | Request, init?: RequestInit) => Promise<Response>;
+    try {
+      if (typeof globalThis.fetch === 'function') {
+        fetchImpl = globalThis.fetch as typeof fetch;
+      } else {
+        const nodeFetch = await import('node-fetch');
+        fetchImpl = nodeFetch.default as unknown as typeof fetch;
+      }
+    } catch (e) {
+      throw new Error(`Failed to load fetch implementation: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    
+    const scraperApiKey = process.env.SCRAPER_API_KEY;
+    let page = 1;
+    const maxPages = 20; // Max pages per year
+    let hasMore = true;
+    
+    while (hasMore && page <= maxPages) {
+      const url = page === 1 ? baseUrl : `${baseUrl}&page=${page}`;
+      console.log(`[scrape] Fetching year ${year}, page ${page}...`);
+      
+      try {
+        const html = await fetchPage(url, fetchImpl, !!scraperApiKey);
+        const beforeCount = extractions.length;
+        parseExtractionsFromHTML(html, extractions);
+        const newExtractions = extractions.length - beforeCount;
+        
+        console.log(`[scrape] Year ${year}, page ${page}: Added ${newExtractions} extractions (total: ${newExtractions})`);
+        
+        // Check if there are more pages
+        const $ = cheerio.load(html);
+        const nextButton = $('a').filter((_, el) => {
+          const text = $(el).text().trim().toLowerCase();
+          return text.includes('next') || text.includes('succ') || text.includes('avanti') || text === '>';
+        });
+        
+        hasMore = nextButton.length > 0 && newExtractions > 0;
+        page++;
+        
+        if (hasMore) {
+          await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+        }
+      } catch (pageError) {
+        console.error(`[scrape] Error fetching year ${year}, page ${page}:`, pageError);
+        hasMore = false;
+      }
+    }
+    
+    console.log(`[scrape] Completed year ${year}: ${extractions.length} extractions`);
+    
+    // Sort by date (newest first)
+    extractions.sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return dateB - dateA;
+    });
+    
+    return extractions;
+  } catch (error) {
+    console.error(`[scrape] Error scraping year ${year}:`, error);
+    throw error;
+  }
 }
 
 // Helper function to fetch a single page with ScraperAPI support

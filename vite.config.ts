@@ -16,6 +16,7 @@ export default defineConfig({
         target: process.env.VITE_VERCEL_URL || 'https://numerix-kappa.vercel.app',
         changeOrigin: true,
         secure: true,
+        timeout: 600000, // 10 minute timeout for historical data sync
       },
     },
   },
