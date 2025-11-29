@@ -79,6 +79,162 @@ const hasUnluckyPair = (numbers: number[], statistics: GameStatistics): boolean 
 };
 
 /**
+ * Apply balance criteria to improve combination quality:
+ * 1. Even/Odd balance: 2/4 or 3/3, avoid 0/6 or 6/0
+ * 2. High/Low balance: mix numbers from both halves (1-45 and 46-90 for SuperEnalotto)
+ * 3. Decade distribution: max 2 numbers per decade
+ */
+const applyBalanceCriteria = (
+  combination: number[],
+  maxNumber: number,
+  numbersToSelect: number
+): number[] => {
+  let improved = [...combination];
+  const sorted = [...improved].sort((a, b) => a - b);
+  const maxAttempts = 50;
+  let attempts = 0;
+
+  while (attempts < maxAttempts) {
+    attempts++;
+    let needsImprovement = false;
+
+    // 1. Check Even/Odd balance (avoid 0/6 or 6/0, prefer 2/4 or 3/3)
+    const evenCount = sorted.filter(n => n % 2 === 0).length;
+    const oddCount = sorted.length - evenCount;
+    if (evenCount === 0 || oddCount === 0) {
+      if (evenCount === 0) {
+        // All odd, need to add an even number
+        const oddToReplace = sorted[Math.floor(Math.random() * sorted.length)];
+        const candidates = [];
+        for (let i = 2; i <= maxNumber; i += 2) {
+          if (!sorted.includes(i) && i !== oddToReplace) {
+            candidates.push(i);
+          }
+        }
+        if (candidates.length > 0) {
+          const newEven = candidates[Math.floor(Math.random() * candidates.length)];
+          improved = sorted.filter(n => n !== oddToReplace).concat(newEven);
+          needsImprovement = true;
+        }
+      } else if (oddCount === 0) {
+        // All even, need to add an odd number
+        const evenToReplace = sorted[Math.floor(Math.random() * sorted.length)];
+        const candidates = [];
+        for (let i = 1; i <= maxNumber; i += 2) {
+          if (!sorted.includes(i) && i !== evenToReplace) {
+            candidates.push(i);
+          }
+        }
+        if (candidates.length > 0) {
+          const newOdd = candidates[Math.floor(Math.random() * candidates.length)];
+          improved = sorted.filter(n => n !== evenToReplace).concat(newOdd);
+          needsImprovement = true;
+        }
+      }
+    }
+
+    // 2. Check High/Low balance (for SuperEnalotto: 1-45 low, 46-90 high)
+    if (maxNumber === 90) {
+      const midpoint = 45;
+      const lowCount = sorted.filter(n => n <= midpoint).length;
+      const highCount = sorted.filter(n => n > midpoint).length;
+      
+      if (lowCount === 0 || highCount === 0) {
+        if (lowCount === 0) {
+          // All high, need to add a low number
+          const highToReplace = sorted[Math.floor(Math.random() * sorted.length)];
+          const candidates = [];
+          for (let i = 1; i <= midpoint; i++) {
+            if (!sorted.includes(i) && i !== highToReplace) {
+              candidates.push(i);
+            }
+          }
+          if (candidates.length > 0) {
+            const newLow = candidates[Math.floor(Math.random() * candidates.length)];
+            improved = sorted.filter(n => n !== highToReplace).concat(newLow);
+            needsImprovement = true;
+          }
+        } else if (highCount === 0) {
+          // All low, need to add a high number
+          const lowToReplace = sorted[Math.floor(Math.random() * sorted.length)];
+          const candidates = [];
+          for (let i = midpoint + 1; i <= maxNumber; i++) {
+            if (!sorted.includes(i) && i !== lowToReplace) {
+              candidates.push(i);
+            }
+          }
+          if (candidates.length > 0) {
+            const newHigh = candidates[Math.floor(Math.random() * candidates.length)];
+            improved = sorted.filter(n => n !== lowToReplace).concat(newHigh);
+            needsImprovement = true;
+          }
+        }
+      }
+    }
+
+    // 3. Check decade distribution (max 2 numbers per decade)
+    const decades = Array(9).fill(0);
+    sorted.forEach(num => {
+      const decade = Math.floor((num - 1) / 10);
+      if (decade >= 0 && decade < 9) {
+        decades[decade]++;
+      }
+    });
+    
+    const overloadedDecades: number[] = [];
+    decades.forEach((count, decade) => {
+      if (count > 2) {
+        overloadedDecades.push(decade);
+      }
+    });
+
+    if (overloadedDecades.length > 0) {
+      const overloadedDecade = overloadedDecades[0];
+      const numbersInDecade = sorted.filter(n => {
+        const d = Math.floor((n - 1) / 10);
+        return d === overloadedDecade;
+      });
+      
+      if (numbersInDecade.length > 0) {
+        const toReplace = numbersInDecade[Math.floor(Math.random() * numbersInDecade.length)];
+        const underloadedDecades: number[] = [];
+        decades.forEach((count, d) => {
+          if (count < 2 && d !== overloadedDecade) {
+            underloadedDecades.push(d);
+          }
+        });
+        
+        if (underloadedDecades.length > 0) {
+          const targetDecade = underloadedDecades[Math.floor(Math.random() * underloadedDecades.length)];
+          const minInDecade = targetDecade * 10 + 1;
+          const maxInDecade = Math.min((targetDecade + 1) * 10, maxNumber);
+          const candidates = [];
+          for (let i = minInDecade; i <= maxInDecade; i++) {
+            if (!sorted.includes(i) && i !== toReplace) {
+              candidates.push(i);
+            }
+          }
+          if (candidates.length > 0) {
+            const newNumber = candidates[Math.floor(Math.random() * candidates.length)];
+            improved = sorted.filter(n => n !== toReplace).concat(newNumber);
+            needsImprovement = true;
+          }
+        }
+      }
+    }
+
+    if (needsImprovement) {
+      improved = ensureUniqueCount(improved, numbersToSelect, maxNumber);
+      sorted.splice(0, sorted.length, ...improved.sort((a, b) => a - b));
+    } else {
+      break;
+    }
+  }
+
+  return improved.sort((a, b) => a - b);
+};
+
+/**
  * Ensures a combination has exactly the required count of unique numbers.
  * Deduplicates, fills missing spots with random numbers that aren't already in the set.
  */
