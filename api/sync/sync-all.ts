@@ -719,9 +719,13 @@ async function syncSuperEnalotto(year?: number): Promise<{
       try {
         console.log(`[sync] Fetching year ${year}...`);
         const yearExtractions = await scrapeSuperEnalottoExtractions(year);
-        allExtractions = allExtractions.concat(yearExtractions);
-        totalScraped += yearExtractions.length;
-        console.log(`[sync] Year ${year}: ${yearExtractions.length} extractions`);
+        if (yearExtractions && yearExtractions.length > 0) {
+          allExtractions = allExtractions.concat(yearExtractions);
+          totalScraped += yearExtractions.length;
+          console.log(`[sync] Year ${year}: ${yearExtractions.length} extractions`);
+        } else {
+          console.log(`[sync] Year ${year}: No extractions found`);
+        }
         
         // Small delay between years
         if (year !== yearsToFetch[yearsToFetch.length - 1]) {
@@ -729,7 +733,9 @@ async function syncSuperEnalotto(year?: number): Promise<{
         }
       } catch (yearError) {
         console.error(`[sync] Error fetching year ${year}:`, yearError);
-        // Continue with next year
+        const errorMsg = yearError instanceof Error ? yearError.message : String(yearError);
+        console.error(`[sync] Year ${year} error details:`, errorMsg);
+        // Continue with next year instead of failing completely
         continue;
       }
     }

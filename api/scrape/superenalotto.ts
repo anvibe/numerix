@@ -128,7 +128,7 @@ async function scrapeLottologiaSuperEnalottoByYear(year: number): Promise<Extrac
         parseExtractionsFromHTML(html, extractions);
         const newExtractions = extractions.length - beforeCount;
         
-        console.log(`[scrape] Year ${year}, page ${page}: Added ${newExtractions} extractions (total: ${newExtractions})`);
+        console.log(`[scrape] Year ${year}, page ${page}: Added ${newExtractions} extractions (total: ${extractions.length})`);
         
         // Check if there are more pages
         const $ = cheerio.load(html);
