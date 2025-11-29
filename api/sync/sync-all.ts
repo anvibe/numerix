@@ -658,30 +658,47 @@ async function syncSuperEnalotto(): Promise<{
   error?: string;
 }> {
   try {
-    console.log('Starting SuperEnalotto sync...');
+    console.log('[sync] Starting SuperEnalotto sync...');
     
-    // Scrape extractions with timeout protection (increased timeout for pagination)
-    let extractions;
+    // Scrape extractions with timeout protection
+    let extractions: ExtractedNumbers[] = [];
     try {
-      console.log('[sync] Calling scrapeSuperEnalottoExtractions (with pagination)...');
+      console.log('[sync] Calling scrapeSuperEnalottoExtractions...');
+      
       // Add timeout wrapper - 2 minutes should be enough for recent years scraping
       const scrapePromise = scrapeSuperEnalottoExtractions();
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error('Scraping timeout after 2 minutes')), 120000);
       });
       
-      console.log('[sync] Waiting for scrape to complete (this may take a while for historical data)...');
+      console.log('[sync] Waiting for scrape to complete...');
       extractions = await Promise.race([scrapePromise, timeoutPromise]);
       console.log(`[sync] Scrape completed, got ${extractions.length} extractions`);
     } catch (scrapeError) {
-      console.error('Error scraping SuperEnalotto:', scrapeError);
+      console.error('[sync] Error scraping SuperEnalotto:', scrapeError);
       const errorMessage = scrapeError instanceof Error ? scrapeError.message : 'Scraping failed';
       const errorStack = scrapeError instanceof Error ? scrapeError.stack : String(scrapeError);
-      console.error('Scrape error details:', { errorMessage, errorStack });
+      const errorName = scrapeError instanceof Error ? scrapeError.name : 'Unknown';
+      
+      console.error('[sync] Scrape error details:', { 
+        errorMessage, 
+        errorStack,
+        errorName
+      });
+      
+      // Return a more user-friendly error message
+      let userMessage = errorMessage;
+      if (errorMessage.includes('Cloudflare') || errorMessage.includes('403') || errorMessage.includes('Lottologia request failed')) {
+        userMessage = 'Il sito ha bloccato la richiesta. Configura SCRAPER_API_KEY in Vercel per bypassare le protezioni anti-bot.';
+      } else if (errorMessage.includes('timeout')) {
+        userMessage = 'Il scraping ha impiegato troppo tempo. Riprova più tardi.';
+      } else if (errorMessage.includes('fetch') || errorMessage.includes('network')) {
+        userMessage = 'Errore di connessione durante lo scraping. Riprova più tardi.';
+      }
       
       return {
         success: false,
-        message: errorMessage,
+        message: userMessage,
         total: 0,
         new: 0,
         error: errorStack,
@@ -869,8 +886,17 @@ async function syncSuperEnalotto(): Promise<{
       new: inserted,
     };
   } catch (error) {
-    console.error('Error in SuperEnalotto sync:', error);
-    throw error;
+    console.error('[sync] Unexpected error in SuperEnalotto sync:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    const errorStack = error instanceof Error ? error.stack : String(error);
+    
+    return {
+      success: false,
+      message: `Errore imprevisto durante la sincronizzazione: ${errorMessage}`,
+      total: 0,
+      new: 0,
+      error: errorStack,
+    };
   }
 }
 
