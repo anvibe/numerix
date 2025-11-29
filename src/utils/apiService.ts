@@ -115,9 +115,9 @@ export class ApiService {
       try {
         console.log(`Making API request to: ${url} (attempt ${attempt + 1}/${retries})`);
         
-        // Add timeout
+        // Add timeout - increased for historical data scraping (10 minutes)
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minute timeout for historical sync
         
         const response = await fetch(url, {
           ...options,
