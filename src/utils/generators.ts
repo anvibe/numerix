@@ -289,6 +289,9 @@ export const generateCombination = (
   // GUARANTEE: Ensure exactly the right number of UNIQUE selections
   combination = ensureUniqueCount(combination, game.numbersToSelect, game.maxNumber);
   
+  // Apply balance criteria to improve combination quality
+  combination = applyBalanceCriteria(combination, game.maxNumber, game.numbersToSelect);
+  
   // For SuperEnalotto, generate Jolly and Superstar numbers (also avoiding unlucky ones)
   if (gameType === 'superenalotto') {
     let jolly = generateUniqueNumberExcluding(1, game.maxNumber, combination);
