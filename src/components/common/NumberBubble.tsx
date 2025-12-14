@@ -4,12 +4,15 @@ interface NumberBubbleProps {
   number: number;
   type?: 'default' | 'hot' | 'cold' | 'due' | 'selected' | 'jolly' | 'superstar';
   size?: 'sm' | 'md' | 'lg';
+  /** Accessible label for screen readers */
+  ariaLabel?: string;
 }
 
 const NumberBubble: React.FC<NumberBubbleProps> = ({ 
   number, 
   type = 'default',
-  size = 'md'
+  size = 'md',
+  ariaLabel
 }) => {
   const getTypeClass = () => {
     switch (type) {
@@ -41,8 +44,29 @@ const NumberBubble: React.FC<NumberBubbleProps> = ({
     }
   };
   
+  // Generate accessible label based on type
+  const getAccessibleLabel = (): string => {
+    if (ariaLabel) return ariaLabel;
+    
+    const typeLabels: Record<string, string> = {
+      hot: 'numero frequente',
+      cold: 'numero poco frequente',
+      due: 'numero in ritardo',
+      selected: 'numero selezionato',
+      jolly: 'numero jolly',
+      superstar: 'numero superstar',
+      default: 'numero'
+    };
+    
+    return `${typeLabels[type]} ${number}`;
+  };
+  
   return (
-    <div className={`${getTypeClass()} ${getSizeClass()}`}>
+    <div 
+      className={`${getTypeClass()} ${getSizeClass()}`}
+      role="img"
+      aria-label={getAccessibleLabel()}
+    >
       {number}
     </div>
   );

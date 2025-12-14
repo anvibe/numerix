@@ -1,9 +1,7 @@
-import { saveAs } from 'file-saver';
-import { jsPDF } from 'jspdf';
-import { GeneratedCombination, Game } from '../types';
+import { GeneratedCombination } from '../types';
 import { getGameByType } from './generators';
 
-// Export to CSV
+// Export to CSV (no external dependencies needed)
 export const exportToCSV = (combinations: GeneratedCombination[]): void => {
   // Create CSV headers
   let csvContent = "data:text/csv;charset=utf-8,";
@@ -34,8 +32,10 @@ export const exportToCSV = (combinations: GeneratedCombination[]): void => {
   document.body.removeChild(link);
 };
 
-// Export to PDF
-export const exportToPDF = (combinations: GeneratedCombination[]): void => {
+// Export to PDF - dynamically imports jsPDF to reduce initial bundle size
+export const exportToPDF = async (combinations: GeneratedCombination[]): Promise<void> => {
+  // Dynamic import for code splitting - jsPDF is only loaded when user exports
+  const { jsPDF } = await import('jspdf');
   const doc = new jsPDF();
   
   // Title
@@ -80,4 +80,16 @@ export const exportToPDF = (combinations: GeneratedCombination[]): void => {
   
   // Save PDF
   doc.save(`numerix_combinazioni_${new Date().toISOString().split('T')[0]}.pdf`);
+};
+
+/**
+ * Export to file using file-saver library
+ * Dynamically imports file-saver to reduce initial bundle size
+ */
+export const saveToFile = async (
+  content: Blob | string, 
+  filename: string
+): Promise<void> => {
+  const { saveAs } = await import('file-saver');
+  saveAs(content, filename);
 };

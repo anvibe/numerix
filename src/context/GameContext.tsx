@@ -127,7 +127,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+      if (process.env.NODE_ENV === 'development' && (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED')) {
         console.log('Auth state changed:', event);
       }
       
@@ -145,7 +145,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         setUnsuccessfulCombinations([]);
         
         // Clear any cached data when signing out
-        if (wasAuthenticated && !nowAuthenticated) {
+        if (process.env.NODE_ENV === 'development' && wasAuthenticated && !nowAuthenticated) {
           console.log('User signed out, clearing cached data');
         }
       }
@@ -242,7 +242,9 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       const hasLotto = newExtractionsData.lotto.length > 0;
       
       if (!hasSuper || !hasLotto) {
-        console.log('Loading default CSV data and populating Supabase...');
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Loading default CSV data and populating Supabase...');
+        }
         
         const [lottoData, superenalottoData] = await Promise.all([
           fetchAndParseLottoCSV(),
@@ -285,7 +287,9 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   
   // Function to reload extractions (for use after scraping)
   const reloadExtractions = async () => {
-    console.log('Reloading extractions from Supabase...');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Reloading extractions from Supabase...');
+    }
     await loadExtractionsData();
   };
   
@@ -309,7 +313,9 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         if (localSavedCombinations) {
           const parsed = JSON.parse(localSavedCombinations);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            console.log('Migrating saved combinations to Supabase...');
+            if (process.env.NODE_ENV === 'development') {
+              console.log('Migrating saved combinations to Supabase...');
+            }
             for (const combo of parsed) {
               try {
                 await combinationService.saveCombination({
@@ -334,7 +340,9 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         if (localUnsuccessfulCombinations) {
           const parsed = JSON.parse(localUnsuccessfulCombinations);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            console.log('Migrating unsuccessful combinations to Supabase...');
+            if (process.env.NODE_ENV === 'development') {
+              console.log('Migrating unsuccessful combinations to Supabase...');
+            }
             for (const combo of parsed) {
               try {
                 await combinationService.addUnsuccessfulCombination({
@@ -374,12 +382,15 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     setGameConfig(game);
     
     const extractions = extractionsData[selectedGame];
-    console.log(`[GameContext] Calculating statistics for ${selectedGame} with ${extractions.length} extractions`);
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[GameContext] Calculating statistics for ${selectedGame} with ${extractions.length} extractions`);
+    }
     
     const newStats = calculateGameStatistics(selectedGame, extractionsData, unsuccessfulCombinations);
     
-    // Log statistics summary
-    if (newStats.advancedStatistics) {
+    // Log statistics summary (development only)
+    if (process.env.NODE_ENV === 'development' && newStats.advancedStatistics) {
       console.log(`[GameContext] Advanced statistics calculated:`, {
         totalExtractions: extractions.length,
         bayesianProbabilities: newStats.advancedStatistics.bayesianProbabilities.length,
@@ -406,7 +417,9 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
 
   const setExtractionsForGame = async (gameType: GameType, newExtractions: ExtractedNumbers[]) => {
     try {
-      console.log(`Setting ${newExtractions.length} extractions for ${gameType}`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Setting ${newExtractions.length} extractions for ${gameType}`);
+      }
       await extractionService.replaceExtractions(gameType, newExtractions);
       setExtractionsData(prev => ({
         ...prev,

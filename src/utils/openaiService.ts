@@ -399,7 +399,7 @@ Generate a DIFFERENT combination each time. There are many statistically interes
     return context;
   }
 
-  private validateResponse(result: any, game: any): void {
+  private validateResponse(result: { numbers?: unknown[]; reasons?: unknown[]; confidence?: unknown; jolly?: unknown; superstar?: unknown }, game: { numbersToSelect: number; maxNumber: number }): void {
     if (!result.numbers || !Array.isArray(result.numbers)) {
       throw new Error('Invalid response: numbers must be an array');
     }
@@ -408,7 +408,7 @@ Generate a DIFFERENT combination each time. There are many statistically interes
       throw new Error(`Invalid response: must have exactly ${game.numbersToSelect} numbers`);
     }
 
-    if (result.numbers.some((n: any) => typeof n !== 'number' || n < 1 || n > game.maxNumber)) {
+    if (result.numbers.some((n: unknown) => typeof n !== 'number' || n < 1 || n > game.maxNumber)) {
       throw new Error(`Invalid response: all numbers must be between 1 and ${game.maxNumber}`);
     }
 

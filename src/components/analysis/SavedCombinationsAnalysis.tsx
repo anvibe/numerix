@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Target, AlertCircle, Lightbulb, CheckCircle2, XCircle } from 'lucide-react';
 import { useGame } from '../../context/GameContext';
 import { GeneratedCombination, ExtractedNumbers, LottoWheel } from '../../types';
@@ -98,49 +98,50 @@ const SavedCombinationsAnalysis: React.FC = () => {
     });
   }
 
-  // Debug: Log to help identify mismatches
-  // Always log (not just in development) to help diagnose the issue
-  (() => {
-    // Count unique combinations by numbers in savedCombinations from context
-    const savedUniqueSet = new Set<string>();
-    savedCombinations.filter(c => c.gameType === selectedGame).forEach(combo => {
-      const sortedNumbers = [...combo.numbers].sort((a, b) => a - b);
-      const numbersKey = `${sortedNumbers.join(',')}-${combo.gameType}`;
-      savedUniqueSet.add(numbersKey);
-    });
-    
-    // Count unique in relevantCombinations (after our deduplication)
-    const relevantUniqueSet = new Set<string>();
-    relevantCombinations.forEach(combo => {
-      const sortedNumbers = [...combo.numbers].sort((a, b) => a - b);
-      const numbersKey = `${sortedNumbers.join(',')}-${combo.gameType}`;
-      relevantUniqueSet.add(numbersKey);
-    });
-    
-    console.log('🔍 Analysis Deduplication Status:', {
-      selectedGame,
-      totalSavedInContext: savedCombinations.length,
-      savedForGame: savedCombinations.filter(c => c.gameType === selectedGame).length,
-      savedUniqueByNumbers: savedUniqueSet.size,
-      relevantAfterDedup: relevantCombinations.length,
-      relevantUniqueByNumbers: relevantUniqueSet.size,
-      duplicatesInContext: savedCombinations.filter(c => c.gameType === selectedGame).length - savedUniqueSet.size,
-      duplicatesAfterDedup: relevantCombinations.length - relevantUniqueSet.size,
-      recommendation: relevantUniqueSet.size < relevantCombinations.length 
-        ? '⚠️ Use "Rimuovi Duplicati" button to clean database!' 
-        : relevantUniqueSet.size === savedUniqueSet.size 
-          ? '✅ Deduplication working correctly' 
-          : '✅ Some duplicates removed in analysis'
-    });
-    
-    if (relevantUniqueSet.size < relevantCombinations.length) {
-      console.warn('⚠️ WARNING: Still have duplicates after deduplication!', {
-        total: relevantCombinations.length,
-        unique: relevantUniqueSet.size,
-        duplicates: relevantCombinations.length - relevantUniqueSet.size
+  // Debug: Log to help identify mismatches (development only)
+  if (process.env.NODE_ENV === 'development') {
+    (() => {
+      // Count unique combinations by numbers in savedCombinations from context
+      const savedUniqueSet = new Set<string>();
+      savedCombinations.filter(c => c.gameType === selectedGame).forEach(combo => {
+        const sortedNumbers = [...combo.numbers].sort((a, b) => a - b);
+        const numbersKey = `${sortedNumbers.join(',')}-${combo.gameType}`;
+        savedUniqueSet.add(numbersKey);
       });
-    }
-  })();
+      
+      // Count unique in relevantCombinations (after our deduplication)
+      const relevantUniqueSet = new Set<string>();
+      relevantCombinations.forEach(combo => {
+        const sortedNumbers = [...combo.numbers].sort((a, b) => a - b);
+        const numbersKey = `${sortedNumbers.join(',')}-${combo.gameType}`;
+        relevantUniqueSet.add(numbersKey);
+      });
+      
+      console.log('🔍 Analysis Deduplication Status:', {
+        selectedGame,
+        totalSavedInContext: savedCombinations.length,
+        savedForGame: savedCombinations.filter(c => c.gameType === selectedGame).length,
+        savedUniqueByNumbers: savedUniqueSet.size,
+        relevantAfterDedup: relevantCombinations.length,
+        relevantUniqueByNumbers: relevantUniqueSet.size,
+        duplicatesInContext: savedCombinations.filter(c => c.gameType === selectedGame).length - savedUniqueSet.size,
+        duplicatesAfterDedup: relevantCombinations.length - relevantUniqueSet.size,
+        recommendation: relevantUniqueSet.size < relevantCombinations.length 
+          ? '⚠️ Use "Rimuovi Duplicati" button to clean database!' 
+          : relevantUniqueSet.size === savedUniqueSet.size 
+            ? '✅ Deduplication working correctly' 
+            : '✅ Some duplicates removed in analysis'
+      });
+      
+      if (relevantUniqueSet.size < relevantCombinations.length) {
+        console.warn('⚠️ WARNING: Still have duplicates after deduplication!', {
+          total: relevantCombinations.length,
+          unique: relevantUniqueSet.size,
+          duplicates: relevantCombinations.length - relevantUniqueSet.size
+        });
+      }
+    })();
+  }
 
   const currentGameExtractions = extractionsData[selectedGame] || [];
   let relevantExtractions = currentGameExtractions.length === 0 

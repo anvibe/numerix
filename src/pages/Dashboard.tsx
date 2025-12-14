@@ -1,11 +1,16 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import GameSelector from '../components/dashboard/GameSelector';
 import StatsOverview from '../components/dashboard/StatsOverview';
 import GeneratorPanel from '../components/generator/GeneratorPanel';
 import AIRecommendation from '../components/ai/AIRecommendation';
 import ExtractionHistory from '../components/history/ExtractionHistory';
 import SavedCombinations from '../components/saved/SavedCombinations';
-import SavedCombinationsAnalysis from '../components/analysis/SavedCombinationsAnalysis';
+import { AnalysisSkeleton } from '../components/common/LoadingSkeleton';
+
+// Lazy load heavy analysis component for better initial page load
+const SavedCombinationsAnalysis = lazy(
+  () => import('../components/analysis/SavedCombinationsAnalysis')
+);
 
 const Dashboard: React.FC = () => {
   return (
@@ -21,7 +26,12 @@ const Dashboard: React.FC = () => {
       </div>
       
       <ExtractionHistory />
-      <SavedCombinationsAnalysis />
+      
+      {/* Lazy loaded with skeleton fallback */}
+      <Suspense fallback={<AnalysisSkeleton />}>
+        <SavedCombinationsAnalysis />
+      </Suspense>
+      
       <SavedCombinations />
     </div>
   );

@@ -60,12 +60,13 @@ const GeneratorPanel: React.FC = () => {
         <label className="block text-sm font-medium text-text-secondary mb-2">
           Seleziona Strategia
         </label>
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col sm:flex-row gap-3" role="group" aria-label="Selezione strategia di generazione">
           <button
             className={`btn ${
               strategy === 'standard' ? 'btn-primary' : 'btn-outline'
             }`}
             onClick={() => setStrategy('standard')}
+            aria-pressed={strategy === 'standard'}
           >
             Combinazione Standard
           </button>
@@ -74,6 +75,7 @@ const GeneratorPanel: React.FC = () => {
               strategy === 'high-variability' ? 'btn-primary' : 'btn-outline'
             }`}
             onClick={() => setStrategy('high-variability')}
+            aria-pressed={strategy === 'high-variability'}
           >
             Alta Variabilità
           </button>
@@ -115,13 +117,15 @@ const GeneratorPanel: React.FC = () => {
         </div>
       )}
       
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col sm:flex-row gap-3" role="group" aria-label="Azioni generatore">
         <button
           className="btn btn-primary flex items-center justify-center"
           onClick={handleGenerate}
           disabled={isGenerating}
+          aria-busy={isGenerating}
+          aria-label={isGenerating ? 'Generazione in corso' : 'Genera nuovi numeri'}
         >
-          <Shuffle className="mr-2 h-5 w-5" />
+          <Shuffle className="mr-2 h-5 w-5" aria-hidden="true" />
           {isGenerating ? 'Generazione...' : 'Genera Numeri'}
         </button>
         
@@ -129,8 +133,9 @@ const GeneratorPanel: React.FC = () => {
           <button
             className="btn btn-accent flex items-center justify-center"
             onClick={handleSave}
+            aria-label="Salva la combinazione generata"
           >
-            <Save className="mr-2 h-5 w-5" />
+            <Save className="mr-2 h-5 w-5" aria-hidden="true" />
             Salva Combinazione
           </button>
         )}

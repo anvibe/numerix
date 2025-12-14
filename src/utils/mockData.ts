@@ -1,4 +1,4 @@
-import { ExtractedNumbers, GameStatistics, GameType, LottoWheel, UnsuccessfulCombination, Frequency } from '../types';
+import { ExtractedNumbers, GameStatistics, GameType, LottoWheel, UnsuccessfulCombination, Frequency, Delay } from '../types';
 import { GAMES, LOTTO_WHEELS } from './constants';
 import { calculateAdvancedStatistics } from './advancedStatistics';
 
@@ -25,7 +25,7 @@ export const calculateFrequencies = (
   extractions: ExtractedNumbers[],
   maxNumber: number,
   wheel?: LottoWheel
-): { frequentNumbers: any[]; infrequentNumbers: any[] } => {
+): { frequentNumbers: Frequency[]; infrequentNumbers: Frequency[] } => {
   const counts = new Array(maxNumber + 1).fill(0);
   let totalExtractions = extractions.length;
   
@@ -73,7 +73,7 @@ export const calculateDelays = (
   extractions: ExtractedNumbers[],
   maxNumber: number,
   wheel?: LottoWheel
-): any[] => {
+): Delay[] => {
   const lastSeen = new Array(maxNumber + 1).fill(-1);
 
   // Find the last extraction each number appeared in
@@ -244,13 +244,20 @@ export const calculateGameStatistics = (
   if (gameType === 'lotto') {
     // Calculate statistics for each wheel
     const wheelStats: Record<LottoWheel, {
-      frequentNumbers: any[];
-      infrequentNumbers: any[];
-      delays: any[];
+      frequentNumbers: Frequency[];
+      infrequentNumbers: Frequency[];
+      delays: Delay[];
       unluckyNumbers?: Frequency[];
       unluckyPairs?: { pair: [number, number]; count: number }[];
       advancedStatistics?: ReturnType<typeof calculateAdvancedStatistics>;
-    }> = {} as any;
+    }> = {} as Record<LottoWheel, {
+      frequentNumbers: Frequency[];
+      infrequentNumbers: Frequency[];
+      delays: Delay[];
+      unluckyNumbers?: Frequency[];
+      unluckyPairs?: { pair: [number, number]; count: number }[];
+      advancedStatistics?: ReturnType<typeof calculateAdvancedStatistics>;
+    }>;
     
     LOTTO_WHEELS.forEach(wheel => {
       const { frequentNumbers, infrequentNumbers } = calculateFrequencies(

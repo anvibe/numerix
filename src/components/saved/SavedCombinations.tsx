@@ -57,13 +57,22 @@ const SavedCombinations: React.FC = () => {
     exportToCSV(filteredCombinations);
   };
   
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (filteredCombinations.length === 0) {
       showToast.error('Non ci sono combinazioni da esportare.');
       return;
     }
     
-    exportToPDF(filteredCombinations);
+    try {
+      showToast.loading('Preparazione PDF...');
+      await exportToPDF(filteredCombinations);
+      showToast.dismiss();
+      showToast.success('PDF esportato con successo!');
+    } catch (error) {
+      showToast.dismiss();
+      showToast.error('Errore durante l\'esportazione PDF');
+      console.error('PDF export error:', error);
+    }
   };
   
   const getStrategyDisplay = (combo: typeof savedCombinations[0]) => {
