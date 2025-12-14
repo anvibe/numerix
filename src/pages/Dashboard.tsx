@@ -5,6 +5,7 @@ import GeneratorPanel from '../components/generator/GeneratorPanel';
 import AIRecommendation from '../components/ai/AIRecommendation';
 import ExtractionHistory from '../components/history/ExtractionHistory';
 import SavedCombinations from '../components/saved/SavedCombinations';
+import ProbabilityRealityCheck from '../components/common/ProbabilityRealityCheck';
 import { AnalysisSkeleton } from '../components/common/LoadingSkeleton';
 
 // Lazy load heavy analysis component for better initial page load
@@ -18,6 +19,10 @@ const Dashboard: React.FC = () => {
       <h1 className="text-3xl font-bold mb-6">Dashboard Numerix</h1>
       
       <GameSelector />
+      
+      {/* Reality check - Show true probabilities first */}
+      <ProbabilityRealityCheck />
+      
       <StatsOverview />
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
