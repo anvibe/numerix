@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, BarChart3, Target, AlertCircle, Info } from 'lucide-react';
+import { TrendingUp, TrendingDown, BarChart3, Target, AlertCircle, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { useGame } from '../../context/GameContext';
 import { GeneratedCombination, ExtractedNumbers, LottoWheel } from '../../types';
 import { 
@@ -31,6 +31,7 @@ const MatchVarianceAnalysis: React.FC<MatchVarianceAnalysisProps> = ({
 }) => {
   const { selectedGame, gameConfig } = useGame();
   const [currentWheel, setCurrentWheel] = useState<LottoWheel>(selectedWheel || 'Bari');
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Get probabilities for the selected game
   const getProbabilities = (): LotteryProbabilities => {
@@ -228,11 +229,20 @@ const MatchVarianceAnalysis: React.FC<MatchVarianceAnalysisProps> = ({
   return (
     <div className="card mb-8">
       <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+          aria-expanded={!isCollapsed}
+        >
           <BarChart3 className="h-6 w-6 text-primary" />
           <h2 className="text-xl font-semibold">Analisi Varianza e Performance</h2>
-        </div>
-        {selectedGame === 'lotto' && gameConfig.wheels && (
+          {isCollapsed ? (
+            <ChevronDown className="h-5 w-5 text-text-secondary" />
+          ) : (
+            <ChevronUp className="h-5 w-5 text-text-secondary" />
+          )}
+        </button>
+        {!isCollapsed && selectedGame === 'lotto' && gameConfig.wheels && (
           <select
             value={currentWheel}
             onChange={(e) => setCurrentWheel(e.target.value as LottoWheel)}
@@ -246,6 +256,9 @@ const MatchVarianceAnalysis: React.FC<MatchVarianceAnalysisProps> = ({
           </select>
         )}
       </div>
+
+      {isCollapsed ? null : (
+        <>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -528,6 +541,8 @@ const MatchVarianceAnalysis: React.FC<MatchVarianceAnalysisProps> = ({
           </div>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 };

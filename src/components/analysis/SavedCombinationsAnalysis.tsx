@@ -992,9 +992,18 @@ const SavedCombinationsAnalysis: React.FC = () => {
                       <span>
                         Tua Combinazione Salvata:
                       </span>
-                      {matchCount === 0 && (
-                        <span className="text-xs text-warning font-medium">0 Match</span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-text-secondary font-normal">
+                          Creata: {new Date(savedCombination.date).toLocaleDateString('it-IT', { 
+                            day: '2-digit', 
+                            month: '2-digit', 
+                            year: 'numeric' 
+                          })}
+                        </span>
+                        {matchCount === 0 && (
+                          <span className="text-xs text-warning font-medium">0 Match</span>
+                        )}
+                      </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {savedCombination.numbers.map((num) => {
@@ -1027,9 +1036,18 @@ const SavedCombinationsAnalysis: React.FC = () => {
                       <span>
                         Numeri Vincenti:
                       </span>
-                      {matchCount === 0 && (
-                        <span className="text-xs text-warning font-medium">Nessun Match</span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-text-secondary font-normal">
+                          Estrazione: {new Date(extraction.date).toLocaleDateString('it-IT', { 
+                            day: '2-digit', 
+                            month: '2-digit', 
+                            year: 'numeric' 
+                          })}
+                        </span>
+                        {matchCount === 0 && (
+                          <span className="text-xs text-warning font-medium">Nessun Match</span>
+                        )}
+                      </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {/* LOTTO: Only wheel-specific data, no fallback to prevent mixing */}
