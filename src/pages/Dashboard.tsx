@@ -7,6 +7,8 @@ import ExtractionHistory from '../components/history/ExtractionHistory';
 import SavedCombinations from '../components/saved/SavedCombinations';
 import ProbabilityRealityCheck from '../components/common/ProbabilityRealityCheck';
 import { AnalysisSkeleton } from '../components/common/LoadingSkeleton';
+import { useGame } from '../context/GameContext';
+import MatchVarianceAnalysis from '../components/analysis/MatchVarianceAnalysis';
 
 // Lazy load heavy analysis component for better initial page load
 const SavedCombinationsAnalysis = lazy(
@@ -14,6 +16,13 @@ const SavedCombinationsAnalysis = lazy(
 );
 
 const Dashboard: React.FC = () => {
+  const { 
+    selectedGame, 
+    savedCombinations, 
+    extractionsData,
+    gameConfig 
+  } = useGame();
+
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-6">Dashboard Numerix</h1>
@@ -31,6 +40,13 @@ const Dashboard: React.FC = () => {
       </div>
       
       <ExtractionHistory />
+      
+      {/* Variance Analysis - Show statistical performance */}
+      <MatchVarianceAnalysis
+        savedCombinations={savedCombinations}
+        extractions={extractionsData[selectedGame] || []}
+        selectedWheel={selectedGame === 'lotto' ? 'Bari' : undefined}
+      />
       
       {/* Lazy loaded with skeleton fallback */}
       <Suspense fallback={<AnalysisSkeleton />}>
