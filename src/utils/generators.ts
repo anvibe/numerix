@@ -391,10 +391,34 @@ const generateBasedOnDelays = (count: number, statistics: GameStatistics): numbe
   return numbers.sort((a, b) => a - b);
 };
 
+export interface GenerationMetadata {
+  strategy: 'standard' | 'high-variability';
+  sources: {
+    frequentNumbers?: number[];
+    delayNumbers?: number[];
+    infrequentNumbers?: number[];
+    randomFill?: number[];
+  };
+  poolsUsed: {
+    frequentPoolSize: number;
+    delayPoolSize: number;
+    infrequentPoolSize: number;
+  };
+  filtersApplied: {
+    avoidedConsecutive: boolean;
+    avoidedUnluckyNumbers: number;
+    avoidedUnluckyPairs: number;
+    balanceCriteria: boolean;
+  };
+  totalCombinationsPossible: number;
+  note: string;
+}
+
 interface GeneratedResult {
   numbers: number[];
   jolly?: number;
   superstar?: number;
+  metadata?: GenerationMetadata;
 }
 
 // Main generator function
@@ -402,12 +426,42 @@ export const generateCombination = (
   gameType: GameType, 
   strategy: 'standard' | 'high-variability' = 'standard',
   statistics: GameStatistics,
-  wheel?: LottoWheel
+  wheel?: LottoWheel,
+  includeMetadata: boolean = false
 ): GeneratedResult => {
   const game = getGameByType(gameType);
   const stats = wheel && statistics.wheelStats ? statistics.wheelStats[wheel] : statistics;
   
+  // Calculate total combinations for transparency
+  const totalCombinations = (() => {
+    // C(n, k) = n! / (k! * (n-k)!)
+    let result = 1;
+    const n = game.maxNumber;
+    const k = game.numbersToSelect;
+    for (let i = 0; i < k; i++) {
+      result = result * (n - i) / (i + 1);
+    }
+    return Math.round(result);
+  })();
+  
   let combination: number[] = [];
+  const metadata: GenerationMetadata = {
+    strategy,
+    sources: {},
+    poolsUsed: {
+      frequentPoolSize: stats.frequentNumbers?.length || 0,
+      delayPoolSize: stats.delays?.length || 0,
+      infrequentPoolSize: stats.infrequentNumbers?.length || 0,
+    },
+    filtersApplied: {
+      avoidedConsecutive: false,
+      avoidedUnluckyNumbers: 0,
+      avoidedUnluckyPairs: 0,
+      balanceCriteria: false,
+    },
+    totalCombinationsPossible: totalCombinations,
+    note: '',
+  };
   
   if (strategy === 'standard') {
     // Standard strategy: mix of frequent numbers and some with delays, avoiding unlucky patterns
@@ -420,10 +474,12 @@ export const generateCombination = (
       stats,
       true
     );
+    metadata.sources.frequentNumbers = [...frequentNumbers];
     
     // Get numbers with delays (avoiding unlucky ones), excluding already selected
     const delayNumbers = generateBasedOnDelays(delayCount, stats)
       .filter(num => !frequentNumbers.includes(num));
+    metadata.sources.delayNumbers = [...delayNumbers];
     
     // Combine what we have so far
     combination = [...frequentNumbers, ...delayNumbers];
@@ -438,15 +494,59 @@ export const generateCombination = (
       stats,
       false
     );
+    metadata.sources.infrequentNumbers = [...infrequentNumbers];
     
     combination = [...infrequentNumbers];
   }
   
+  // Track original combination before filling
+  const beforeFill = [...combination];
+  
   // GUARANTEE: Ensure exactly the right number of UNIQUE selections
   combination = ensureUniqueCount(combination, game.numbersToSelect, game.maxNumber);
   
+  // Track what was filled randomly
+  const randomFill = combination.filter(num => !beforeFill.includes(num));
+  if (randomFill.length > 0) {
+    metadata.sources.randomFill = randomFill;
+  }
+  
   // Apply balance criteria to improve combination quality
   combination = applyBalanceCriteria(combination, game.maxNumber, game.numbersToSelect);
+  
+  // Check if consecutive sequences were avoided (after all processing)
+  metadata.filtersApplied.avoidedConsecutive = !hasConsecutiveSequence(combination);
+  
+  // Count avoided unlucky numbers
+  if (stats.unluckyNumbers) {
+    metadata.filtersApplied.avoidedUnluckyNumbers = combination.filter(
+      num => !isUnluckyNumber(num, stats)
+    ).length;
+  }
+  
+  // Count avoided unlucky pairs
+  if (stats.unluckyPairs) {
+    let avoidedPairs = 0;
+    for (let i = 0; i < combination.length; i++) {
+      for (let j = i + 1; j < combination.length; j++) {
+        const pair = [combination[i], combination[j]].sort((a, b) => a - b);
+        const isUnlucky = stats.unluckyPairs.some(up => 
+          up.pair[0] === pair[0] && up.pair[1] === pair[1]
+        );
+        if (!isUnlucky) avoidedPairs++;
+      }
+    }
+    metadata.filtersApplied.avoidedUnluckyPairs = avoidedPairs;
+  }
+  
+  metadata.filtersApplied.balanceCriteria = true;
+  
+  // Generate note
+  if (strategy === 'standard') {
+    metadata.note = `Generato da pool di ${metadata.poolsUsed.frequentPoolSize} numeri frequenti e ${metadata.poolsUsed.delayPoolSize} numeri ritardatari. Non analizza tutte le ${totalCombinations.toLocaleString('it-IT')} combinazioni possibili.`;
+  } else {
+    metadata.note = `Generato da pool di ${metadata.poolsUsed.infrequentPoolSize} numeri poco frequenti. Maggiore variabilità rispetto alla strategia standard.`;
+  }
   
   // For SuperEnalotto, generate Jolly and Superstar numbers using statistics
   if (gameType === 'superenalotto') {
@@ -515,10 +615,18 @@ export const generateCombination = (
       }
     }
     
-    return { numbers: combination, jolly, superstar };
+    const result: GeneratedResult = { numbers: combination, jolly, superstar };
+    if (includeMetadata) {
+      result.metadata = metadata;
+    }
+    return result;
   }
   
-  return { numbers: combination };
+  const result: GeneratedResult = { numbers: combination };
+  if (includeMetadata) {
+    result.metadata = metadata;
+  }
+  return result;
 };
 
 // AI recommendation function with enhanced unlucky pattern avoidance and advanced statistics

@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Shuffle, Save } from 'lucide-react';
+import { Shuffle, Save, Info, ChevronDown, ChevronUp, Zap, Filter, Target } from 'lucide-react';
 import NumberDisplay from './NumberDisplay';
 import { useGame } from '../../context/GameContext';
 import { LottoWheel } from '../../types';
 import { showToast } from '../../utils/toast';
+import { GenerationMetadata } from '../../utils/generators';
 
 interface GeneratedNumbers {
   numbers: number[];
   jolly?: number;
   superstar?: number;
+  metadata?: GenerationMetadata;
 }
 
 const GeneratorPanel: React.FC = () => {
@@ -17,6 +19,7 @@ const GeneratorPanel: React.FC = () => {
   const [generatedNumbers, setGeneratedNumbers] = useState<GeneratedNumbers | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedWheel, setSelectedWheel] = useState<LottoWheel>('Bari');
+  const [showTransparency, setShowTransparency] = useState(false);
   
   useEffect(() => {
     if (selectedGame === 'lotto' && gameConfig.wheels) {
@@ -114,6 +117,197 @@ const GeneratorPanel: React.FC = () => {
             jolly={generatedNumbers.jolly}
             superstar={generatedNumbers.superstar}
           />
+          
+          {/* Transparency Panel */}
+          {generatedNumbers.metadata && (
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => setShowTransparency(!showTransparency)}
+                className="w-full flex items-center justify-between text-left"
+                aria-expanded={showTransparency}
+              >
+                <div className="flex items-center gap-2">
+                  <Info className="h-4 w-4 text-primary" aria-hidden="true" />
+                  <span className="text-sm font-medium text-primary">
+                    Come sono stati generati questi numeri?
+                  </span>
+                </div>
+                {showTransparency ? (
+                  <ChevronUp className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" aria-hidden="true" />
+                )}
+              </button>
+              
+              {showTransparency && (
+                <div className="mt-4 space-y-4 text-sm">
+                  {/* Algorithm Overview */}
+                  <div className="bg-bg-secondary rounded-lg p-3">
+                    <div className="flex items-start gap-2 mb-2">
+                      <Zap className="h-4 w-4 text-warning mt-0.5 flex-shrink-0" aria-hidden="true" />
+                      <div>
+                        <p className="font-semibold mb-1">Algoritmo Utilizzato</p>
+                        <p className="text-text-secondary text-xs">
+                          {generatedNumbers.metadata.strategy === 'standard' ? (
+                            <>
+                              <strong>Strategia Standard:</strong> 60% numeri frequenti, 30% numeri ritardatari, 10% random
+                            </>
+                          ) : (
+                            <>
+                              <strong>Alta Variabilità:</strong> 40% numeri poco frequenti, 60% random
+                            </>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Sources */}
+                  <div className="bg-bg-secondary rounded-lg p-3">
+                    <div className="flex items-start gap-2 mb-2">
+                      <Target className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" aria-hidden="true" />
+                      <div className="flex-1">
+                        <p className="font-semibold mb-2">Origine dei Numeri</p>
+                        <div className="space-y-1 text-xs">
+                          {generatedNumbers.metadata.sources.frequentNumbers && (
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-success"></span>
+                              <span>
+                                <strong>{generatedNumbers.metadata.sources.frequentNumbers.length}</strong> da pool frequenti
+                                {generatedNumbers.metadata.sources.frequentNumbers.length > 0 && (
+                                  <span className="text-text-secondary">
+                                    {' '}({generatedNumbers.metadata.sources.frequentNumbers.join(', ')})
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                          )}
+                          {generatedNumbers.metadata.sources.delayNumbers && (
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-warning"></span>
+                              <span>
+                                <strong>{generatedNumbers.metadata.sources.delayNumbers.length}</strong> da pool ritardatari
+                                {generatedNumbers.metadata.sources.delayNumbers.length > 0 && (
+                                  <span className="text-text-secondary">
+                                    {' '}({generatedNumbers.metadata.sources.delayNumbers.join(', ')})
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                          )}
+                          {generatedNumbers.metadata.sources.infrequentNumbers && (
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-info"></span>
+                              <span>
+                                <strong>{generatedNumbers.metadata.sources.infrequentNumbers.length}</strong> da pool poco frequenti
+                                {generatedNumbers.metadata.sources.infrequentNumbers.length > 0 && (
+                                  <span className="text-text-secondary">
+                                    {' '}({generatedNumbers.metadata.sources.infrequentNumbers.join(', ')})
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                          )}
+                          {generatedNumbers.metadata.sources.randomFill && (
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-gray-400"></span>
+                              <span>
+                                <strong>{generatedNumbers.metadata.sources.randomFill.length}</strong> random
+                                {generatedNumbers.metadata.sources.randomFill.length > 0 && (
+                                  <span className="text-text-secondary">
+                                    {' '}({generatedNumbers.metadata.sources.randomFill.join(', ')})
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Pools Used */}
+                  <div className="bg-bg-secondary rounded-lg p-3">
+                    <p className="font-semibold mb-2">Pool Utilizzati</p>
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      <div>
+                        <div className="text-text-secondary">Frequenti</div>
+                        <div className="font-bold">{generatedNumbers.metadata.poolsUsed.frequentPoolSize} numeri</div>
+                      </div>
+                      <div>
+                        <div className="text-text-secondary">Ritardatari</div>
+                        <div className="font-bold">{generatedNumbers.metadata.poolsUsed.delayPoolSize} numeri</div>
+                      </div>
+                      <div>
+                        <div className="text-text-secondary">Poco Frequenti</div>
+                        <div className="font-bold">{generatedNumbers.metadata.poolsUsed.infrequentPoolSize} numeri</div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-text-secondary mt-2">
+                      ⚠️ Utilizza solo i <strong>top 10</strong> numeri di ogni categoria, non tutti i 90 numeri disponibili.
+                    </p>
+                  </div>
+                  
+                  {/* Filters Applied */}
+                  <div className="bg-bg-secondary rounded-lg p-3">
+                    <div className="flex items-start gap-2 mb-2">
+                      <Filter className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" aria-hidden="true" />
+                      <div className="flex-1">
+                        <p className="font-semibold mb-2">Filtri Applicati</p>
+                        <div className="space-y-1 text-xs">
+                          <div className="flex items-center gap-2">
+                            {generatedNumbers.metadata.filtersApplied.avoidedConsecutive ? (
+                              <span className="text-success">✓</span>
+                            ) : (
+                              <span className="text-warning">⚠</span>
+                            )}
+                            <span>Sequenze consecutive evitate</span>
+                          </div>
+                          {generatedNumbers.metadata.filtersApplied.avoidedUnluckyNumbers > 0 && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-success">✓</span>
+                              <span>
+                                {generatedNumbers.metadata.filtersApplied.avoidedUnluckyNumbers} numeri "sfortunati" evitati
+                              </span>
+                            </div>
+                          )}
+                          {generatedNumbers.metadata.filtersApplied.avoidedUnluckyPairs > 0 && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-success">✓</span>
+                              <span>
+                                {generatedNumbers.metadata.filtersApplied.avoidedUnluckyPairs} coppie "sfortunate" evitate
+                              </span>
+                            </div>
+                          )}
+                          {generatedNumbers.metadata.filtersApplied.balanceCriteria && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-success">✓</span>
+                              <span>Bilanciamento parità/dispari, decadi, distribuzione</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Important Note */}
+                  <div className="bg-warning/10 border border-warning/30 rounded-lg p-3">
+                    <p className="font-semibold text-warning mb-1 text-xs">⚠️ Trasparenza Algoritmica</p>
+                    <p className="text-xs text-text-secondary">
+                      {generatedNumbers.metadata.note}
+                    </p>
+                    <p className="text-xs text-text-secondary mt-2">
+                      <strong>Non analizza tutte le {generatedNumbers.metadata.totalCombinationsPossible.toLocaleString('it-IT')} combinazioni possibili.</strong>
+                      {' '}Usa euristiche basate su statistiche storiche per generare combinazioni "esteticamente piacevoli" in modo rapido.
+                    </p>
+                    <p className="text-xs text-text-secondary mt-2">
+                      <strong>Ogni combinazione ha la stessa probabilità di vincere</strong> - questo algoritmo non aumenta le tue possibilità.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
       

@@ -433,9 +433,10 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   
   const generateNumbers = (
     strategy: 'standard' | 'high-variability' = 'standard',
-    wheel?: LottoWheel
+    wheel?: LottoWheel,
+    includeMetadata: boolean = true
   ) => {
-    return generateCombination(selectedGame, strategy, gameStats, wheel);
+    return generateCombination(selectedGame, strategy, gameStats, wheel, includeMetadata);
   };
   
   const saveCombination = async (
