@@ -173,6 +173,44 @@ const MatchVarianceAnalysis: React.FC<MatchVarianceAnalysisProps> = ({
     };
   }, [matchRecords, gameConfig, probs]);
 
+  // Update wheel when selectedGame changes - MUST be before any conditional returns
+  useEffect(() => {
+    if (selectedGame === 'lotto' && selectedWheel) {
+      setCurrentWheel(selectedWheel);
+    }
+  }, [selectedGame, selectedWheel]);
+
+  // Format percentage - helper function (not a hook, safe to define after hooks)
+  const formatPercent = (value: number, total: number): string => {
+    if (total === 0) return '0%';
+    return `${((value / total) * 100).toFixed(1)}%`;
+  };
+
+  // Get color for period type - helper function
+  const getPeriodColor = (type: string): string => {
+    switch (type) {
+      case 'lucky':
+        return 'text-success';
+      case 'unlucky':
+        return 'text-error';
+      default:
+        return 'text-warning';
+    }
+  };
+
+  // Get period label - helper function
+  const getPeriodLabel = (type: string): string => {
+    switch (type) {
+      case 'lucky':
+        return '🍀 Periodo Fortunato';
+      case 'unlucky':
+        return '⚠️ Periodo Sfortunato';
+      default:
+        return '📊 Periodo Normale';
+    }
+  };
+
+  // Early return AFTER all hooks
   if (!stats || stats.totalPlays === 0) {
     return (
       <div className="card mb-8">
@@ -186,43 +224,6 @@ const MatchVarianceAnalysis: React.FC<MatchVarianceAnalysisProps> = ({
       </div>
     );
   }
-
-  // Format percentage
-  const formatPercent = (value: number, total: number): string => {
-    if (total === 0) return '0%';
-    return `${((value / total) * 100).toFixed(1)}%`;
-  };
-
-  // Get color for period type
-  const getPeriodColor = (type: string): string => {
-    switch (type) {
-      case 'lucky':
-        return 'text-success';
-      case 'unlucky':
-        return 'text-error';
-      default:
-        return 'text-warning';
-    }
-  };
-
-  // Get period label
-  const getPeriodLabel = (type: string): string => {
-    switch (type) {
-      case 'lucky':
-        return '🍀 Periodo Fortunato';
-      case 'unlucky':
-        return '⚠️ Periodo Sfortunato';
-      default:
-        return '📊 Periodo Normale';
-    }
-  };
-
-  // Update wheel when selectedGame changes
-  useEffect(() => {
-    if (selectedGame === 'lotto' && selectedWheel) {
-      setCurrentWheel(selectedWheel);
-    }
-  }, [selectedGame, selectedWheel]);
 
   return (
     <div className="card mb-8">
