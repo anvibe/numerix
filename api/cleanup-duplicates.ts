@@ -29,11 +29,13 @@ function getSupabaseClient() {
 function getExtractionKey(extraction: {
   extraction_date: string;
   numbers: number[];
+  wheels: unknown;
   jolly: number | null;
   superstar: number | null;
 }): string {
   const sortedNumbers = [...extraction.numbers].sort((a, b) => a - b).join(',');
-  return `${extraction.extraction_date}|${sortedNumbers}|${extraction.jolly || 'null'}|${extraction.superstar || 'null'}`;
+  const wheelsStr = extraction.wheels != null ? JSON.stringify(extraction.wheels) : 'null';
+  return `${extraction.extraction_date}|${sortedNumbers}|${wheelsStr}|${extraction.jolly ?? 'null'}|${extraction.superstar ?? 'null'}`;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -60,10 +62,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     const supabase = getSupabaseClient();
     
-    // Get all extractions for this game type
+    // Get all extractions for this game type (include wheels for Lotto duplicate key)
     const { data: extractions, error: fetchError } = await supabase
       .from('extractions')
-      .select('id, extraction_date, numbers, jolly, superstar, created_at')
+      .select('id, extraction_date, numbers, wheels, jolly, superstar, created_at')
       .eq('game_type', gameType)
       .order('created_at', { ascending: true }); // Order by created_at to keep the oldest one
     

@@ -3,6 +3,7 @@ import { Target, AlertCircle, Lightbulb, CheckCircle2, XCircle } from 'lucide-re
 import { useGame } from '../../context/GameContext';
 import { GeneratedCombination, ExtractedNumbers, LottoWheel } from '../../types';
 import NumberBubble from '../common/NumberBubble';
+import { getPrizeInfo, PRIZE_DISCLAIMER } from '../../utils/prizeTables';
 
 interface MatchAnalysis {
   savedCombination: GeneratedCombination;
@@ -698,6 +699,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
           {showSuggestions ? 'Nascondi' : 'Mostra'} Suggerimenti
         </button>
       </div>
+      <p className="text-xs text-text-secondary mb-6">{PRIZE_DISCLAIMER}</p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         {selectedGame === 'lotto' && gameConfig?.wheels && (
@@ -982,6 +984,14 @@ const SavedCombinationsAnalysis: React.FC = () => {
                       {matchCount}/{gameConfig?.numbersToSelect ?? '?'}
                     </div>
                     <div className="text-xs text-text-secondary">Match</div>
+                    {matchCount >= 1 && (() => {
+                      const prize = getPrizeInfo(selectedGame, matchCount);
+                      return prize ? (
+                        <div className="mt-1 text-xs font-medium text-success">
+                          {prize.category}: {prize.indicativeAmount}
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
                 </div>
 

@@ -5,6 +5,13 @@ import { Database } from '../types/supabase';
 type ExtractionsRow = Database['public']['Tables']['extractions']['Row'];
 type ExtractionsInsert = Database['public']['Tables']['extractions']['Insert'];
 
+// Unique key for deduplication (same as API: date + numbers + wheels + jolly + superstar)
+function getExtractionKey(extraction: ExtractedNumbers): string {
+  const sortedNumbers = [...extraction.numbers].sort((a, b) => a - b).join(',');
+  const wheelsStr = extraction.wheels != null ? JSON.stringify(extraction.wheels) : 'null';
+  return `${extraction.date}|${sortedNumbers}|${wheelsStr}|${extraction.jolly ?? 'null'}|${extraction.superstar ?? 'null'}`;
+}
+
 // Convert database row to ExtractedNumbers type
 const convertRowToExtraction = (row: ExtractionsRow): ExtractedNumbers => {
   return {
@@ -91,8 +98,20 @@ export const extractionService = {
       if (totalCount !== null && allData.length !== totalCount) {
         console.warn(`[ExtractionService] WARNING: Expected ${totalCount} extractions but loaded ${allData.length} for ${gameType}`);
       }
-      
-      return allData.map(convertRowToExtraction);
+
+      const mapped = allData.map(convertRowToExtraction);
+      // Deduplicate by (date, numbers, wheels, jolly, superstar) - keep first occurrence (order already by extraction_date desc)
+      const seen = new Set<string>();
+      const deduped = mapped.filter((ext) => {
+        const key = getExtractionKey(ext);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      if (deduped.length < mapped.length) {
+        console.log(`[ExtractionService] Deduplicated ${gameType}: ${mapped.length} → ${deduped.length} (removed ${mapped.length - deduped.length} duplicates)`);
+      }
+      return deduped;
     } catch (error) {
       console.error('Error in getExtractions:', error);
       return [];
