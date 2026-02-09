@@ -1,0 +1,18 @@
+# Duplicate app (not used in deploy)
+project/
+
+# Docs and scripts (not needed for build)
+*.md
+!README.md
+.bolt
+sql
+*.sh
+
+# Tests (run locally only)
+src/**/*.test.ts
+src/**/*.test.tsx
+src/**/*.spec.ts
+src/test
+
+# Supabase local / temp
+supabase/.temp
