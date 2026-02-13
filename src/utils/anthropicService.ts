@@ -35,7 +35,10 @@ class AnthropicService {
   private getClient(): Anthropic | null {
     const apiKey = getAnthropicKey();
     if (!apiKey) return null;
-    return new Anthropic({ apiKey });
+    return new Anthropic({
+      apiKey,
+      dangerouslyAllowBrowser: true, // Same as OpenAI: frontend calls; use backend proxy in production
+    });
   }
 
   isAvailable(): boolean {
