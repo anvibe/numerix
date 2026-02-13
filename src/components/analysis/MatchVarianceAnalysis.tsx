@@ -31,7 +31,7 @@ const MatchVarianceAnalysis: React.FC<MatchVarianceAnalysisProps> = ({
 }) => {
   const { selectedGame, gameConfig } = useGame();
   const [currentWheel, setCurrentWheel] = useState<LottoWheel>(selectedWheel || 'Bari');
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true); // closed by default
 
   // Get probabilities for the selected game
   const getProbabilities = (): LotteryProbabilities => {
