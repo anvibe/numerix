@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, LogIn, LogOut, UserPlus, Eye, EyeOff } from 'lucide-react';
+import { User, LogIn, LogOut, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../../utils/supabaseClient';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { showToast } from '../../utils/toast';
@@ -386,7 +386,7 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
                   </div>
                   <h2 className="text-xl font-semibold mb-2">Benvenuto in Numerix</h2>
                   <p className="text-text-secondary text-sm">
-                    Per utilizzare l'applicazione e salvare i tuoi dati, effettua l'accesso o registrati.
+                    Per utilizzare l'applicazione e salvare i tuoi dati, effettua l'accesso.
                   </p>
                 </div>
                 
@@ -401,26 +401,13 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
                     <LogIn className="h-5 w-5 mr-2" />
                     Accedi
                   </button>
-                  
-                  <button
-                    onClick={() => {
-                      setShowAuth(true);
-                      setIsSignUp(true);
-                    }}
-                    className="btn btn-outline w-full flex items-center justify-center"
-                  >
-                    <UserPlus className="h-5 w-5 mr-2" />
-                    Registrati
-                  </button>
                 </div>
               </div>
             ) : (
               <div className="card bg-bg-primary/90 backdrop-blur-sm shadow-xl border-2 border-gray-300 dark:border-gray-700">
-                <h2 className="text-xl font-semibold mb-4">
-                  {isSignUp ? 'Registrazione' : 'Accesso'}
-                </h2>
+                <h2 className="text-xl font-semibold mb-4">Accesso</h2>
                 
-                <form onSubmit={isSignUp ? handleSignUp : handleSignIn} className="space-y-4">
+                <form onSubmit={handleSignIn} className="space-y-4">
                   <div>
                     <label htmlFor="email" className="block text-sm font-medium text-text-secondary mb-1">
                       Email
@@ -515,27 +502,10 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
                   <button
                     type="submit"
                     className="btn btn-primary w-full"
-                    disabled={emailConfirmationSent}
                   >
-                    {isSignUp ? 'Registrati' : 'Accedi'}
+                    Accedi
                   </button>
                 </form>
-                
-                <div className="mt-4 text-center">
-                  <button
-                    onClick={() => {
-                      setIsSignUp(!isSignUp);
-                      setEmailConfirmationSent(false);
-                      setError('');
-                    }}
-                    className="text-primary hover:underline text-sm"
-                  >
-                    {isSignUp 
-                      ? 'Hai già un account? Accedi' 
-                      : 'Non hai un account? Registrati'
-                    }
-                  </button>
-                </div>
                 
                 <div className="mt-4 text-center">
                   <button
