@@ -35,7 +35,8 @@ interface GameContextType {
     jolly?: number,
     superstar?: number,
     isAI?: boolean,
-    isAdvancedAI?: boolean
+    isAdvancedAI?: boolean,
+    aiProvider?: 'openai' | 'anthropic'
   ) => void;
   deleteCombination: (id: string) => void;
   clearCombinations: () => void;
@@ -326,7 +327,8 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
                   jolly: combo.jolly,
                   superstar: combo.superstar,
                   isAI: combo.isAI,
-                  isAdvancedAI: combo.isAdvancedAI
+                  isAdvancedAI: combo.isAdvancedAI,
+                  aiProvider: combo.aiProvider
                 });
               } catch (error) {
                 console.error('Error migrating saved combination:', error);
@@ -446,7 +448,8 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     jolly?: number,
     superstar?: number,
     isAI?: boolean,
-    isAdvancedAI?: boolean
+    isAdvancedAI?: boolean,
+    aiProvider?: 'openai' | 'anthropic'
   ) => {
     try {
       await combinationService.saveCombination({
@@ -457,7 +460,8 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         jolly,
         superstar,
         isAI,
-        isAdvancedAI
+        isAdvancedAI,
+        aiProvider
       });
       
       // Reload saved combinations (with deduplication)

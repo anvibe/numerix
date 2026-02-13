@@ -1,4 +1,4 @@
-import { supabase } from '../utils/supabaseClient';
+import { supabase, requireAuth } from '../utils/supabaseClient';
 import { ExtractedNumbers, GameType, LottoWheel } from '../types';
 import { Database } from '../types/supabase';
 
@@ -23,10 +23,11 @@ const convertRowToExtraction = (row: ExtractionsRow): ExtractedNumbers => {
   };
 };
 
-// Convert ExtractedNumbers to database insert format
+// Convert ExtractedNumbers to database insert format (created_by must be set by caller for RLS)
 const convertExtractionToInsert = (
   gameType: GameType,
-  extraction: ExtractedNumbers
+  extraction: ExtractedNumbers,
+  createdBy: string
 ): ExtractionsInsert => {
   return {
     game_type: gameType,
@@ -35,6 +36,7 @@ const convertExtractionToInsert = (
     wheels: extraction.wheels || null,
     jolly: extraction.jolly || null,
     superstar: extraction.superstar || null,
+    created_by: createdBy,
   };
 };
 
@@ -118,11 +120,12 @@ export const extractionService = {
     }
   },
 
-  // Add a new extraction
+  // Add a new extraction (requires auth; created_by set for RLS)
   async addExtraction(gameType: GameType, extraction: ExtractedNumbers): Promise<void> {
     try {
-      const insertData = convertExtractionToInsert(gameType, extraction);
-      
+      const user = await requireAuth();
+      const insertData = convertExtractionToInsert(gameType, extraction, user.id);
+
       const { error } = await supabase
         .from('extractions')
         .insert(insertData);
@@ -137,22 +140,18 @@ export const extractionService = {
     }
   },
 
-  // Bulk insert extractions (useful for CSV imports)
+  // Bulk insert extractions (useful for CSV imports; requires auth for RLS)
   async bulkInsertExtractions(gameType: GameType, extractions: ExtractedNumbers[]): Promise<void> {
     try {
-      const insertData = extractions.map(extraction => 
-        convertExtractionToInsert(gameType, extraction)
+      const user = await requireAuth();
+      const insertData = extractions.map(extraction =>
+        convertExtractionToInsert(gameType, extraction, user.id)
       );
 
-      // Insert in batches to avoid hitting limits
       const batchSize = 100;
       for (let i = 0; i < insertData.length; i += batchSize) {
         const batch = insertData.slice(i, i + batchSize);
-        
-        const { error } = await supabase
-          .from('extractions')
-          .insert(batch);
-
+        const { error } = await supabase.from('extractions').insert(batch);
         if (error) {
           console.error('Error in bulk insert batch:', error);
           throw error;
@@ -164,21 +163,22 @@ export const extractionService = {
     }
   },
 
-  // Replace all extractions for a game type (useful for CSV uploads)
+  // Replace all extractions for a game type that this user created (useful for CSV uploads)
   async replaceExtractions(gameType: GameType, extractions: ExtractedNumbers[]): Promise<void> {
     try {
-      // First, delete existing extractions for this game type
+      const user = await requireAuth();
+      // Delete only rows this user created for this game type (RLS requires created_by = auth.uid())
       const { error: deleteError } = await supabase
         .from('extractions')
         .delete()
-        .eq('game_type', gameType);
+        .eq('game_type', gameType)
+        .eq('created_by', user.id);
 
       if (deleteError) {
         console.error('Error deleting existing extractions:', deleteError);
         throw deleteError;
       }
 
-      // Then insert new extractions
       await this.bulkInsertExtractions(gameType, extractions);
     } catch (error) {
       console.error('Error in replaceExtractions:', error);

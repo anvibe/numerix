@@ -33,7 +33,13 @@ Devi configurare queste variabili in **Vercel Dashboard → Il tuo progetto → 
 - **Valore**: La tua API key di OpenAI
 - **Dove trovarla**: https://platform.openai.com/api-keys
 
-### 5. ScraperAPI Key (per scraping automatico - RACCOMANDATO se hai problemi con 403)
+### 5. Anthropic API Key (opzionale, alternativa a OpenAI)
+- **Nome**: `VITE_ANTHROPIC_API_KEY`
+- **Valore**: La tua API key di Anthropic (Claude)
+- **Dove trovarla**: https://console.anthropic.com/settings/keys
+- **Nota**: Usa l’interruttore “OpenAI | Anthropic” nella barra in alto per scegliere quale provider usare.
+
+### 6. ScraperAPI Key (per scraping automatico - RACCOMANDATO se hai problemi con 403)
 - **Nome**: `SCRAPER_API_KEY`
 - **Valore**: La tua API key di ScraperAPI
 - **Dove trovarla**: https://www.scraperapi.com/ (registrazione gratuita, 1000 richieste/mese)

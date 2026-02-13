@@ -17,6 +17,7 @@ export default defineConfig({
           'chart-vendor': ['chart.js', 'react-chartjs-2'],
           'supabase-vendor': ['@supabase/supabase-js'],
           'openai-vendor': ['openai'],
+          'anthropic-vendor': ['@anthropic-ai/sdk'],
           'export-vendor': ['jspdf', 'file-saver'],
         },
       },

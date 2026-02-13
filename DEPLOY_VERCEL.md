@@ -57,6 +57,7 @@ git push -u origin main
      VITE_SUPABASE_URL=https://your-project.supabase.co
      VITE_SUPABASE_ANON_KEY=your-anon-key
      VITE_OPENAI_API_KEY=your-openai-key (optional)
+     VITE_ANTHROPIC_API_KEY=your-anthropic-key (optional)
      ```
    - Make sure to add them for:
      - ✅ Production
@@ -90,7 +91,8 @@ git push -u origin main
    ```bash
    vercel env add VITE_SUPABASE_URL
    vercel env add VITE_SUPABASE_ANON_KEY
-   vercel env add VITE_OPENAI_API_KEY  # Optional
+   vercel env add VITE_OPENAI_API_KEY   # Optional
+   vercel env add VITE_ANTHROPIC_API_KEY  # Optional
    ```
    - Enter values when prompted
    - Select environments (Production, Preview, Development)
@@ -112,6 +114,7 @@ git push -u origin main
 
 ### Optional:
 - `VITE_OPENAI_API_KEY` - OpenAI API key for advanced AI features
+- `VITE_ANTHROPIC_API_KEY` - Anthropic API key (alternative to OpenAI); use the header switch to choose provider
 
 ## Getting Your Supabase Credentials
 

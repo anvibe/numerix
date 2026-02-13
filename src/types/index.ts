@@ -45,6 +45,8 @@ export interface GeneratedCombination {
   superstar?: number;
   isAI?: boolean;
   isAdvancedAI?: boolean;
+  /** When isAdvancedAI is true: 'openai' | 'anthropic'. Legacy rows may be undefined (display as OpenAI). */
+  aiProvider?: 'openai' | 'anthropic';
 }
 
 export interface UnsuccessfulCombination {

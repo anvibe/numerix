@@ -1,10 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ThemeToggle from './ThemeToggle';
 import GameRules from './GameRules';
 import { BookOpen } from 'lucide-react';
+import { getCurrentAIProvider, setCurrentAIProvider } from '../../utils/aiProvider';
+import { openAIService } from '../../utils/openaiService';
+import { anthropicService } from '../../utils/anthropicService';
 
 const Header: React.FC = () => {
   const [showRules, setShowRules] = useState(false);
+  const [provider, setProvider] = useState<'openai' | 'anthropic'>(getCurrentAIProvider);
+
+  const openAIAvailable = openAIService.isAvailable();
+  const anthropicAvailable = anthropicService.isAvailable();
+  const showProviderSwitch = openAIAvailable || anthropicAvailable;
+
+  useEffect(() => {
+    const current = getCurrentAIProvider();
+    const available = current === 'openai' ? openAIAvailable : anthropicAvailable;
+    if (!available && (openAIAvailable || anthropicAvailable)) {
+      const fallback = openAIAvailable ? 'openai' : 'anthropic';
+      setCurrentAIProvider(fallback);
+      setProvider(fallback);
+    } else {
+      setProvider(current);
+    }
+  }, [openAIAvailable, anthropicAvailable]);
+
+  const handleProviderChange = (p: 'openai' | 'anthropic') => {
+    if (p === 'anthropic' && !anthropicAvailable) return;
+    if (p === 'openai' && !openAIAvailable) return;
+    setCurrentAIProvider(p);
+    setProvider(p);
+  };
 
   return (
     <>
@@ -49,6 +76,28 @@ const Header: React.FC = () => {
           
           {/* Actions on the right */}
           <div className="flex items-center space-x-2">
+            {showProviderSwitch && (
+              <div className="flex rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden" role="group" aria-label="AI provider">
+                <button
+                  type="button"
+                  onClick={() => handleProviderChange('openai')}
+                  disabled={!openAIAvailable}
+                  title="Use OpenAI for AI recommendations"
+                  className={`px-2.5 py-1.5 text-xs font-medium transition-colors ${provider === 'openai' ? 'bg-primary text-white' : 'bg-bg-primary text-text-secondary hover:bg-bg-secondary'} ${!openAIAvailable ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  OpenAI
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleProviderChange('anthropic')}
+                  disabled={!anthropicAvailable}
+                  title="Use Anthropic for AI recommendations"
+                  className={`px-2.5 py-1.5 text-xs font-medium transition-colors border-l border-gray-300 dark:border-gray-600 ${provider === 'anthropic' ? 'bg-primary text-white' : 'bg-bg-primary text-text-secondary hover:bg-bg-secondary'} ${!anthropicAvailable ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  Anthropic
+                </button>
+              </div>
+            )}
             <button
               onClick={() => setShowRules(true)}
               className="p-2 rounded-full hover:bg-bg-secondary transition-colors"

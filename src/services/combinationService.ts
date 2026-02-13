@@ -8,7 +8,10 @@ type UnsuccessfulCombinationsRow = Database['public']['Tables']['unsuccessful_co
 type UnsuccessfulCombinationsInsert = Database['public']['Tables']['unsuccessful_combinations']['Insert'];
 
 // Convert database row to GeneratedCombination type
-const convertRowToGeneratedCombination = (row: SavedCombinationsRow): GeneratedCombination => {
+const convertRowToGeneratedCombination = (row: SavedCombinationsRow & { ai_provider?: string | null }): GeneratedCombination => {
+  const raw = row as Record<string, unknown>;
+  const ap = raw.ai_provider as string | undefined | null;
+  const aiProvider = ap === 'openai' || ap === 'anthropic' ? ap : undefined;
   return {
     id: row.id,
     gameType: row.game_type,
@@ -20,6 +23,7 @@ const convertRowToGeneratedCombination = (row: SavedCombinationsRow): GeneratedC
     superstar: row.superstar || undefined,
     isAI: row.is_ai,
     isAdvancedAI: row.is_advanced_ai,
+    aiProvider,
   };
 };
 
@@ -57,6 +61,12 @@ export const combinationService = {
       }
 
       const allCombinations = data.map(convertRowToGeneratedCombination);
+      if (process.env.NODE_ENV === 'development' && allCombinations.length > 0) {
+        const withAdvanced = allCombinations.filter(c => c.isAdvancedAI);
+        if (withAdvanced.length > 0) {
+          console.debug('[Numerix] Loaded saved combinations: sample advanced-AI row', { isAdvancedAI: withAdvanced[0].isAdvancedAI, aiProvider: withAdvanced[0].aiProvider });
+        }
+      }
       
       // Deduplicate by ID first
       const uniqueByIdMap = new Map<string, GeneratedCombination>();
@@ -167,6 +177,7 @@ export const combinationService = {
         superstar: combination.superstar || null,
         is_ai: combination.isAI || false,
         is_advanced_ai: combination.isAdvancedAI || false,
+        ai_provider: combination.isAdvancedAI && (combination.aiProvider === 'openai' || combination.aiProvider === 'anthropic') ? combination.aiProvider : null,
       };
 
       const { error } = await supabase

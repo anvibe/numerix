@@ -18,6 +18,7 @@ export interface Database {
           wheels: Json | null
           jolly: number | null
           superstar: number | null
+          created_by: string | null
           created_at: string
         }
         Insert: {
@@ -28,6 +29,7 @@ export interface Database {
           wheels?: Json | null
           jolly?: number | null
           superstar?: number | null
+          created_by?: string | null
           created_at?: string
         }
         Update: {
@@ -38,6 +40,7 @@ export interface Database {
           wheels?: Json | null
           jolly?: number | null
           superstar?: number | null
+          created_by?: string | null
           created_at?: string
         }
       }
@@ -53,6 +56,7 @@ export interface Database {
           superstar: number | null
           is_ai: boolean
           is_advanced_ai: boolean
+          ai_provider: string | null
           created_at: string
         }
         Insert: {
@@ -66,6 +70,7 @@ export interface Database {
           superstar?: number | null
           is_ai?: boolean
           is_advanced_ai?: boolean
+          ai_provider?: string | null
           created_at?: string
         }
         Update: {
@@ -79,6 +84,7 @@ export interface Database {
           superstar?: number | null
           is_ai?: boolean
           is_advanced_ai?: boolean
+          ai_provider?: string | null
           created_at?: string
         }
       }

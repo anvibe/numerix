@@ -1,58 +1,49 @@
-import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 import { GameType, GameStatistics, LottoWheel, UnsuccessfulCombination, ExtractedNumbers } from '../types';
 import { getGameByType } from './generators';
 import { buildSystemPrompt, buildUserContext, validateAIResponse } from './aiPromptBuilder';
 
-const OPENAI_KEY_STORAGE = 'numerix-openai-key';
+const ANTHROPIC_KEY_STORAGE = 'numerix-anthropic-key';
 
-function getOpenAIKey(): string | undefined {
+function getAnthropicKey(): string | undefined {
   if (typeof window !== 'undefined') {
-    const win = window as unknown as { __VITE_OPENAI_API_KEY?: string };
-    if (win.__VITE_OPENAI_API_KEY) return win.__VITE_OPENAI_API_KEY;
-    const stored = localStorage.getItem(OPENAI_KEY_STORAGE);
+    const win = window as unknown as { __VITE_ANTHROPIC_API_KEY?: string };
+    if (win.__VITE_ANTHROPIC_API_KEY) return win.__VITE_ANTHROPIC_API_KEY;
+    const stored = localStorage.getItem(ANTHROPIC_KEY_STORAGE);
     if (stored) return stored;
   }
-  return import.meta.env.VITE_OPENAI_API_KEY;
+  return import.meta.env.VITE_ANTHROPIC_API_KEY;
 }
 
-// OpenAI service class with latest models support
-class OpenAIService {
-  private model: string = 'gpt-4o';
+const ANTHROPIC_MODELS = [
+  'claude-sonnet-4-20250514',
+  'claude-3-5-sonnet-20241022',
+  'claude-3-opus-20240229',
+  'claude-3-haiku-20240307'
+];
 
-  private availableModels = [
-    'gpt-4o', 'gpt-4-turbo', 'gpt-4o-mini', 'gpt-4', 'gpt-3.5-turbo'
-  ];
+class AnthropicService {
+  private model: string = 'claude-sonnet-4-20250514';
 
   constructor() {
-    const modelOverride = import.meta.env.VITE_OPENAI_MODEL;
-    if (modelOverride && this.availableModels.includes(modelOverride)) {
-      this.model = modelOverride;
+    const override = import.meta.env.VITE_ANTHROPIC_MODEL;
+    if (override && ANTHROPIC_MODELS.includes(override)) {
+      this.model = override;
     }
   }
 
-  private getClient(): OpenAI | null {
-    const apiKey = getOpenAIKey();
+  private getClient(): Anthropic | null {
+    const apiKey = getAnthropicKey();
     if (!apiKey) return null;
-    return new OpenAI({
-      apiKey,
-      dangerouslyAllowBrowser: true
-    });
+    return new Anthropic({ apiKey });
   }
 
   isAvailable(): boolean {
-    return !!getOpenAIKey();
+    return !!getAnthropicKey();
   }
 
   getModel(): string {
     return this.model;
-  }
-
-  setModel(model: string): void {
-    if (this.availableModels.includes(model)) {
-      this.model = model;
-    } else {
-      console.warn(`Model ${model} not in available models. Using default: ${this.model}`);
-    }
   }
 
   async generateAIRecommendation(
@@ -71,7 +62,7 @@ class OpenAIService {
   }> {
     const client = this.getClient();
     if (!client) {
-      throw new Error('OpenAI client not configured. Please set VITE_OPENAI_API_KEY or add your key in Impostazioni.');
+      throw new Error('Anthropic client not configured. Please set VITE_ANTHROPIC_API_KEY or add your key in Impostazioni.');
     }
 
     const game = getGameByType(gameType);
@@ -86,19 +77,16 @@ class OpenAIService {
     const userContent = `${context}\n\nRequest ID: ${timestamp}-${randomSeed}\nGenerate a unique combination - avoid repeating previous recommendations.`;
 
     try {
-      const completion = await client.chat.completions.create({
+      const message = await client.messages.create({
         model: this.model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userContent }
-        ],
-        temperature: 0.8,
         max_tokens: 1500,
-        response_format: { type: 'json_object' }
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userContent }]
       });
 
-      const response = completion.choices[0]?.message?.content;
-      if (!response) throw new Error('No response from OpenAI');
+      const textBlock = message.content.find(block => block.type === 'text');
+      const response = textBlock && 'text' in textBlock ? textBlock.text : '';
+      if (!response) throw new Error('No response from Anthropic');
 
       let result: unknown;
       try {
@@ -111,7 +99,7 @@ class OpenAIService {
       validateAIResponse(result as Parameters<typeof validateAIResponse>[0], game);
       return result as { numbers: number[]; reasons: string[]; jolly?: number; superstar?: number; confidence: number };
     } catch (error) {
-      console.error('OpenAI API error:', error);
+      console.error('Anthropic API error:', error);
       throw new Error(`Failed to generate AI recommendation: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -120,18 +108,19 @@ class OpenAIService {
     const client = this.getClient();
     if (!client) return false;
     try {
-      const completion = await client.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: 'Test connection. Respond with \'OK\'.' }],
-        max_tokens: 10
+      const message = await client.messages.create({
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 10,
+        messages: [{ role: 'user', content: 'Test connection. Respond with \'OK\'.' }]
       });
-      return completion.choices[0]?.message?.content?.includes('OK') ?? false;
+      const textBlock = message.content.find(block => block.type === 'text');
+      const text = textBlock && 'text' in textBlock ? textBlock.text : '';
+      return text.includes('OK');
     } catch (error) {
-      console.error('OpenAI connection test failed:', error);
+      console.error('Anthropic connection test failed:', error);
       return false;
     }
   }
 }
 
-// Export singleton instance
-export const openAIService = new OpenAIService();
+export const anthropicService = new AnthropicService();

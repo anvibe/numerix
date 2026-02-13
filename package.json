@@ -3,7 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "vite",
     "dev:vercel": "vercel dev --listen 3000",
@@ -16,6 +18,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.74.0",
     "@supabase/supabase-js": "^2.53.0",
     "@types/cheerio": "^0.22.35",
     "@types/node-fetch": "^2.6.13",

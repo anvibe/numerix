@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Brain, Info, Settings, Sparkles, Zap } from 'lucide-react';
 import { generateAIRecommendation } from '../../utils/generators';
-import { openAIService } from '../../utils/openaiService';
+import { getCurrentAIService, getCurrentAIProvider, logProviderForRequest, AI_PROVIDER_CHANGED_EVENT } from '../../utils/aiProvider';
 import { useGame } from '../../context/GameContext';
 import NumberBubble from '../common/NumberBubble';
 import OpenAISettings from './OpenAISettings';
@@ -15,6 +15,7 @@ interface AIResult {
   superstar?: number;
   confidence?: number;
   isOpenAI?: boolean;
+  provider?: 'openai' | 'anthropic';
 }
 
 const AIRecommendation: React.FC = () => {
@@ -33,6 +34,7 @@ const AIRecommendation: React.FC = () => {
   const [useOpenAI, setUseOpenAI] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [error, setError] = useState<string>('');
+  const [providerLabel, setProviderLabel] = useState<'openai' | 'anthropic'>(getCurrentAIProvider);
   
   useEffect(() => {
     if (selectedGame === 'lotto' && gameConfig.wheels) {
@@ -40,8 +42,14 @@ const AIRecommendation: React.FC = () => {
     }
   }, [selectedGame, gameConfig.wheels]);
 
-  // Check if OpenAI is available
-  const isOpenAIAvailable = openAIService.isAvailable();
+  useEffect(() => {
+    const onProviderChange = () => setProviderLabel(getCurrentAIProvider());
+    window.addEventListener(AI_PROVIDER_CHANGED_EVENT, onProviderChange);
+    return () => window.removeEventListener(AI_PROVIDER_CHANGED_EVENT, onProviderChange);
+  }, []);
+
+  const cloudService = getCurrentAIService();
+  const isCloudAIAvailable = cloudService.isAvailable();
   
   const handleGenerateAI = async () => {
     setIsGenerating(true);
@@ -49,20 +57,22 @@ const AIRecommendation: React.FC = () => {
     setError('');
     
     try {
-      if (useOpenAI && isOpenAIAvailable) {
-        // Use OpenAI for advanced AI recommendation with advanced statistics
-        const result = await openAIService.generateAIRecommendation(
+      if (useOpenAI && isCloudAIAvailable) {
+        logProviderForRequest();
+        const provider = getCurrentAIProvider();
+        const result = await cloudService.generateAIRecommendation(
           selectedGame,
           gameStats,
           unsuccessfulCombinations,
           extractionsData[selectedGame],
           selectedGame === 'lotto' ? selectedWheel : undefined,
-          gameStats.advancedStatistics // Pass advanced statistics
+          gameStats.advancedStatistics
         );
         
         setAiResult({
           ...result,
-          isOpenAI: true
+          isOpenAI: true,
+          provider
         });
       } else {
         // Use local AI recommendation with advanced statistics
@@ -91,12 +101,13 @@ const AIRecommendation: React.FC = () => {
             selectedGame, 
             gameStats,
             selectedGame === 'lotto' ? selectedWheel : undefined,
-            gameStats.advancedStatistics // Pass advanced statistics
+            gameStats.advancedStatistics
           );
           setAiResult({
             ...result,
             confidence: 75,
-            isOpenAI: false
+            isOpenAI: false,
+            provider: undefined
           });
         }, 500);
       }
@@ -119,8 +130,9 @@ const AIRecommendation: React.FC = () => {
         selectedGame === 'lotto' ? selectedWheel : undefined,
         aiResult.jolly,
         aiResult.superstar,
-        !aiResult.isOpenAI, // isAI (true for local AI, false for OpenAI)
-        !!aiResult.isOpenAI   // isAdvancedAI (true for OpenAI, false for local AI)
+        !aiResult.isOpenAI, // isAI (true for local AI, false for cloud)
+        !!aiResult.isOpenAI, // isAdvancedAI (true for cloud AI)
+        aiResult.isOpenAI ? aiResult.provider : undefined // aiProvider: openai | anthropic when advanced
       ).then(() => {
         showToast.success('Combinazione AI salvata con successo!');
       }).catch((error) => {
@@ -148,11 +160,11 @@ const AIRecommendation: React.FC = () => {
       
       <div className="mb-6">
         <p className="text-sm text-text-secondary mb-4">
-          {isOpenAIAvailable ? (
+          {isCloudAIAvailable ? (
             <>
               Utilizza l'intelligenza artificiale avanzata per analizzare pattern statistici, probabilità bayesiane, 
-              co-occorrenze e distribuzioni ottimali. Puoi scegliere tra l'AI locale (gratuita) o l'AI avanzata di OpenAI 
-              (più sofisticata, con analisi distribuzionale e calcoli probabilistici avanzati).
+              co-occorrenze e distribuzioni ottimali. Puoi scegliere tra l'AI locale (gratuita) o l'AI avanzata (OpenAI o Anthropic: 
+              seleziona il provider nella barra in alto).
             </>
           ) : (
             <>
@@ -166,7 +178,7 @@ const AIRecommendation: React.FC = () => {
       
       {showSettings && <OpenAISettings />}
       
-      {isOpenAIAvailable && (
+      {isCloudAIAvailable && (
         <div className="mb-6">
           <label className="block text-sm font-medium text-text-secondary mb-2">
             Tipo di AI
@@ -192,12 +204,12 @@ const AIRecommendation: React.FC = () => {
                 className="mr-2"
               />
               <Sparkles className="h-4 w-4 mr-1" />
-              AI Avanzata (OpenAI)
+              AI Avanzata ({providerLabel === 'anthropic' ? 'Anthropic' : 'OpenAI'})
             </label>
           </div>
           <p className="text-xs text-text-secondary mt-2">
             {useOpenAI ? (
-              <>✨ L'AI avanzata utilizza modelli GPT-4o con analisi distribuzionale, probabilità bayesiane e co-occorrenze per suggerimenti più accurati.</>
+              <>✨ L'AI avanzata utilizza {providerLabel === 'anthropic' ? 'Anthropic (Claude)' : 'OpenAI (GPT-4o)'} con analisi distribuzionale, probabilità bayesiane e co-occorrenze. Controlla la console per il debug del provider.</>
             ) : (
               <>🧠 L'AI locale utilizza algoritmi di apprendimento locale con statistiche avanzate per generare combinazioni ottimizzate.</>
             )}
@@ -306,7 +318,7 @@ const AIRecommendation: React.FC = () => {
           
           {aiResult.isOpenAI && (
             <div className="mt-3 p-2 bg-primary/10 border border-primary/20 rounded text-xs text-primary">
-              ✨ Questa raccomandazione è stata generata utilizzando l'AI avanzata di OpenAI
+              ✨ Questa raccomandazione è stata generata utilizzando l'AI avanzata ({aiResult.provider === 'anthropic' ? 'Anthropic' : 'OpenAI'})
             </div>
           )}
         </div>
@@ -325,7 +337,7 @@ const AIRecommendation: React.FC = () => {
             </>
           ) : (
             <>
-              {(useOpenAI && isOpenAIAvailable) ? (
+              {(useOpenAI && isCloudAIAvailable) ? (
                 <>
                   <Sparkles className="mr-2 h-5 w-5" />
                   Genera con AI Avanzata

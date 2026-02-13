@@ -76,19 +76,32 @@ const SavedCombinations: React.FC = () => {
   };
   
   const getStrategyDisplay = (combo: typeof savedCombinations[0]) => {
-    // Check for AI Avanzata first (OpenAI)
-    if (combo.isAdvancedAI === true) {
+    if (combo.isAdvancedAI === true || combo.aiProvider === 'openai' || combo.aiProvider === 'anthropic') {
       return 'AI Avanzata';
     }
-    
-    // Check for AI Locale
-    if (combo.isAI === true) {
-      return 'AI Locale';
-    }
-    
-    // Regular strategies
+    if (combo.isAI === true) return 'AI Locale';
     return combo.strategy === 'standard' ? 'Standard' : 'Alta Variabilità';
   };
+
+  /** Provider for tag (OpenAI / Anthropic); null for non–advanced-AI */
+  const getProviderTag = (combo: typeof savedCombinations[0]): 'openai' | 'anthropic' | null => {
+    if (combo.aiProvider === 'anthropic') return 'anthropic';
+    if (combo.isAdvancedAI === true || combo.aiProvider === 'openai') return 'openai';
+    return null;
+  };
+
+  const ProviderTag: React.FC<{ provider: 'openai' | 'anthropic' }> = ({ provider }) => (
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+        provider === 'openai'
+          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
+          : 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
+      }`}
+      title={provider === 'openai' ? 'Generata con OpenAI (GPT)' : 'Generata con Anthropic (Claude)'}
+    >
+      {provider === 'openai' ? 'OpenAI' : 'Anthropic'}
+    </span>
+  );
   
   // Debug: Verify deduplication worked
   if (process.env.NODE_ENV === 'development') {
@@ -198,11 +211,22 @@ const SavedCombinations: React.FC = () => {
               )}
             </div>
           </div>
-          <div className="mt-3 text-sm text-text-secondary">
-            <span className="font-medium">Data:</span> {new Date(latestCombination.date).toLocaleDateString('it-IT')} | 
-            <span className="font-medium ml-2">Strategia:</span> {getStrategyDisplay(latestCombination)}
+          <div className="mt-3 text-sm text-text-secondary flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span><span className="font-medium">Data:</span> {new Date(latestCombination.date).toLocaleDateString('it-IT')}</span>
+            <span>|</span>
+            <span className="flex items-center gap-1.5">
+              <span className="font-medium">Strategia:</span>
+              {getStrategyDisplay(latestCombination)}
+              {(() => {
+                const tag = getProviderTag(latestCombination);
+                return tag ? <ProviderTag provider={tag} /> : null;
+              })()}
+            </span>
             {latestCombination.wheel && (
-              <> | <span className="font-medium ml-2">Ruota:</span> {latestCombination.wheel}</>
+              <>
+                <span>|</span>
+                <span><span className="font-medium">Ruota:</span> {latestCombination.wheel}</span>
+              </>
             )}
           </div>
         </div>
@@ -277,7 +301,13 @@ const SavedCombinations: React.FC = () => {
                     {new Date(combo.date).toLocaleDateString('it-IT')}
                   </td>
                   <td className="py-3 px-4 border-b border-gray-200 dark:border-gray-700">
-                    {getStrategyDisplay(combo)}
+                    <span className="flex items-center gap-2 flex-wrap">
+                      {getStrategyDisplay(combo)}
+                      {(() => {
+                        const tag = getProviderTag(combo);
+                        return tag ? <ProviderTag provider={tag} /> : null;
+                      })()}
+                    </span>
                   </td>
                   <td className="py-3 px-4 border-b border-gray-200 dark:border-gray-700">
                     <button
