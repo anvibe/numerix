@@ -19,6 +19,29 @@ interface MatchAnalysis {
   } | null;
 }
 
+function getStrategyDisplay(combo: GeneratedCombination): string {
+  if (combo.isAdvancedAI === true || combo.aiProvider === 'openai' || combo.aiProvider === 'anthropic') return 'AI Avanzata';
+  if (combo.isAI === true) return 'AI Locale';
+  return combo.strategy === 'standard' ? 'Standard' : 'Alta Variabilità';
+}
+
+function getProviderTag(combo: GeneratedCombination): 'openai' | 'anthropic' | null {
+  if (combo.aiProvider === 'anthropic') return 'anthropic';
+  if (combo.isAdvancedAI === true || combo.aiProvider === 'openai') return 'openai';
+  return null;
+}
+
+const ProviderTag: React.FC<{ provider: 'openai' | 'anthropic' }> = ({ provider }) => (
+  <span
+    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+      provider === 'openai' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
+    }`}
+    title={provider === 'openai' ? 'Generata con OpenAI (GPT)' : 'Generata con Anthropic (Claude)'}
+  >
+    {provider === 'openai' ? 'OpenAI' : 'Anthropic'}
+  </span>
+);
+
 const SavedCombinationsAnalysis: React.FC = () => {
   const { 
     selectedGame, 
@@ -739,7 +762,8 @@ const SavedCombinationsAnalysis: React.FC = () => {
                   {combo.wheel && ` (${combo.wheel})`}
                   {combo.jolly && ` - Jolly: ${combo.jolly}`}
                   {combo.superstar && ` - Superstar: ${combo.superstar}`}
-                  {` - ${new Date(combo.date).toLocaleDateString('it-IT')}`}
+                  {` - ${new Date(combo.date).toLocaleDateString('it-IT')} - ${getStrategyDisplay(combo)}`}
+                  {getProviderTag(combo) && ` (${getProviderTag(combo) === 'anthropic' ? 'Anthropic' : 'OpenAI'})`}
                 </option>
               ))}
             </select>
@@ -998,18 +1022,19 @@ const SavedCombinationsAnalysis: React.FC = () => {
                 <div className="grid md:grid-cols-2 gap-6 mb-4">
                   {/* Saved Combination */}
                   <div className={`p-4 rounded-lg border-2 ${matchCount === 0 ? 'bg-bg-secondary border-warning/30' : matchCount === gameConfig?.numbersToSelect ? 'bg-success/10 border-success/30' : 'bg-bg-secondary border-gray-300 dark:border-gray-700'}`}>
-                    <div className="text-sm font-semibold text-text-secondary mb-3 flex items-center justify-between">
-                      <span>
-                        Tua Combinazione Salvata:
-                      </span>
-                      <div className="flex items-center gap-2">
+                    <div className="text-sm font-semibold text-text-secondary mb-3 flex items-center justify-between flex-wrap gap-2">
+                      <span>Tua Combinazione Salvata:</span>
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs text-text-secondary font-normal">
-                          Creata: {new Date(savedCombination.date).toLocaleDateString('it-IT', { 
-                            day: '2-digit', 
-                            month: '2-digit', 
-                            year: 'numeric' 
-                          })}
+                          Creata: {new Date(savedCombination.date).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                         </span>
+                        <span className="text-xs font-medium text-text-primary">
+                          {getStrategyDisplay(savedCombination)}
+                        </span>
+                        {(() => {
+                          const tag = getProviderTag(savedCombination);
+                          return tag ? <ProviderTag provider={tag} /> : null;
+                        })()}
                         {matchCount === 0 && (
                           <span className="text-xs text-warning font-medium">0 Match</span>
                         )}
