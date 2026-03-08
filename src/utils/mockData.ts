@@ -29,7 +29,7 @@ export const calculateFrequencies = (
   const counts = new Array(maxNumber + 1).fill(0);
   let totalExtractions = extractions.length;
   
-  if (process.env.NODE_ENV === 'development') {
+  if (process.env.NODE_ENV === 'development' && totalExtractions > 0) {
     console.log(`[calculateFrequencies] Processing ${totalExtractions} extractions${wheel ? ` for wheel ${wheel}` : ''}`);
   }
 

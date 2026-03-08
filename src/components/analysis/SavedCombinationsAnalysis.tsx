@@ -292,14 +292,17 @@ const SavedCombinationsAnalysis: React.FC = () => {
         let winningNumbers: number[];
         
         if (selectedGame === 'lotto') {
-          // LOTTO: Only use wheel-specific data, no fallback to prevent data pollution
-          winningNumbers = extraction.wheels?.[selectedWheel] || [];
+          // LOTTO: Prefer wheel-specific data; if missing (e.g. 07/03 Bari not in DB), fall back to extraction.numbers (often Bari or first wheel from sync)
+          winningNumbers = extraction.wheels?.[selectedWheel]?.length
+            ? extraction.wheels[selectedWheel]
+            : (extraction.numbers || []);
         } else {
           // NON-LOTTO (SuperEnalotto, etc.): Use main numbers
           winningNumbers = extraction.numbers || [];
         }
 
-        if (winningNumbers.length === 0) return; // Skip if no valid winning numbers
+        // Always include the extraction in results (even 0 matches or missing wheel data)
+        if (winningNumbers.length === 0 && selectedGame !== 'lotto') return; // Skip only for non-Lotto when no numbers
 
       // Find matches
       const matches = combo.numbers.filter(num => winningNumbers.includes(num));
@@ -438,11 +441,11 @@ const SavedCombinationsAnalysis: React.FC = () => {
     });
     
     filteredResults = Array.from(bestByExtraction.values()).sort((a, b) => {
-      // Sort by match count (best first), then by date (most recent first)
-      if (b.matchCount !== a.matchCount) {
-        return b.matchCount - a.matchCount;
-      }
-      return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
+      // Sort by extraction date (most recent first) so 07/03 appears before 06/03, then by match count
+      const dateA = new Date(a.extraction.date).getTime();
+      const dateB = new Date(b.extraction.date).getTime();
+      if (dateB !== dateA) return dateB - dateA;
+      return b.matchCount - a.matchCount;
     });
     
     // When a combination is selected, show ALL results including 0 matches
@@ -797,6 +800,20 @@ const SavedCombinationsAnalysis: React.FC = () => {
         </div>
       </div>
 
+      {/* Latest extraction in archive + hint for "Tutte" */}
+      {relevantExtractions.length > 0 && (
+        <div className="mb-4 p-3 bg-bg-secondary border border-gray-200 dark:border-gray-700 rounded-md">
+          <div className="text-sm text-text-secondary">
+            📅 Ultima estrazione in archivio: {formatDateKeyForDisplay(toLocalDateKey(relevantExtractions[0].date))} ({relevantExtractions.length} estrazioni)
+            {selectedCombinationId === null && (
+              <span className="block mt-1 text-xs">
+                Con «Tutte le combinazioni» viene mostrato solo il miglior match per ogni combinazione. Seleziona una combinazione dal menu sopra per vedere tutte le estrazioni (es. 06/03 e 07/03).
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Results */}
       <div className="space-y-6">
         {selectedCombinationId !== null && filteredResults.length > 0 && (() => {
@@ -1012,21 +1029,41 @@ const SavedCombinationsAnalysis: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {/* LOTTO: Only wheel-specific data, no fallback to prevent mixing */}
-                      {(selectedGame === 'lotto'
-                        ? (extraction.wheels?.[selectedWheel] || [])
-                        : (extraction.numbers || [])
-                      ).filter(num => num !== undefined && num !== null).map((num) => {
-                        const isMatch = matches.includes(num);
+                      {(() => {
+                        const wheelNums = selectedGame === 'lotto' ? (extraction.wheels?.[selectedWheel] || []) : [];
+                        const winningNums = selectedGame === 'lotto'
+                          ? (wheelNums.length ? wheelNums : (extraction.numbers || []))
+                          : (extraction.numbers || []);
+                        const valid = winningNums.filter(num => num !== undefined && num !== null);
+                        const usedFallback = selectedGame === 'lotto' && wheelNums.length === 0 && valid.length > 0;
+                        if (valid.length === 0) {
+                          return (
+                            <span className="text-sm text-text-secondary italic">
+                              Dati ruota ({selectedWheel}) non disponibili per questa estrazione
+                            </span>
+                          );
+                        }
                         return (
-                          <NumberBubble
-                            key={num}
-                            number={num}
-                            type={isMatch ? 'hot' : 'cold'}
-                            size="sm"
-                          />
+                          <>
+                            {usedFallback && (
+                              <span className="w-full text-xs text-text-secondary italic mb-1">
+                                Ruota {selectedWheel} non in archivio; mostrati numeri generici
+                              </span>
+                            )}
+                            {valid.map((num) => {
+                              const isMatch = matches.includes(num);
+                              return (
+                                <NumberBubble
+                                  key={num}
+                                  number={num}
+                                  type={isMatch ? 'hot' : 'cold'}
+                                  size="sm"
+                                />
+                              );
+                            })}
+                          </>
                         );
-                      })}
+                      })()}
                     </div>
                     {extraction.jolly && (
                       <div className="mt-3 text-xs text-text-secondary">
