@@ -31,6 +31,25 @@ function getProviderTag(combo: GeneratedCombination): 'openai' | 'anthropic' | n
   return null;
 }
 
+/** Calendar date YYYY-MM-DD for comparison. Date-only strings are returned as-is (no UTC parsing). */
+function toLocalDateKey(d: Date | string): string {
+  if (typeof d === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d.trim())) return d.trim();
+    d = new Date(d);
+  }
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Format YYYY-MM-DD as dd/mm/yyyy for display (no Date parsing to avoid timezone bugs). */
+function formatDateKeyForDisplay(dateKey: string): string {
+  if (!dateKey || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey.trim())) return dateKey;
+  const [y, m, d] = dateKey.trim().split('-');
+  return `${d}/${m}/${y}`;
+}
+
 const ProviderTag: React.FC<{ provider: 'openai' | 'anthropic' }> = ({ provider }) => (
   <span
     className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -100,24 +119,12 @@ const SavedCombinationsAnalysis: React.FC = () => {
   
   relevantCombinations = Array.from(finalUniqueNumbersMap.values());
 
-  // Apply date filter if set (after deduplication to filter final unique combinations)
+  // Apply date filter if set (after deduplication). Use calendar-day comparison so "from 7/03" includes 7 March.
   if (dateFilterFrom || dateFilterTo) {
     relevantCombinations = relevantCombinations.filter(combo => {
-      const comboDate = new Date(combo.date);
-      comboDate.setHours(0, 0, 0, 0);
-      
-      if (dateFilterFrom) {
-        const fromDate = new Date(dateFilterFrom);
-        fromDate.setHours(0, 0, 0, 0);
-        if (comboDate < fromDate) return false;
-      }
-      
-      if (dateFilterTo) {
-        const toDate = new Date(dateFilterTo);
-        toDate.setHours(23, 59, 59, 999); // Include the entire end date
-        if (comboDate > toDate) return false;
-      }
-      
+      const comboKey = toLocalDateKey(combo.date);
+      if (dateFilterFrom && comboKey < dateFilterFrom) return false;
+      if (dateFilterTo && comboKey > dateFilterTo) return false;
       return true;
     });
   }
@@ -139,22 +146,6 @@ const SavedCombinationsAnalysis: React.FC = () => {
         const sortedNumbers = [...combo.numbers].sort((a, b) => a - b);
         const numbersKey = `${sortedNumbers.join(',')}-${combo.gameType}`;
         relevantUniqueSet.add(numbersKey);
-      });
-      
-      console.log('🔍 Analysis Deduplication Status:', {
-        selectedGame,
-        totalSavedInContext: savedCombinations.length,
-        savedForGame: savedCombinations.filter(c => c.gameType === selectedGame).length,
-        savedUniqueByNumbers: savedUniqueSet.size,
-        relevantAfterDedup: relevantCombinations.length,
-        relevantUniqueByNumbers: relevantUniqueSet.size,
-        duplicatesInContext: savedCombinations.filter(c => c.gameType === selectedGame).length - savedUniqueSet.size,
-        duplicatesAfterDedup: relevantCombinations.length - relevantUniqueSet.size,
-        recommendation: relevantUniqueSet.size < relevantCombinations.length 
-          ? '⚠️ Use "Rimuovi Duplicati" button to clean database!' 
-          : relevantUniqueSet.size === savedUniqueSet.size 
-            ? '✅ Deduplication working correctly' 
-            : '✅ Some duplicates removed in analysis'
       });
       
       if (relevantUniqueSet.size < relevantCombinations.length) {
@@ -221,33 +212,28 @@ const SavedCombinationsAnalysis: React.FC = () => {
   if (selectedCombinationId !== null) {
     const selectedCombo = relevantCombinations.find(c => c.id === selectedCombinationId);
     if (selectedCombo) {
-      const comboDate = new Date(selectedCombo.date);
-      // Reset time to start of day for accurate date comparison
-      comboDate.setHours(0, 0, 0, 0);
+      const comboDateKey = toLocalDateKey(selectedCombo.date);
       
       // Debug logging
       if (process.env.NODE_ENV === 'development') {
         console.log('Filtering extractions by combination save date:', {
           combinationId: selectedCombo.id,
           combinationDate: selectedCombo.date,
-          combinationDateNormalized: comboDate.toISOString(),
+          comboDateKey,
           totalExtractions: relevantExtractions.length
         });
       }
       
       sortedExtractions = relevantExtractions.filter(ext => {
-        const extDate = new Date(ext.date);
-        // Reset time to start of day for accurate date comparison
-        extDate.setHours(0, 0, 0, 0);
-        // Only include extractions on or after the combination's save date
-        const shouldInclude = extDate >= comboDate;
+        const extDateKey = toLocalDateKey(ext.date);
+        const shouldInclude = extDateKey >= comboDateKey;
         
         if (process.env.NODE_ENV === 'development' && !shouldInclude) {
           console.log('Excluding extraction:', {
             extractionDate: ext.date,
-            extractionDateNormalized: extDate.toISOString(),
-            combinationDateNormalized: comboDate.toISOString(),
-            comparison: extDate >= comboDate
+            extDateKey,
+            comboDateKey,
+            comparison: shouldInclude
           });
         }
         
@@ -274,21 +260,18 @@ const SavedCombinationsAnalysis: React.FC = () => {
   // CRITICAL: For each saved combination, compare it with extractions that happened on or after its save date
   // Compare with ALL valid extractions to find the best matches
   combos.forEach(combo => {
-    const comboDate = new Date(combo.date);
-    comboDate.setHours(0, 0, 0, 0);
+    const comboDateKey = toLocalDateKey(combo.date);
     
     // Use the FULL list of extractions so each combination can be compared with all relevant extractions
     const extractionsToSearch = isShowingAllCombinations 
       ? relevantExtractions  // Use full list for "Tutte" mode
       : sortedExtractions;   // Use filtered list for specific combination mode
     
-    // Filter extractions to only include those on or after the combination's save date
-    // This includes extractions on the same day (>= means on or after)
-    // relevantExtractions is already sorted by date descending (most recent first)
+    // Filter extractions to only include those on or after the combination's save date (calendar day).
+    // Use date-only comparison so "saved on 7/03" always includes "extraction of 7/03" (no timezone shift).
     const validExtractions = extractionsToSearch.filter(ext => {
-      const extDate = new Date(ext.date);
-      extDate.setHours(0, 0, 0, 0);
-      return extDate >= comboDate; // Include extractions on the same day or after combo save date
+      const extDateKey = toLocalDateKey(ext.date);
+      return extDateKey >= comboDateKey;
     });
     
     // Skip this combination if no valid extractions exist (no point comparing)
@@ -301,17 +284,6 @@ const SavedCombinationsAnalysis: React.FC = () => {
     // For "Tutte" mode: compare with all extractions, then keep BEST match for display
     // For specific combination: compare with all valid extractions
     const extractionsToCompare = validExtractions; // Always compare with all valid extractions
-    
-    // Debug log to verify the logic
-    if (process.env.NODE_ENV === 'development' && isShowingAllCombinations) {
-      console.log('Comparing combination:', {
-        comboId: combo.id,
-        comboDate: combo.date,
-        comboDateNormalized: comboDate.toISOString(),
-        validExtractionsCount: validExtractions.length,
-        comparingWith: extractionsToCompare.length + ' extractions'
-      });
-    }
     
     // Compare this combination with the selected extractions
     extractionsToCompare.forEach(extraction => {
@@ -564,54 +536,9 @@ const SavedCombinationsAnalysis: React.FC = () => {
     ];
   }
 
-  // When a specific combination is selected, ensure we only show results for extractions >= combination save date
-  // This is already handled in the extraction filtering above, but ensure deduplication works correctly
-  if (selectedCombinationId !== null) {
-    // Create a set of valid combination number keys (deduplicated)
-    const validCombinationKeys = new Set<string>();
-    relevantCombinations.forEach(combo => {
-      const sortedNumbers = [...combo.numbers].sort((a, b) => a - b);
-      const numbersKey = `${sortedNumbers.join(',')}-${combo.gameType}`;
-      validCombinationKeys.add(numbersKey);
-    });
-    
-    // Deduplicate by combination ID first
-    const uniqueByIdMap = new Map<string, MatchAnalysis>();
-    filteredResults.forEach(result => {
-      const comboId = result.savedCombination.id;
-      const existing = uniqueByIdMap.get(comboId);
-      
-      // If no existing result, or if this one has better match, keep it
-      if (!existing || result.matchCount > existing.matchCount) {
-        uniqueByIdMap.set(comboId, result);
-      }
-    });
-    
-    // Also deduplicate by numbers (in case same combination has different IDs)
-    // AND filter to only include valid saved combinations
-    const uniqueByNumbersMap = new Map<string, MatchAnalysis>();
-    Array.from(uniqueByIdMap.values()).forEach(result => {
-      const sortedNumbers = [...result.savedCombination.numbers].sort((a, b) => a - b);
-      const numbersKey = `${sortedNumbers.join(',')}-${result.savedCombination.gameType}`;
-      
-      // Only include if this combination key exists in our saved combinations
-      if (!validCombinationKeys.has(numbersKey)) {
-        return; // Skip this result - it's not in our saved combinations
-      }
-      
-      const existing = uniqueByNumbersMap.get(numbersKey);
-      if (!existing || result.matchCount > existing.matchCount) {
-        uniqueByNumbersMap.set(numbersKey, result);
-      }
-    });
-    
-    filteredResults = Array.from(uniqueByNumbersMap.values()).sort((a, b) => {
-      if (b.matchCount !== a.matchCount) {
-        return b.matchCount - a.matchCount;
-      }
-      return new Date(b.extraction.date).getTime() - new Date(a.extraction.date).getTime();
-    });
-  }
+  // When a specific combination is selected we already have one result per extraction date (from bestByExtraction above).
+  // Do NOT collapse to a single "best" result — we want to show every extraction (6th, 7th, etc.).
+  // So we skip the per-combo deduplication here when viewing one combination.
 
   if (relevantCombinations.length === 0) {
     // Check if it's because of date filter
@@ -637,13 +564,13 @@ const SavedCombinationsAnalysis: React.FC = () => {
               <p className="text-text-secondary mb-4">
                 Nessuna combinazione trovata per il periodo selezionato.
                 {dateFilterFrom && dateFilterTo && (
-                  <> Periodo: dal {new Date(dateFilterFrom).toLocaleDateString('it-IT')} al {new Date(dateFilterTo).toLocaleDateString('it-IT')}</>
+                  <> Periodo: dal {formatDateKeyForDisplay(dateFilterFrom)} al {formatDateKeyForDisplay(dateFilterTo)}</>
                 )}
                 {dateFilterFrom && !dateFilterTo && (
-                  <> Dal {new Date(dateFilterFrom).toLocaleDateString('it-IT')} in poi</>
+                  <> Dal {formatDateKeyForDisplay(dateFilterFrom)} in poi</>
                 )}
                 {!dateFilterFrom && dateFilterTo && (
-                  <> Fino al {new Date(dateFilterTo).toLocaleDateString('it-IT')}</>
+                  <> Fino al {formatDateKeyForDisplay(dateFilterTo)}</>
                 )}
               </p>
               <button
@@ -814,13 +741,13 @@ const SavedCombinationsAnalysis: React.FC = () => {
         {(dateFilterFrom || dateFilterTo) && (
           <div className="mt-2 text-xs text-text-secondary">
             {dateFilterFrom && dateFilterTo && (
-              <>Mostrate combinazioni salvate dal {new Date(dateFilterFrom).toLocaleDateString('it-IT')} al {new Date(dateFilterTo).toLocaleDateString('it-IT')}</>
+              <>Mostrate combinazioni salvate dal {formatDateKeyForDisplay(dateFilterFrom)} al {formatDateKeyForDisplay(dateFilterTo)}</>
             )}
             {dateFilterFrom && !dateFilterTo && (
-              <>Mostrate combinazioni salvate dal {new Date(dateFilterFrom).toLocaleDateString('it-IT')} in poi</>
+              <>Mostrate combinazioni salvate dal {formatDateKeyForDisplay(dateFilterFrom)} in poi</>
             )}
             {!dateFilterFrom && dateFilterTo && (
-              <>Mostrate combinazioni salvate fino al {new Date(dateFilterTo).toLocaleDateString('it-IT')}</>
+              <>Mostrate combinazioni salvate fino al {formatDateKeyForDisplay(dateFilterTo)}</>
             )}
           </div>
         )}

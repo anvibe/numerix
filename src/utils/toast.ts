@@ -23,7 +23,16 @@ export const showToast = {
   loading: (message: string) => {
     return toast.loading(message);
   },
-  
+
+  /** Dismiss toast(s). Call with no args to dismiss all, or pass a toast id to dismiss that one. */
+  dismiss: (id?: string) => {
+    if (id !== undefined) {
+      toast.dismiss(id);
+    } else {
+      toast.dismiss();
+    }
+  },
+
   promise: <T,>(
     promise: Promise<T>,
     messages: {
