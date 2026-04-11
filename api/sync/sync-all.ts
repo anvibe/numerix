@@ -165,6 +165,9 @@ async function scrapeLottoExtractions(): Promise<ExtractedNumbers[]> {
             render: render ? 'true' : 'false',
             country_code: 'it',
           });
+          if (process.env.SCRAPER_API_PREMIUM === 'true' || process.env.SCRAPER_API_PREMIUM === '1') {
+            params.set('premium', 'true');
+          }
           const scraperApiUrl = `https://api.scraperapi.com/?${params.toString()}`;
           response = await fetchImpl(scraperApiUrl, {
             headers: {

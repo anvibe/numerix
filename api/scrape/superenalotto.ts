@@ -83,11 +83,130 @@ function parseNumbers(numbersText: string): number[] {
   return numbers;
 }
 
+/** Read body as UTF-8 bytes (more reliable than text() for some proxies / encodings). */
+async function readBodyAsUtf8(response: Response): Promise<string> {
+  const buf = await response.arrayBuffer();
+  return new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(buf));
+}
+
+async function getFetchImpl(): Promise<typeof fetch> {
+  if (typeof globalThis.fetch === 'function') {
+    return globalThis.fetch as typeof fetch;
+  }
+  const nodeFetch = await import('node-fetch');
+  return nodeFetch.default as unknown as typeof fetch;
+}
+
+const OFFICIAL_SUPERENALOTTO_URL = 'https://www.superenalotto.it/';
+const OFFICIAL_FETCH_TIMEOUT_MS = 28_000;
+
+const ITALIAN_MONTH_TO_MM = new Map<string, string>([
+  ['gennaio', '01'],
+  ['febbraio', '02'],
+  ['marzo', '03'],
+  ['aprile', '04'],
+  ['maggio', '05'],
+  ['giugno', '06'],
+  ['luglio', '07'],
+  ['agosto', '08'],
+  ['settembre', '09'],
+  ['ottobre', '10'],
+  ['novembre', '11'],
+  ['dicembre', '12'],
+]);
+
+/** e.g. "venerdì 10 aprile 2026" → YYYY-MM-DD */
+function parseItalianNewsDateFragment(fragment: string): string | null {
+  const normalized = fragment.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+  const m = normalized.match(/(\d{1,2})\s+([a-zàèéìòù]+)\s+(\d{4})/i);
+  if (!m) return null;
+  const day = m[1].padStart(2, '0');
+  const monthName = m[2].toLowerCase();
+  const mm = ITALIAN_MONTH_TO_MM.get(monthName);
+  if (!mm) return null;
+  return `${m[3]}-${mm}-${day}`;
+}
+
+/**
+ * Parses draw lines embedded in superenalotto.it homepage HTML (news teasers).
+ * Lottologia is often blocked; the official site is usually reachable from serverless.
+ */
+function parseExtractionsFromOfficialSuperenalottoHtml(html: string): ExtractedNumbers[] {
+  const extractions: ExtractedNumbers[] = [];
+  const re =
+    /concorso\s+numero\s+(\d+)\s+del\s+SuperEnalotto\s+di\s+([^<]+?)\s+è:\s*((?:\d{1,2},\s*){5}\d{1,2})\.\s*Numero\s+Jolly\s+(\d+),\s*Numero\s+SuperStar\s+(\d+)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    const [, , dateFragment, numsCsv, jollyStr, superstarStr] = m;
+    const date = parseItalianNewsDateFragment(dateFragment);
+    if (!date) continue;
+    const rawNums = numsCsv.split(',').map((s) => parseInt(s.trim(), 10));
+    const numbers = rawNums.filter((n) => !Number.isNaN(n) && n >= 1 && n <= 90);
+    if (numbers.length !== 6) continue;
+    const sortedNumbers = [...numbers].sort((a, b) => a - b);
+    const jolly = parseInt(jollyStr, 10);
+    const superstar = parseInt(superstarStr, 10);
+    if (Number.isNaN(jolly) || Number.isNaN(superstar)) continue;
+
+    const dup = extractions.some(
+      (ext) =>
+        ext.date === date &&
+        ext.numbers.length === sortedNumbers.length &&
+        ext.numbers.every((n, i) => n === sortedNumbers[i])
+    );
+    if (!dup) {
+      extractions.push({
+        date,
+        numbers: sortedNumbers,
+        jolly,
+        superstar,
+      });
+    }
+  }
+  return extractions;
+}
+
+async function tryScrapeOfficialSuperenalottoHomepage(fetchImpl: typeof fetch): Promise<ExtractedNumbers[]> {
+  const ua =
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+  console.log('[scrape] Fetching official homepage', OFFICIAL_SUPERENALOTTO_URL);
+  const response = await fetchImpl(OFFICIAL_SUPERENALOTTO_URL, {
+    headers: {
+      'User-Agent': ua,
+      Accept: 'text/html,application/xhtml+xml',
+      'Accept-Language': 'it-IT,it;q=0.9,en;q=0.8',
+    },
+    signal: AbortSignal.timeout(OFFICIAL_FETCH_TIMEOUT_MS),
+  });
+  if (!response.ok) {
+    throw new Error(`Official SuperEnalotto HTTP ${response.status}`);
+  }
+  const html = await readBodyAsUtf8(response);
+  if (html.length < 500) {
+    throw new Error('Official SuperEnalotto: HTML unexpectedly short');
+  }
+  return parseExtractionsFromOfficialSuperenalottoHtml(html);
+}
+
 // Export scraping function for use by other modules
 // Fetches only the latest extractions (first page)
 export async function scrapeSuperEnalottoExtractions(): Promise<ExtractedNumbers[]> {
   try {
     console.log('[scrape] Fetching latest SuperEnalotto extractions...');
+    const fetchImpl = await getFetchImpl();
+
+    try {
+      const official = await tryScrapeOfficialSuperenalottoHomepage(fetchImpl);
+      if (official.length > 0) {
+        official.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        console.log(`[scrape] Using official superenalotto.it (${official.length} draw(s) from homepage)`);
+        return official;
+      }
+      console.warn('[scrape] Official site: no draw lines matched (layout may have changed); trying Lottologia');
+    } catch (officialErr) {
+      console.warn('[scrape] Official site failed:', officialErr);
+    }
+
     return await scrapeLottologiaSuperEnalotto();
   } catch (error) {
     console.error('[scrape] Error in scrapeSuperEnalottoExtractions:', error);
@@ -181,12 +300,6 @@ const MIN_HTML_LEN = 100;
 const SCRAPER_API_CLIENT_TIMEOUT_MS = 72_000;
 const DIRECT_FETCH_TIMEOUT_MS = 25_000;
 
-/** Read body as UTF-8 bytes (more reliable than text() when proxies return odd encodings / empty text). */
-async function readBodyAsUtf8(response: Response): Promise<string> {
-  const buf = await response.arrayBuffer();
-  return new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(buf));
-}
-
 function scraperApiUrl(targetUrl: string, apiKey: string, render: boolean): string {
   const params = new URLSearchParams({
     api_key: apiKey,
@@ -194,6 +307,9 @@ function scraperApiUrl(targetUrl: string, apiKey: string, render: boolean): stri
     render: render ? 'true' : 'false',
     country_code: 'it',
   });
+  if (process.env.SCRAPER_API_PREMIUM === 'true' || process.env.SCRAPER_API_PREMIUM === '1') {
+    params.set('premium', 'true');
+  }
   return `https://api.scraperapi.com/?${params.toString()}`;
 }
 
