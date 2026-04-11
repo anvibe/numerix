@@ -177,7 +177,15 @@ async function scrapeLottologiaSuperEnalottoByYear(year: number): Promise<Extrac
 
 /** Lottologia pages are large; short bodies are usually errors, CF challenges, or bad proxy responses. */
 const MIN_HTML_LEN = 100;
-const FETCH_TIMEOUT_MS = 22_000;
+/** Client must outwait ScraperAPI (proxy + target + render). Keep 2 attempts × this under Vercel maxDuration. */
+const SCRAPER_API_CLIENT_TIMEOUT_MS = 72_000;
+const DIRECT_FETCH_TIMEOUT_MS = 25_000;
+
+/** Read body as UTF-8 bytes (more reliable than text() when proxies return odd encodings / empty text). */
+async function readBodyAsUtf8(response: Response): Promise<string> {
+  const buf = await response.arrayBuffer();
+  return new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(buf));
+}
 
 function scraperApiUrl(targetUrl: string, apiKey: string, render: boolean): string {
   const params = new URLSearchParams({
@@ -195,7 +203,7 @@ async function fetchPage(url: string, fetchImpl: typeof fetch, useScraperAPI: bo
   const ua =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-  // Try ScraperAPI if available — retry with render=true when the body is empty/too short (common with strict bot protection)
+  // Try ScraperAPI if available — render=false then render=true; long client timeout
   if (useScraperAPI && scraperApiKey) {
     for (const render of [false, true]) {
       try {
@@ -203,18 +211,18 @@ async function fetchPage(url: string, fetchImpl: typeof fetch, useScraperAPI: bo
         console.log(`[scrape] ScraperAPI request (render=${render})...`);
         const response = await fetchImpl(apiUrl, {
           headers: { 'User-Agent': ua },
-          signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+          signal: AbortSignal.timeout(SCRAPER_API_CLIENT_TIMEOUT_MS),
         });
         if (response.ok) {
-          const html = await response.text();
+          const html = await readBodyAsUtf8(response);
           if (html.length >= MIN_HTML_LEN) {
             return html;
           }
           console.warn(
-            `[scrape] ScraperAPI returned ok but HTML too short (${html.length} chars, render=${render}), trying next strategy...`
+            `[scrape] ScraperAPI returned ok but HTML too short (${html.length} chars, render=${render}), trying next...`
           );
         } else {
-          const errText = await response.text().catch(() => '');
+          const errText = await readBodyAsUtf8(response).catch(() => '');
           console.warn(`[scrape] ScraperAPI HTTP ${response.status}: ${errText.slice(0, 200)}`);
         }
       } catch (scraperError) {
@@ -223,7 +231,7 @@ async function fetchPage(url: string, fetchImpl: typeof fetch, useScraperAPI: bo
     }
   }
 
-  // Direct request with headers (omit br — rare decode issues with some runtimes; gzip/deflate is enough)
+  // Direct request (Lottologia often returns 200 + empty body to datacenter IPs — ScraperAPI is primary)
   const headerConfigs: Record<string, string>[] = [
     {
       'User-Agent': ua,
@@ -239,6 +247,11 @@ async function fetchPage(url: string, fetchImpl: typeof fetch, useScraperAPI: bo
       'Upgrade-Insecure-Requests': '1',
       Referer: 'https://www.google.com/',
     },
+    {
+      'User-Agent': ua,
+      Accept: 'text/html',
+      'Accept-Language': 'it-IT,it;q=0.9',
+    },
   ];
 
   let lastError: Error | null = null;
@@ -246,10 +259,10 @@ async function fetchPage(url: string, fetchImpl: typeof fetch, useScraperAPI: bo
     try {
       const response = await fetchImpl(url, {
         headers,
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        signal: AbortSignal.timeout(DIRECT_FETCH_TIMEOUT_MS),
       });
       if (response.ok) {
-        const html = await response.text();
+        const html = await readBodyAsUtf8(response);
         if (html.length >= MIN_HTML_LEN) {
           return html;
         }
@@ -260,7 +273,7 @@ async function fetchPage(url: string, fetchImpl: typeof fetch, useScraperAPI: bo
         lastError = new Error(`Lottologia request failed: ${response.status}`);
         continue;
       }
-      const errorText = await response.text().catch(() => 'Unable to read error response');
+      const errorText = await readBodyAsUtf8(response).catch(() => 'Unable to read error response');
       throw new Error(`Lottologia request failed: ${response.status} - ${errorText.substring(0, 200)}`);
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
@@ -277,7 +290,10 @@ async function fetchPage(url: string, fetchImpl: typeof fetch, useScraperAPI: bo
           `ScraperAPI offre un piano GRATUITO con 1000 richieste/mese.`
       );
     }
-    throw lastError;
+    throw new Error(
+      `${lastError.message} ` +
+        `(ScraperAPI e la richiesta diretta sono falliti: controlla crediti ScraperAPI, piano, o blocchi sul target.)`
+    );
   }
 
   throw new Error('All request attempts failed');

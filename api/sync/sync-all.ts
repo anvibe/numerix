@@ -21,7 +21,7 @@ const LOTTO_WHEELS = ['Bari', 'Cagliari', 'Firenze', 'Genova', 'Milano', 'Napoli
 type LottoWheel = typeof LOTTO_WHEELS[number];
 
 /** Outer cap for `scrapeLottoExtractions` (ScraperAPI ×2 + delay + direct retries). Must stay ≤ Vercel `maxDuration` for this route. */
-const LOTTO_SCRAPE_RACE_MS = 150_000;
+const LOTTO_SCRAPE_RACE_MS = 230_000;
 
 // Helper to return API errors with structured logging
 function toApiError(res: VercelResponse, status: number, message: string, details?: unknown) {
@@ -140,7 +140,13 @@ async function scrapeLottoExtractions(): Promise<ExtractedNumbers[]> {
     }
     
     const MIN_HTML_LEN = 100;
-    const FETCH_TIMEOUT_MS = 22_000;
+    const SCRAPER_API_CLIENT_TIMEOUT_MS = 72_000;
+    const DIRECT_FETCH_TIMEOUT_MS = 25_000;
+
+    const readBodyAsUtf8 = async (res: Response) => {
+      const buf = await res.arrayBuffer();
+      return new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(buf));
+    };
 
     // Check for ScraperAPI key
     const scraperApiKey = process.env.SCRAPER_API_KEY;
@@ -165,11 +171,11 @@ async function scrapeLottoExtractions(): Promise<ExtractedNumbers[]> {
               'User-Agent':
                 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             },
-            signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+            signal: AbortSignal.timeout(SCRAPER_API_CLIENT_TIMEOUT_MS),
           });
 
           if (response.ok) {
-            const probe = await response.clone().text();
+            const probe = await readBodyAsUtf8(response.clone());
             if (probe.length >= MIN_HTML_LEN) {
               console.log('[scrape-lotto] ScraperAPI request successful');
               break;
@@ -227,7 +233,10 @@ async function scrapeLottoExtractions(): Promise<ExtractedNumbers[]> {
             }
             
             console.log(`[scrape-lotto] Making fetch request (config ${configIndex + 1}, attempt ${attempt + 1})...`);
-            response = await fetchImpl(url, { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+            response = await fetchImpl(url, {
+              headers,
+              signal: AbortSignal.timeout(DIRECT_FETCH_TIMEOUT_MS),
+            });
             
             if (response.ok) {
               console.log(`[scrape-lotto] Success with config ${configIndex + 1}`);
@@ -272,7 +281,7 @@ async function scrapeLottoExtractions(): Promise<ExtractedNumbers[]> {
     }
     
     console.log('[scrape-lotto] Fetch successful, reading response...');
-    const html = await response.text();
+    const html = await readBodyAsUtf8(response);
     console.log(`[scrape-lotto] Fetched HTML, length: ${html.length}`);
     
     if (!html || html.length < MIN_HTML_LEN) {
