@@ -20,6 +20,9 @@ type GameType = typeof VALID_GAME_TYPES[number];
 const LOTTO_WHEELS = ['Bari', 'Cagliari', 'Firenze', 'Genova', 'Milano', 'Napoli', 'Palermo', 'Roma', 'Torino', 'Venezia', 'Nazionale'] as const;
 type LottoWheel = typeof LOTTO_WHEELS[number];
 
+/** Outer cap for `scrapeLottoExtractions` (ScraperAPI ×2 + delay + direct retries). Must stay ≤ Vercel `maxDuration` for this route. */
+const LOTTO_SCRAPE_RACE_MS = 150_000;
+
 // Helper to return API errors with structured logging
 function toApiError(res: VercelResponse, status: number, message: string, details?: unknown) {
   const errorInfo: Record<string, unknown> = {
@@ -500,15 +503,21 @@ async function syncLotto(): Promise<{
 }> {
   try {
     console.log('Starting Lotto sync...');
-    
+    console.log(`[sync-lotto] scrapeRaceMs=${LOTTO_SCRAPE_RACE_MS} (if logs show 30s/90s, deployment is stale)`);
+
     // Scrape extractions with timeout protection
     let extractions;
     try {
       console.log('[sync-lotto] Calling scrapeLottoExtractions...');
       const scrapePromise = scrapeLottoExtractions();
-      // Allow time for ScraperAPI (incl. render=true) + direct retries; keep below Vercel maxDuration
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Scraping timeout after 90 seconds')), 90_000);
+        setTimeout(
+          () =>
+            reject(
+              new Error(`Scraping timeout after ${Math.round(LOTTO_SCRAPE_RACE_MS / 1000)} seconds`)
+            ),
+          LOTTO_SCRAPE_RACE_MS
+        );
       });
       
       console.log('[sync-lotto] Waiting for scrape to complete...');
