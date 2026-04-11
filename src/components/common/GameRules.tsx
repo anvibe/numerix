@@ -22,7 +22,7 @@ const GameRules: React.FC<GameRulesProps> = ({ isOpen, onClose }) => {
         'Seleziona 6 numeri da 1 a 90',
         'Puoi scegliere anche il numero Jolly (1-90) e il SuperStar (1-90)',
         'Ogni combinazione costa 1€',
-        'Le estrazioni avvengono tre volte alla settimana: martedì, giovedì e sabato'
+        'Le estrazioni avvengono quattro volte alla settimana: martedì, giovedì, venerdì e sabato'
       ],
       prizes: [
         '6 numeri: Jackpot',
@@ -45,7 +45,7 @@ const GameRules: React.FC<GameRulesProps> = ({ isOpen, onClose }) => {
         'Seleziona 5 numeri da 1 a 90',
         'Scegli una ruota (Bari, Cagliari, Firenze, Genova, Milano, Napoli, Palermo, Roma, Torino, Venezia o Nazionale)',
         'Ogni combinazione costa 1€',
-        'Le estrazioni avvengono tre volte alla settimana: martedì, giovedì e sabato'
+        'Le estrazioni avvengono quattro volte alla settimana: martedì, giovedì, venerdì e sabato'
       ],
       prizes: [
         '5 numeri: Ambata (premio massimo)',

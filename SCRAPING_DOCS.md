@@ -37,7 +37,7 @@ Il sistema controlla automaticamente le estrazioni esistenti in Supabase e inser
 
 ### ✅ SuperEnalotto
 - **Fonte**: lottologia.com
-- **Frequenza Estrazioni**: Martedì, Giovedì, Sabato alle 20:30
+- **Frequenza Estrazioni**: Martedì, Giovedì, Venerdì, Sabato alle 20:30
 - **Dati**: 6 numeri + Jolly + SuperStar
 
 ### ⏳ In Sviluppo
