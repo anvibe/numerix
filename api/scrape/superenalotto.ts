@@ -175,79 +175,111 @@ async function scrapeLottologiaSuperEnalottoByYear(year: number): Promise<Extrac
   }
 }
 
+/** Lottologia pages are large; short bodies are usually errors, CF challenges, or bad proxy responses. */
+const MIN_HTML_LEN = 100;
+const FETCH_TIMEOUT_MS = 22_000;
+
+function scraperApiUrl(targetUrl: string, apiKey: string, render: boolean): string {
+  const params = new URLSearchParams({
+    api_key: apiKey,
+    url: targetUrl,
+    render: render ? 'true' : 'false',
+    country_code: 'it',
+  });
+  return `https://api.scraperapi.com/?${params.toString()}`;
+}
+
 // Helper function to fetch a single page with ScraperAPI support
 async function fetchPage(url: string, fetchImpl: typeof fetch, useScraperAPI: boolean = false): Promise<string> {
-  let response: Response;
-  
-  // Try ScraperAPI if available and requested
   const scraperApiKey = process.env.SCRAPER_API_KEY;
+  const ua =
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+  // Try ScraperAPI if available — retry with render=true when the body is empty/too short (common with strict bot protection)
   if (useScraperAPI && scraperApiKey) {
-    try {
-      const scraperApiUrl = `http://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(url)}&render=false`;
-      response = await fetchImpl(scraperApiUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        },
-      });
-      
-      if (response.ok) {
-        return await response.text();
+    for (const render of [false, true]) {
+      try {
+        const apiUrl = scraperApiUrl(url, scraperApiKey, render);
+        console.log(`[scrape] ScraperAPI request (render=${render})...`);
+        const response = await fetchImpl(apiUrl, {
+          headers: { 'User-Agent': ua },
+          signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        });
+        if (response.ok) {
+          const html = await response.text();
+          if (html.length >= MIN_HTML_LEN) {
+            return html;
+          }
+          console.warn(
+            `[scrape] ScraperAPI returned ok but HTML too short (${html.length} chars, render=${render}), trying next strategy...`
+          );
+        } else {
+          const errText = await response.text().catch(() => '');
+          console.warn(`[scrape] ScraperAPI HTTP ${response.status}: ${errText.slice(0, 200)}`);
+        }
+      } catch (scraperError) {
+        console.warn('[scrape] ScraperAPI attempt failed:', scraperError);
       }
-    } catch (scraperError) {
-      console.warn('[scrape] ScraperAPI failed, falling back to direct request:', scraperError);
     }
   }
-  
-  // Direct request with headers
+
+  // Direct request with headers (omit br — rare decode issues with some runtimes; gzip/deflate is enough)
   const headerConfigs: Record<string, string>[] = [
     {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'User-Agent': ua,
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       'Accept-Language': 'it-IT,it;q=0.9,en;q=0.8',
     },
     {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+      'User-Agent': ua,
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
       'Accept-Language': 'it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7',
-      'Accept-Encoding': 'gzip, deflate, br',
-      'Connection': 'keep-alive',
+      'Accept-Encoding': 'gzip, deflate',
+      Connection: 'keep-alive',
       'Upgrade-Insecure-Requests': '1',
-      'Referer': 'https://www.google.com/',
+      Referer: 'https://www.google.com/',
     },
   ];
-  
+
   let lastError: Error | null = null;
   for (const headers of headerConfigs) {
     try {
-      response = await fetchImpl(url, { headers });
+      const response = await fetchImpl(url, {
+        headers,
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
       if (response.ok) {
-        return await response.text();
-      } else if (response.status === 403) {
+        const html = await response.text();
+        if (html.length >= MIN_HTML_LEN) {
+          return html;
+        }
+        lastError = new Error(`Lottologia returned ok but body too short (${html.length} chars)`);
+        continue;
+      }
+      if (response.status === 403) {
         lastError = new Error(`Lottologia request failed: ${response.status}`);
         continue;
-      } else {
-        const errorText = await response.text().catch(() => 'Unable to read error response');
-        throw new Error(`Lottologia request failed: ${response.status} - ${errorText.substring(0, 200)}`);
       }
+      const errorText = await response.text().catch(() => 'Unable to read error response');
+      throw new Error(`Lottologia request failed: ${response.status} - ${errorText.substring(0, 200)}`);
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
       continue;
     }
   }
-  
+
   if (lastError) {
     if (!scraperApiKey) {
       throw new Error(
         `Lottologia request failed: ${lastError.message}. ` +
-        `Il sito ha protezioni anti-bot avanzate (Cloudflare). ` +
-        `Soluzione GRATUITA: configura SCRAPER_API_KEY in Vercel Environment Variables. ` +
-        `ScraperAPI offre un piano GRATUITO con 1000 richieste/mese.`
+          `Il sito ha protezioni anti-bot avanzate (Cloudflare). ` +
+          `Soluzione GRATUITA: configura SCRAPER_API_KEY in Vercel Environment Variables. ` +
+          `ScraperAPI offre un piano GRATUITO con 1000 richieste/mese.`
       );
-    } else {
-      throw lastError;
     }
+    throw lastError;
   }
-  
+
   throw new Error('All request attempts failed');
 }
 
@@ -412,7 +444,7 @@ async function scrapeLottologiaSuperEnalotto(): Promise<ExtractedNumbers[]> {
     const scraperApiKey = process.env.SCRAPER_API_KEY;
     const html = await fetchPage(baseUrl, fetchImpl, !!scraperApiKey);
     
-    if (!html || html.length < 100) {
+    if (!html || html.length < MIN_HTML_LEN) {
       throw new Error('Received empty or too short HTML response');
     }
     

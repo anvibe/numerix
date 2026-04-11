@@ -136,31 +136,54 @@ async function scrapeLottoExtractions(): Promise<ExtractedNumbers[]> {
       }
     }
     
+    const MIN_HTML_LEN = 100;
+    const FETCH_TIMEOUT_MS = 22_000;
+
     // Check for ScraperAPI key
     const scraperApiKey = process.env.SCRAPER_API_KEY;
-    
+
     let response: Response | null = null;
     let lastError: Error | null = null;
-    
-    // Try ScraperAPI first
+
+    // Try ScraperAPI first (retry with render=true if body is too short — same as superenalotto scraper)
     if (scraperApiKey) {
-      console.log('[scrape-lotto] Using ScraperAPI to bypass Cloudflare protection...');
-      try {
-        const scraperApiUrl = `http://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(url)}&render=false`;
-        response = await fetchImpl(scraperApiUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          },
-        });
-        
-        if (!response.ok) {
-          const errorText = await response.text().catch(() => 'Unable to read error response');
-          throw new Error(`ScraperAPI request failed: ${response.status} - ${errorText.substring(0, 200)}`);
+      for (const render of [false, true]) {
+        console.log(`[scrape-lotto] ScraperAPI (render=${render})...`);
+        try {
+          const params = new URLSearchParams({
+            api_key: scraperApiKey,
+            url,
+            render: render ? 'true' : 'false',
+            country_code: 'it',
+          });
+          const scraperApiUrl = `https://api.scraperapi.com/?${params.toString()}`;
+          response = await fetchImpl(scraperApiUrl, {
+            headers: {
+              'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            },
+            signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+          });
+
+          if (response.ok) {
+            const probe = await response.clone().text();
+            if (probe.length >= MIN_HTML_LEN) {
+              console.log('[scrape-lotto] ScraperAPI request successful');
+              break;
+            }
+            console.warn(
+              `[scrape-lotto] ScraperAPI ok but HTML too short (${probe.length} chars), trying next...`
+            );
+            response = null;
+          } else {
+            const errorText = await response.text().catch(() => 'Unable to read error response');
+            console.warn(`[scrape-lotto] ScraperAPI ${response.status}: ${errorText.substring(0, 200)}`);
+            response = null;
+          }
+        } catch (scraperError) {
+          console.error('[scrape-lotto] ScraperAPI attempt failed:', scraperError);
+          response = null;
         }
-        console.log('[scrape-lotto] ScraperAPI request successful');
-      } catch (scraperError) {
-        console.error('[scrape-lotto] ScraperAPI failed, trying alternatives:', scraperError);
-        response = null;
       }
     }
     
@@ -182,7 +205,7 @@ async function scrapeLottoExtractions(): Promise<ExtractedNumbers[]> {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
           'Accept-Language': 'it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7',
-          'Accept-Encoding': 'gzip, deflate, br',
+          'Accept-Encoding': 'gzip, deflate',
           'Connection': 'keep-alive',
           'Upgrade-Insecure-Requests': '1',
           'Referer': 'https://www.google.com/',
@@ -201,7 +224,7 @@ async function scrapeLottoExtractions(): Promise<ExtractedNumbers[]> {
             }
             
             console.log(`[scrape-lotto] Making fetch request (config ${configIndex + 1}, attempt ${attempt + 1})...`);
-            response = await fetchImpl(url, { headers });
+            response = await fetchImpl(url, { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
             
             if (response.ok) {
               console.log(`[scrape-lotto] Success with config ${configIndex + 1}`);
@@ -249,7 +272,7 @@ async function scrapeLottoExtractions(): Promise<ExtractedNumbers[]> {
     const html = await response.text();
     console.log(`[scrape-lotto] Fetched HTML, length: ${html.length}`);
     
-    if (!html || html.length < 100) {
+    if (!html || html.length < MIN_HTML_LEN) {
       throw new Error('Received empty or too short HTML response');
     }
     
@@ -483,8 +506,9 @@ async function syncLotto(): Promise<{
     try {
       console.log('[sync-lotto] Calling scrapeLottoExtractions...');
       const scrapePromise = scrapeLottoExtractions();
+      // Allow time for ScraperAPI (incl. render=true) + direct retries; keep below Vercel maxDuration
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Scraping timeout after 30 seconds')), 30000);
+        setTimeout(() => reject(new Error('Scraping timeout after 90 seconds')), 90_000);
       });
       
       console.log('[sync-lotto] Waiting for scrape to complete...');

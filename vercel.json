@@ -1,4 +1,9 @@
 {
+  "functions": {
+    "api/sync/sync-all.ts": {
+      "maxDuration": 90
+    }
+  },
   "rewrites": [
     {
       "source": "/((?!api/).*)",
