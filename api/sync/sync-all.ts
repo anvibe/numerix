@@ -135,9 +135,32 @@ function parseSingleLottoExtractionFromAltHtml(html: string): ExtractedNumbers |
   const date = parseItalianDateText(dateRaw);
   if (!date) return null;
 
-  const plain = $.text().replace(/\s+/g, ' ');
   const wheels: Record<string, number[]> = {};
+
+  // Primary parse: DOM blocks used by estrazionilotto.it
+  $('p.ruota').each((_, el) => {
+    const rawWheel = $(el).text().trim();
+    const wheel = rawWheel.charAt(0).toUpperCase() + rawWheel.slice(1).toLowerCase();
+    if (!LOTTO_WHEELS.includes(wheel as LottoWheel)) return;
+
+    const nums = $(el)
+      .parent()
+      .nextAll('div')
+      .slice(0, 5)
+      .find('p.numero')
+      .toArray()
+      .map((n) => parseInt($(n).text().trim(), 10))
+      .filter((n) => !isNaN(n) && n >= 1 && n <= 90);
+
+    if (nums.length === 5) {
+      wheels[wheel] = nums;
+    }
+  });
+
+  // Fallback parse: resilient text regex if DOM structure changes.
+  const plain = $.text().replace(/\s+/g, ' ');
   for (const wheel of LOTTO_WHEELS) {
+    if (wheels[wheel]) continue;
     const re = new RegExp(`${wheel}\\s+(\\d{1,2})\\s+(\\d{1,2})\\s+(\\d{1,2})\\s+(\\d{1,2})\\s+(\\d{1,2})`, 'i');
     const m = plain.match(re);
     if (!m) continue;
