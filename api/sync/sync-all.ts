@@ -124,28 +124,8 @@ function parseItalianDateText(dateText: string): string | null {
   return `${m[4]}-${mm}-${day}`;
 }
 
-async function tryScrapeLottoFromEstrazioniLotto(fetchImpl: typeof fetch): Promise<ExtractedNumbers[]> {
-  const src = 'https://estrazionilotto.it/';
-  console.log('[scrape-lotto] Trying alternative source...', src);
-  const response = await fetchImpl(src, {
-    headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      Accept: 'text/html,application/xhtml+xml',
-      'Accept-Language': 'it-IT,it;q=0.9,en;q=0.8',
-    },
-    signal: AbortSignal.timeout(25_000),
-  });
-  if (!response.ok) {
-    throw new Error(`Alternative Lotto source HTTP ${response.status}`);
-  }
-  const html = await response.text();
-  if (!html || html.length < 500) {
-    throw new Error('Alternative Lotto source returned empty/short HTML');
-  }
+function parseSingleLottoExtractionFromAltHtml(html: string): ExtractedNumbers | null {
   const $ = cheerio.load(html);
-
-  // Example: "<h3>... sabato 18 aprile 2026</h3>"
   const dateRaw =
     $('h3')
       .toArray()
@@ -153,59 +133,76 @@ async function tryScrapeLottoFromEstrazioniLotto(fetchImpl: typeof fetch): Promi
       .find((t) => /(luned[iì]|marted[iì]|mercoled[iì]|gioved[iì]|venerd[iì]|sabato|domenica)\s+\d{1,2}\s+[a-zàèéìòù]+\s+\d{4}/i.test(t)) ||
     '';
   const date = parseItalianDateText(dateRaw);
-  if (!date) {
-    throw new Error('Failed to parse extraction date from alternative Lotto source');
-  }
+  if (!date) return null;
 
-  // Blocks look like: <p class="ruota">Bari</p> followed by 5 <p class="numero">...</p>
+  const plain = $.text().replace(/\s+/g, ' ');
   const wheels: Record<string, number[]> = {};
-  $('p.ruota').each((_, el) => {
-    const rawWheel = $(el).text().trim();
-    const wheel = rawWheel.charAt(0).toUpperCase() + rawWheel.slice(1).toLowerCase();
-    if (!LOTTO_WHEELS.includes(wheel as LottoWheel)) {
-      return;
-    }
-    const nums = $(el)
-      .parent()
-      .nextAll()
-      .slice(0, 5)
-      .find('p.numero')
-      .toArray()
-      .map((n) => parseInt($(n).text().trim(), 10))
-      .filter((n) => !isNaN(n) && n >= 1 && n <= 90);
-
-    if (nums.length === 5) {
+  for (const wheel of LOTTO_WHEELS) {
+    const re = new RegExp(`${wheel}\\s+(\\d{1,2})\\s+(\\d{1,2})\\s+(\\d{1,2})\\s+(\\d{1,2})\\s+(\\d{1,2})`, 'i');
+    const m = plain.match(re);
+    if (!m) continue;
+    const nums = m.slice(1).map((v) => parseInt(v, 10));
+    if (nums.every((n) => n >= 1 && n <= 90)) {
       wheels[wheel] = nums;
     }
-  });
+  }
 
-  // Fallback parse by regex if DOM structure changes but text remains.
-  if (Object.keys(wheels).length === 0) {
-    const plain = $.text().replace(/\s+/g, ' ');
-    for (const wheel of LOTTO_WHEELS) {
-      const re = new RegExp(`${wheel}\\s+(\\d{1,2})\\s+(\\d{1,2})\\s+(\\d{1,2})\\s+(\\d{1,2})\\s+(\\d{1,2})`, 'i');
-      const m = plain.match(re);
-      if (m) {
-        const nums = m.slice(1).map((v) => parseInt(v, 10));
-        if (nums.every((n) => n >= 1 && n <= 90)) {
-          wheels[wheel] = nums;
-        }
+  if (Object.keys(wheels).length === 0) return null;
+  const defaultNumbers = wheels['Bari'] || Object.values(wheels)[0];
+  return { date, numbers: defaultNumbers, wheels };
+}
+
+function toYmd(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+async function tryScrapeLottoFromEstrazioniLotto(fetchImpl: typeof fetch): Promise<ExtractedNumbers[]> {
+  const base = 'https://estrazionilotto.it/';
+  const maxLookbackDays = 21; // pull recent history to fill gaps
+  const targetCount = 12; // ~3 weeks of draws
+  const extracted: ExtractedNumbers[] = [];
+  const seenDates = new Set<string>();
+
+  console.log('[scrape-lotto] Trying alternative source...', base);
+  for (let i = 0; i <= maxLookbackDays && extracted.length < targetCount; i++) {
+    const ref = new Date();
+    ref.setDate(ref.getDate() - i);
+    const url = i === 0 ? base : `${base}?d=${toYmd(ref)}`;
+
+    try {
+      const response = await fetchImpl(url, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          Accept: 'text/html,application/xhtml+xml',
+          'Accept-Language': 'it-IT,it;q=0.9,en;q=0.8',
+        },
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (!response.ok) {
+        continue;
       }
+      const html = await response.text();
+      if (!html || html.length < 500) {
+        continue;
+      }
+      const parsed = parseSingleLottoExtractionFromAltHtml(html);
+      if (!parsed || seenDates.has(parsed.date)) {
+        continue;
+      }
+      seenDates.add(parsed.date);
+      extracted.push(parsed);
+    } catch {
+      // ignore single-page failures and continue scanning recent dates
+      continue;
     }
   }
 
-  if (Object.keys(wheels).length === 0) {
-    throw new Error('Alternative Lotto source parsed zero wheel rows');
-  }
-
-  const defaultNumbers = wheels['Bari'] || Object.values(wheels)[0];
-  return [
-    {
-      date,
-      numbers: defaultNumbers,
-      wheels,
-    },
-  ];
+  extracted.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  return extracted;
 }
 
 // Note: scrapeSuperEnalottoExtractions is now imported from '../scrape/superenalotto'
