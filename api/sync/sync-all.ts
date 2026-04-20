@@ -148,8 +148,8 @@ async function scrapeLottoExtractions(): Promise<ExtractedNumbers[]> {
       return new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(buf));
     };
 
-    // Check for ScraperAPI key
-    const scraperApiKey = process.env.SCRAPER_API_KEY;
+    // Lotto can use a dedicated ScraperAPI account/key (fallback to shared key)
+    const scraperApiKey = process.env.SCRAPER_API_KEY_LOTTO || process.env.SCRAPER_API_KEY;
 
     let response: Response | null = null;
     let lastError: Error | null = null;
@@ -306,8 +306,8 @@ async function scrapeLottoExtractions(): Promise<ExtractedNumbers[]> {
       } else {
         if (scraperApiRequiresPremium) {
           throw new Error(
-            'ScraperAPI segnala dominio protetto. Abilita SCRAPER_API_PREMIUM=true ' +
-              '(o SCRAPER_API_ULTRA_PREMIUM=true) nelle variabili Vercel.'
+            'ScraperAPI segnala dominio protetto. Per Lotto usa una chiave dedicata ' +
+              '(SCRAPER_API_KEY_LOTTO) con piano adatto, oppure abilita premium/ultra premium.'
           );
         }
         throw new Error(`Lottologia request failed after all attempts: ${errorText}`);
@@ -579,8 +579,8 @@ async function syncLotto(): Promise<{
         errorMessage.toLowerCase().includes('premium proxies')
       ) {
         userMessage =
-          'Il tuo piano ScraperAPI non include proxy premium/ultra premium. ' +
-          'Disattiva SCRAPER_API_PREMIUM oppure aggiorna il piano ScraperAPI.';
+          'Il piano della chiave ScraperAPI usata per Lotto non include proxy premium/ultra premium. ' +
+          'Usa SCRAPER_API_KEY_LOTTO con piano adeguato, oppure disattiva i flag premium/ultra.';
       } else if (errorMessage.includes('timeout')) {
         userMessage = 'Timeout durante lo scraping Lotto. Riprova più tardi.';
       } else if (

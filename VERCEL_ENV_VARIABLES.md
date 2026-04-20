@@ -48,6 +48,12 @@ Devi configurare queste variabili in **Vercel Dashboard → Il tuo progetto → 
 - **Perché è necessaria**: Il sito `lottologia.com` ha protezioni anti-bot avanzate che bloccano le richieste dirette. ScraperAPI gestisce automaticamente queste protezioni.
 - **Piano gratuito**: 1000 richieste/mese (sufficiente per ~33 sincronizzazioni giornaliere)
 
+### 6b. ScraperAPI Key dedicata per Lotto (opzionale, consigliata)
+- **Nome**: `SCRAPER_API_KEY_LOTTO`
+- **Valore**: API key ScraperAPI dedicata alle richieste Lotto
+- **Quando usarla**: Se SuperEnalotto funziona ma Lotto richiede un piano/chiave diversa
+- **Fallback**: Se assente, Lotto usa `SCRAPER_API_KEY`
+
 ### 7. ScraperAPI Premium Flags (opzionali, per domini molto protetti)
 - **Nome**: `SCRAPER_API_PREMIUM`
 - **Valore**: `true` oppure `1`
