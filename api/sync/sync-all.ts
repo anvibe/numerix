@@ -153,6 +153,7 @@ async function scrapeLottoExtractions(): Promise<ExtractedNumbers[]> {
 
     let response: Response | null = null;
     let lastError: Error | null = null;
+    let scraperApiRequiresPremium = false;
 
     // Try ScraperAPI first (retry with render=true if body is too short — same as superenalotto scraper)
     if (scraperApiKey) {
@@ -196,6 +197,14 @@ async function scrapeLottoExtractions(): Promise<ExtractedNumbers[]> {
           } else {
             const errorText = await response.text().catch(() => 'Unable to read error response');
             console.warn(`[scrape-lotto] ScraperAPI ${response.status}: ${errorText.substring(0, 200)}`);
+            if (
+              errorText.includes('premium=true') ||
+              errorText.includes('ultra_premium=true') ||
+              errorText.toLowerCase().includes('protected domains may require') ||
+              errorText.toLowerCase().includes('does not allow you to use our premium proxies')
+            ) {
+              scraperApiRequiresPremium = true;
+            }
             response = null;
           }
         } catch (scraperError) {
@@ -295,6 +304,12 @@ async function scrapeLottoExtractions(): Promise<ExtractedNumbers[]> {
           `Registrati su https://www.scraperapi.com/ e ottieni la chiave gratuita.`
         );
       } else {
+        if (scraperApiRequiresPremium) {
+          throw new Error(
+            'ScraperAPI segnala dominio protetto. Abilita SCRAPER_API_PREMIUM=true ' +
+              '(o SCRAPER_API_ULTRA_PREMIUM=true) nelle variabili Vercel.'
+          );
+        }
         throw new Error(`Lottologia request failed after all attempts: ${errorText}`);
       }
     }
@@ -559,16 +574,21 @@ async function syncLotto(): Promise<{
 
       let userMessage = errorMessage;
       if (
+        errorMessage.includes('premium=true') ||
+        errorMessage.includes('ultra_premium=true') ||
+        errorMessage.toLowerCase().includes('premium proxies')
+      ) {
+        userMessage =
+          'Il tuo piano ScraperAPI non include proxy premium/ultra premium. ' +
+          'Disattiva SCRAPER_API_PREMIUM oppure aggiorna il piano ScraperAPI.';
+      } else if (errorMessage.includes('timeout')) {
+        userMessage = 'Timeout durante lo scraping Lotto. Riprova più tardi.';
+      } else if (
         errorMessage.includes('Cloudflare') ||
         errorMessage.includes('403') ||
         errorMessage.includes('Lottologia request failed')
       ) {
         userMessage = 'Il sito ha bloccato la richiesta. Configura SCRAPER_API_KEY in Vercel per bypassare le protezioni anti-bot.';
-      } else if (errorMessage.includes('premium=true') || errorMessage.includes('ultra_premium=true')) {
-        userMessage =
-          'ScraperAPI segnala dominio protetto. Abilita SCRAPER_API_PREMIUM=true (o SCRAPER_API_ULTRA_PREMIUM=true) nelle variabili Vercel.';
-      } else if (errorMessage.includes('timeout')) {
-        userMessage = 'Timeout durante lo scraping Lotto. Riprova più tardi.';
       }
       
       return {
