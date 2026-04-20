@@ -310,6 +310,12 @@ function scraperApiUrl(targetUrl: string, apiKey: string, render: boolean): stri
   if (process.env.SCRAPER_API_PREMIUM === 'true' || process.env.SCRAPER_API_PREMIUM === '1') {
     params.set('premium', 'true');
   }
+  if (
+    process.env.SCRAPER_API_ULTRA_PREMIUM === 'true' ||
+    process.env.SCRAPER_API_ULTRA_PREMIUM === '1'
+  ) {
+    params.set('ultra_premium', 'true');
+  }
   return `https://api.scraperapi.com/?${params.toString()}`;
 }
 

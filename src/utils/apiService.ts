@@ -110,17 +110,40 @@ export class ApiService {
   private static baseUrl = import.meta.env.DEV 
     ? 'https://numerix-kappa.vercel.app/api'
     : '/api';
+
+  private static getTimeoutForEndpoint(endpoint: string): number {
+    // Sync endpoints can be slow, but 10 minutes feels infinite in UI.
+    // Keep a bounded wait and surface a clear timeout error sooner.
+    if (endpoint.includes('/sync/sync-all')) {
+      return 180000; // 3 minutes
+    }
+    if (endpoint.includes('/cleanup-duplicates')) {
+      return 120000; // 2 minutes
+    }
+    return 60000; // 1 minute default for normal API calls
+  }
+
+  private static getRetriesForEndpoint(endpoint: string, defaultRetries: number): number {
+    // Sync endpoints are long-running. Retrying them multiplies wait time and
+    // looks like an infinite spinner in UI.
+    if (endpoint.includes('/sync/sync-all') || endpoint.includes('/cleanup-duplicates')) {
+      return 1;
+    }
+    return defaultRetries;
+  }
   
   static async makeRequest(endpoint: string, options: RequestInit = {}, retries = 3): Promise<Response> {
     const url = `${this.baseUrl}${endpoint}`;
+    const timeoutMs = this.getTimeoutForEndpoint(endpoint);
+    const maxRetries = this.getRetriesForEndpoint(endpoint, retries);
     
-    for (let attempt = 0; attempt < retries; attempt++) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        console.log(`Making API request to: ${url} (attempt ${attempt + 1}/${retries})`);
+        console.log(`Making API request to: ${url} (attempt ${attempt + 1}/${maxRetries})`);
         
-        // Add timeout - increased for historical data scraping (10 minutes)
+        // Endpoint-aware timeout
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minute timeout for historical sync
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
         
         const response = await fetch(url, {
           ...options,
@@ -165,7 +188,7 @@ export class ApiService {
           console.error(`API Error ${response.status}:`, errorText);
           
           // Retry on 5xx errors (server errors) but not on 4xx
-          if (response.status >= 500 && attempt < retries - 1) {
+          if (response.status >= 500 && attempt < maxRetries - 1) {
             const backoff = 300 * (attempt + 1) ** 2; // Exponential backoff
             console.log(`Retrying after ${backoff}ms...`);
             await new Promise(resolve => setTimeout(resolve, backoff));
@@ -182,16 +205,20 @@ export class ApiService {
         // Handle abort/timeout
         if (error instanceof Error && error.name === 'AbortError') {
           console.error('Request timeout');
-          if (attempt < retries - 1) {
+          if (attempt < maxRetries - 1) {
             const backoff = 300 * (attempt + 1) ** 2;
             await new Promise(resolve => setTimeout(resolve, backoff));
             continue;
           }
-          throw new ApiError(504, 'Request Timeout', 'The request took too long to complete');
+          throw new ApiError(
+            504,
+            'Request Timeout',
+            `The request took too long to complete (${Math.round(timeoutMs / 1000)}s timeout)`
+          );
         }
         
         // Network errors - retry
-        if (attempt < retries - 1 && error instanceof Error && 
+        if (attempt < maxRetries - 1 && error instanceof Error && 
             (error.message.includes('fetch') || error.message.includes('network'))) {
           const backoff = 300 * (attempt + 1) ** 2;
           console.log(`Network error, retrying after ${backoff}ms...`);

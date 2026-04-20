@@ -168,6 +168,12 @@ async function scrapeLottoExtractions(): Promise<ExtractedNumbers[]> {
           if (process.env.SCRAPER_API_PREMIUM === 'true' || process.env.SCRAPER_API_PREMIUM === '1') {
             params.set('premium', 'true');
           }
+          if (
+            process.env.SCRAPER_API_ULTRA_PREMIUM === 'true' ||
+            process.env.SCRAPER_API_ULTRA_PREMIUM === '1'
+          ) {
+            params.set('ultra_premium', 'true');
+          }
           const scraperApiUrl = `https://api.scraperapi.com/?${params.toString()}`;
           response = await fetchImpl(scraperApiUrl, {
             headers: {
@@ -242,8 +248,18 @@ async function scrapeLottoExtractions(): Promise<ExtractedNumbers[]> {
             });
             
             if (response.ok) {
-              console.log(`[scrape-lotto] Success with config ${configIndex + 1}`);
-              break;
+              const probe = await readBodyAsUtf8(response.clone());
+              if (probe.length >= MIN_HTML_LEN) {
+                console.log(`[scrape-lotto] Success with config ${configIndex + 1}`);
+                break;
+              }
+              console.warn(
+                `[scrape-lotto] HTTP 200 but HTML too short (${probe.length} chars) ` +
+                `(config ${configIndex + 1}, attempt ${attempt + 1}), retrying...`
+              );
+              lastError = new Error(`Lottologia returned ok but body too short (${probe.length} chars)`);
+              response = null;
+              continue;
             } else if (response.status === 403) {
               console.warn(`[scrape-lotto] Got 403 with config ${configIndex + 1}, trying next config...`);
               lastError = new Error(`Lottologia request failed: ${response.status}`);
@@ -540,10 +556,24 @@ async function syncLotto(): Promise<{
       const errorMessage = scrapeError instanceof Error ? scrapeError.message : 'Scraping failed';
       const errorStack = scrapeError instanceof Error ? scrapeError.stack : String(scrapeError);
       console.error('Scrape error details:', { errorMessage, errorStack });
+
+      let userMessage = errorMessage;
+      if (
+        errorMessage.includes('Cloudflare') ||
+        errorMessage.includes('403') ||
+        errorMessage.includes('Lottologia request failed')
+      ) {
+        userMessage = 'Il sito ha bloccato la richiesta. Configura SCRAPER_API_KEY in Vercel per bypassare le protezioni anti-bot.';
+      } else if (errorMessage.includes('premium=true') || errorMessage.includes('ultra_premium=true')) {
+        userMessage =
+          'ScraperAPI segnala dominio protetto. Abilita SCRAPER_API_PREMIUM=true (o SCRAPER_API_ULTRA_PREMIUM=true) nelle variabili Vercel.';
+      } else if (errorMessage.includes('timeout')) {
+        userMessage = 'Timeout durante lo scraping Lotto. Riprova più tardi.';
+      }
       
       return {
         success: false,
-        message: errorMessage,
+        message: userMessage,
         total: 0,
         new: 0,
         error: errorStack,
