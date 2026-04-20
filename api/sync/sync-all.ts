@@ -97,6 +97,117 @@ function parseDate(dateText: string): string | null {
   }
 }
 
+const IT_MONTH_TO_MM = new Map<string, string>([
+  ['gennaio', '01'],
+  ['febbraio', '02'],
+  ['marzo', '03'],
+  ['aprile', '04'],
+  ['maggio', '05'],
+  ['giugno', '06'],
+  ['luglio', '07'],
+  ['agosto', '08'],
+  ['settembre', '09'],
+  ['ottobre', '10'],
+  ['novembre', '11'],
+  ['dicembre', '12'],
+]);
+
+function parseItalianDateText(dateText: string): string | null {
+  const cleaned = dateText.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+  const m = cleaned.match(
+    /(luned[iì]|marted[iì]|mercoled[iì]|gioved[iì]|venerd[iì]|sabato|domenica)?\s*(\d{1,2})\s+([a-zàèéìòù]+)\s+(\d{4})/
+  );
+  if (!m) return null;
+  const day = m[2].padStart(2, '0');
+  const mm = IT_MONTH_TO_MM.get(m[3]);
+  if (!mm) return null;
+  return `${m[4]}-${mm}-${day}`;
+}
+
+async function tryScrapeLottoFromEstrazioniLotto(fetchImpl: typeof fetch): Promise<ExtractedNumbers[]> {
+  const src = 'https://estrazionilotto.it/';
+  console.log('[scrape-lotto] Trying alternative source...', src);
+  const response = await fetchImpl(src, {
+    headers: {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      Accept: 'text/html,application/xhtml+xml',
+      'Accept-Language': 'it-IT,it;q=0.9,en;q=0.8',
+    },
+    signal: AbortSignal.timeout(25_000),
+  });
+  if (!response.ok) {
+    throw new Error(`Alternative Lotto source HTTP ${response.status}`);
+  }
+  const html = await response.text();
+  if (!html || html.length < 500) {
+    throw new Error('Alternative Lotto source returned empty/short HTML');
+  }
+  const $ = cheerio.load(html);
+
+  // Example: "<h3>... sabato 18 aprile 2026</h3>"
+  const dateRaw =
+    $('h3')
+      .toArray()
+      .map((el) => $(el).text().trim())
+      .find((t) => /(luned[iì]|marted[iì]|mercoled[iì]|gioved[iì]|venerd[iì]|sabato|domenica)\s+\d{1,2}\s+[a-zàèéìòù]+\s+\d{4}/i.test(t)) ||
+    '';
+  const date = parseItalianDateText(dateRaw);
+  if (!date) {
+    throw new Error('Failed to parse extraction date from alternative Lotto source');
+  }
+
+  // Blocks look like: <p class="ruota">Bari</p> followed by 5 <p class="numero">...</p>
+  const wheels: Record<string, number[]> = {};
+  $('p.ruota').each((_, el) => {
+    const rawWheel = $(el).text().trim();
+    const wheel = rawWheel.charAt(0).toUpperCase() + rawWheel.slice(1).toLowerCase();
+    if (!LOTTO_WHEELS.includes(wheel as LottoWheel)) {
+      return;
+    }
+    const nums = $(el)
+      .parent()
+      .nextAll()
+      .slice(0, 5)
+      .find('p.numero')
+      .toArray()
+      .map((n) => parseInt($(n).text().trim(), 10))
+      .filter((n) => !isNaN(n) && n >= 1 && n <= 90);
+
+    if (nums.length === 5) {
+      wheels[wheel] = nums;
+    }
+  });
+
+  // Fallback parse by regex if DOM structure changes but text remains.
+  if (Object.keys(wheels).length === 0) {
+    const plain = $.text().replace(/\s+/g, ' ');
+    for (const wheel of LOTTO_WHEELS) {
+      const re = new RegExp(`${wheel}\\s+(\\d{1,2})\\s+(\\d{1,2})\\s+(\\d{1,2})\\s+(\\d{1,2})\\s+(\\d{1,2})`, 'i');
+      const m = plain.match(re);
+      if (m) {
+        const nums = m.slice(1).map((v) => parseInt(v, 10));
+        if (nums.every((n) => n >= 1 && n <= 90)) {
+          wheels[wheel] = nums;
+        }
+      }
+    }
+  }
+
+  if (Object.keys(wheels).length === 0) {
+    throw new Error('Alternative Lotto source parsed zero wheel rows');
+  }
+
+  const defaultNumbers = wheels['Bari'] || Object.values(wheels)[0];
+  return [
+    {
+      date,
+      numbers: defaultNumbers,
+      wheels,
+    },
+  ];
+}
+
 // Note: scrapeSuperEnalottoExtractions is now imported from '../scrape/superenalotto'
 
 // Helper function to convert extraction to database format
@@ -117,7 +228,7 @@ async function scrapeLottoExtractions(): Promise<ExtractedNumbers[]> {
   
   try {
     const url = 'https://www.lottologia.com/lotto/archivio-estrazioni/';
-    console.log('[scrape-lotto] Starting scrape from Lottologia...', url);
+    console.log('[scrape-lotto] Starting Lotto scraping...');
     
     // Use native fetch (Node 18+ on Vercel)
     let fetchImpl: (url: string | URL | Request, init?: RequestInit) => Promise<Response>;
@@ -138,6 +249,20 @@ async function scrapeLottoExtractions(): Promise<ExtractedNumbers[]> {
         throw new Error(`Failed to load fetch implementation: ${importError instanceof Error ? importError.message : String(importError)}`);
       }
     }
+
+    // Preferred source: estrazionilotto.it (usually accessible without proxy).
+    // Keep Lottologia as fallback when alternative source changes.
+    try {
+      const alt = await tryScrapeLottoFromEstrazioniLotto(fetchImpl);
+      if (alt.length > 0) {
+        console.log(`[scrape-lotto] Using alternative source (${alt.length} extraction(s))`);
+        return alt;
+      }
+      console.warn('[scrape-lotto] Alternative source returned no rows, falling back to Lottologia...');
+    } catch (altErr) {
+      console.warn('[scrape-lotto] Alternative source failed, falling back to Lottologia:', altErr);
+    }
+    console.log('[scrape-lotto] Falling back to Lottologia...', url);
     
     const MIN_HTML_LEN = 100;
     const SCRAPER_API_CLIENT_TIMEOUT_MS = 72_000;
