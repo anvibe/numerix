@@ -12,6 +12,21 @@ interface ExtractedNumbers {
   superstar?: number;
 }
 
+function redactScraperApiKey(input: unknown): string {
+  const s = typeof input === 'string' ? input : String(input);
+  return s.replace(/([?&]api_key=)[^&\s]+/gi, '$1REDACTED');
+}
+
+function safeErrorMessage(err: unknown): string {
+  if (err instanceof Error) return redactScraperApiKey(err.message);
+  return redactScraperApiKey(String(err));
+}
+
+function safeErrorStack(err: unknown): string {
+  if (err instanceof Error) return redactScraperApiKey(err.stack || '');
+  return redactScraperApiKey(String(err));
+}
+
 // Valid game types
 const VALID_GAME_TYPES = ['superenalotto', 'lotto', '10elotto', 'millionday'] as const;
 type GameType = typeof VALID_GAME_TYPES[number];
@@ -33,11 +48,16 @@ function toApiError(res: VercelResponse, status: number, message: string, detail
   if (details && typeof details === 'object') {
     errorInfo.details = details;
   }
-  console.error('[sync-all]', errorInfo);
+  console.error('[sync-all]', {
+    ...errorInfo,
+    details: typeof details === 'string' ? redactScraperApiKey(details) : details,
+  });
   return res.status(status).json({
     success: false,
     error: message,
-    ...(process.env.NODE_ENV === 'development' && details ? { details } : {}),
+    ...(process.env.NODE_ENV === 'development' && details
+      ? { details: typeof details === 'string' ? redactScraperApiKey(details) : details }
+      : {}),
   });
 }
 
@@ -158,7 +178,7 @@ function parseSingleLottoExtractionFromAltHtml(html: string): ExtractedNumbers |
   });
 
   // Fallback parse: resilient text regex if DOM structure changes.
-  const plain = $.text().replace(/\s+/g, ' ');
+  const plain = $.root().text().replace(/\s+/g, ' ');
   for (const wheel of LOTTO_WHEELS) {
     if (wheels[wheel]) continue;
     const re = new RegExp(`${wheel}\\s+(\\d{1,2})\\s+(\\d{1,2})\\s+(\\d{1,2})\\s+(\\d{1,2})\\s+(\\d{1,2})`, 'i');
@@ -675,8 +695,8 @@ async function scrapeLottoExtractions(): Promise<ExtractedNumbers[]> {
   } catch (error) {
     console.error('[scrape-lotto] Error scraping Lottologia:', error);
     if (error instanceof Error) {
-      console.error('[scrape-lotto] Error message:', error.message);
-      console.error('[scrape-lotto] Error stack:', error.stack);
+      console.error('[scrape-lotto] Error message:', redactScraperApiKey(error.message));
+      console.error('[scrape-lotto] Error stack:', redactScraperApiKey(error.stack || ''));
     }
     throw error;
   }
@@ -713,8 +733,8 @@ async function syncLotto(): Promise<{
       console.log(`[sync-lotto] Scrape completed, got ${extractions.length} extractions`);
     } catch (scrapeError) {
       console.error('Error scraping Lotto:', scrapeError);
-      const errorMessage = scrapeError instanceof Error ? scrapeError.message : 'Scraping failed';
-      const errorStack = scrapeError instanceof Error ? scrapeError.stack : String(scrapeError);
+      const errorMessage = safeErrorMessage(scrapeError);
+      const errorStack = safeErrorStack(scrapeError);
       console.error('Scrape error details:', { errorMessage, errorStack });
 
       let userMessage = errorMessage;
@@ -792,10 +812,10 @@ async function syncLotto(): Promise<{
       console.error('Database query error:', dbError);
       return {
         success: false,
-        message: dbError instanceof Error ? dbError.message : 'Database query failed',
+        message: safeErrorMessage(dbError) || 'Database query failed',
         total: extractions.length,
         new: 0,
-        error: dbError instanceof Error ? dbError.stack : String(dbError),
+        error: safeErrorStack(dbError),
       };
     }
     
@@ -913,10 +933,10 @@ async function syncSuperEnalotto(): Promise<{
       console.error('[sync] Import error:', importError);
       return {
         success: false,
-        message: `Import error: ${importError instanceof Error ? importError.message : String(importError)}`,
+        message: `Import error: ${safeErrorMessage(importError)}`,
         total: 0,
         new: 0,
-        error: importError instanceof Error ? importError.stack : String(importError),
+        error: safeErrorStack(importError),
       };
     }
     
@@ -926,7 +946,7 @@ async function syncSuperEnalotto(): Promise<{
       extractions = await scrapeFunction();
     } catch (scrapeErr) {
       console.error('[sync] Scraping error:', scrapeErr);
-      const errMsg = scrapeErr instanceof Error ? scrapeErr.message : String(scrapeErr);
+      const errMsg = safeErrorMessage(scrapeErr);
       console.error('[sync] Scraping error details:', errMsg);
       
       // Return a more user-friendly error message
@@ -942,7 +962,7 @@ async function syncSuperEnalotto(): Promise<{
         message: userMessage,
         total: 0,
         new: 0,
-        error: errMsg,
+        error: safeErrorStack(scrapeErr) || errMsg,
       };
     }
     
@@ -1035,10 +1055,10 @@ async function syncSuperEnalotto(): Promise<{
       console.error('Database query error:', dbError);
       return {
         success: false,
-        message: dbError instanceof Error ? dbError.message : 'Database query failed',
+        message: safeErrorMessage(dbError) || 'Database query failed',
         total: extractions.length,
         new: 0,
-        error: dbError instanceof Error ? dbError.stack : String(dbError),
+        error: safeErrorStack(dbError),
       };
     }
     
@@ -1130,8 +1150,8 @@ async function syncSuperEnalotto(): Promise<{
     };
   } catch (error) {
     console.error('[sync] Unexpected error in SuperEnalotto sync:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    const errorStack = error instanceof Error ? error.stack : String(error);
+    const errorMessage = safeErrorMessage(error) || 'Unknown error occurred';
+    const errorStack = safeErrorStack(error);
     
     return {
       success: false,
@@ -1195,7 +1215,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       } catch (error) {
         results.superenalotto = { 
           success: false,
-          error: error instanceof Error ? error.message : 'Unknown error' 
+          error: safeErrorMessage(error) || 'Unknown error',
         };
       }
       
@@ -1205,7 +1225,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       } catch (error) {
         results.lotto = { 
           success: false,
-          error: error instanceof Error ? error.message : 'Unknown error' 
+          error: safeErrorMessage(error) || 'Unknown error',
         };
       }
       
@@ -1232,8 +1252,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           });
         } catch (syncError) {
           console.error('[sync-all] Error in syncSuperEnalotto:', syncError);
-          const errorMessage = syncError instanceof Error ? syncError.message : 'Unknown error';
-          const errorStack = syncError instanceof Error ? syncError.stack : String(syncError);
+          const errorMessage = safeErrorMessage(syncError) || 'Unknown error';
+          const errorStack = safeErrorStack(syncError);
           const errorName = syncError instanceof Error ? syncError.name : 'Error';
           
           console.error('[sync-all] Full error details:', {
@@ -1265,9 +1285,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(500).json({
             success: false,
             error: 'Sync failed',
-            message: syncError instanceof Error ? syncError.message : 'Unknown error',
+            message: safeErrorMessage(syncError) || 'Unknown error',
             gameType,
-            details: process.env.NODE_ENV === 'development' ? (syncError instanceof Error ? syncError.stack : String(syncError)) : undefined,
+            details: process.env.NODE_ENV === 'development' ? safeErrorStack(syncError) : undefined,
           });
         }
       }
@@ -1279,8 +1299,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const errorStack = error instanceof Error ? error.stack : String(error);
+      const errorMessage = safeErrorMessage(error) || 'Unknown error';
+      const errorStack = safeErrorStack(error);
       const errorName = error instanceof Error ? error.name : 'Error';
       
       console.error('[sync-all] Handler error:', {
@@ -1307,8 +1327,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (initError) {
     // Catch initialization errors (imports, etc.)
     console.error('Fatal initialization error:', initError);
-    const errorMessage = initError instanceof Error ? initError.message : 'Initialization failed';
-    const errorStack = initError instanceof Error ? initError.stack : String(initError);
+    const errorMessage = safeErrorMessage(initError) || 'Initialization failed';
+    const errorStack = safeErrorStack(initError);
     
     return res.status(500).json({
       error: 'Function initialization failed',

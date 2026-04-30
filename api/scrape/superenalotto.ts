@@ -11,6 +11,12 @@ interface ExtractedNumbers {
   superstar?: number;
 }
 
+function redactScraperApiKey(input: unknown): string {
+  const s = typeof input === 'string' ? input : String(input);
+  // Avoid leaking ScraperAPI key if an error/stack includes full request URL.
+  return s.replace(/([?&]api_key=)[^&\s]+/gi, '$1REDACTED');
+}
+
 // Get Supabase client (lazy initialization)
 function getSupabaseClient() {
   const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -605,8 +611,8 @@ async function scrapeLottologiaSuperEnalotto(): Promise<ExtractedNumbers[]> {
   } catch (error) {
     console.error('Error scraping Lottologia:', error);
     if (error instanceof Error) {
-      console.error('Error message:', error.message);
-      console.error('Error stack:', error.stack);
+      console.error('Error message:', redactScraperApiKey(error.message));
+      console.error('Error stack:', redactScraperApiKey(error.stack || ''));
     }
     throw error;
   }
@@ -633,8 +639,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.error('Scraping failed:', scrapeError);
       return res.status(500).json({
         error: 'Scraping failed',
-        message: scrapeError instanceof Error ? scrapeError.message : 'Unknown scraping error',
-        details: scrapeError instanceof Error ? scrapeError.stack : String(scrapeError),
+        message:
+          scrapeError instanceof Error
+            ? redactScraperApiKey(scrapeError.message)
+            : redactScraperApiKey('Unknown scraping error'),
+        details:
+          scrapeError instanceof Error
+            ? redactScraperApiKey(scrapeError.stack || '')
+            : redactScraperApiKey(String(scrapeError)),
       });
     }
     
