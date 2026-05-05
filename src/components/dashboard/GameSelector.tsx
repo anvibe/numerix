@@ -11,16 +11,18 @@ const GameSelector: React.FC = () => {
         const IconComponent = getIconComponent(game.icon);
         
         return (
-          <div
+          <button
+            type="button"
             key={game.id}
             className={`game-card ${
               selectedGame === game.id ? 'game-card-selected' : ''
             } ${game.color}`}
             onClick={() => setSelectedGame(game.id)}
+            aria-pressed={selectedGame === game.id}
           >
-            <div className="flex items-center">
-              <div className="mr-4">
-                <IconComponent className="h-8 w-8 text-text-primary" />
+            <div className="flex items-center text-left">
+              <div className={`mr-4 rounded-lg p-3 ${selectedGame === game.id ? 'bg-primary text-white' : 'bg-primary/10 text-primary'}`}>
+                <IconComponent className="h-6 w-6" />
               </div>
               <div className="flex-1">
                 <h3 className="text-lg font-semibold">{game.name}</h3>
@@ -32,7 +34,7 @@ const GameSelector: React.FC = () => {
                 )}
               </div>
             </div>
-          </div>
+          </button>
         );
       })}
     </div>

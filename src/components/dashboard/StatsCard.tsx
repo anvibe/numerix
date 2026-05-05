@@ -36,8 +36,8 @@ const StatsCard: React.FC<StatsCardProps> = ({ title, icon, data, type }) => {
   
   return (
     <div className="card">
-      <div className="flex items-center mb-3">
-        <div className="mr-3">{icon}</div>
+      <div className="flex items-center mb-4">
+        <div className="mr-3 rounded-md bg-primary/10 p-2">{icon}</div>
         <h3 className="text-lg font-semibold">{title}</h3>
       </div>
       

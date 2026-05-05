@@ -16,7 +16,6 @@ export const showToast = {
   info: (message: string) => {
     toast(message, {
       duration: 4000,
-      icon: 'ℹ️',
     });
   },
   

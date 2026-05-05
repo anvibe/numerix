@@ -4,34 +4,39 @@
 
 @layer base {
   :root {
-    --color-primary: 26 115 232;
-    --color-primary-dark: 25 103 210;
-    --color-secondary: 229 57 53;
-    --color-secondary-dark: 198 40 40;
-    --color-accent: 67 160 71;
-    --color-accent-dark: 56 142 60;
-    --color-warning: 251 140 0;
-    --color-error: 211 47 47;
-    --color-success: 46 125 50;
+    --color-primary: 37 99 235;
+    --color-primary-dark: 29 78 216;
+    --color-secondary: 225 29 72;
+    --color-secondary-dark: 190 18 60;
+    --color-accent: 5 150 105;
+    --color-accent-dark: 4 120 87;
+    --color-warning: 217 119 6;
+    --color-error: 220 38 38;
+    --color-success: 22 163 74;
+    --color-info: 14 165 233;
   }
 
   .dark {
-    --color-bg-primary: 18 18 18;
-    --color-bg-secondary: 30 30 30;
+    --color-bg-primary: 10 15 28;
+    --color-bg-secondary: 18 24 38;
     --color-text-primary: 255 255 255;
-    --color-text-secondary: 209 213 219;
+    --color-text-secondary: 180 190 207;
   }
 
   .light {
-    --color-bg-primary: 255 255 255;
-    --color-bg-secondary: 243 244 246;
-    --color-text-primary: 17 24 39;
-    --color-text-secondary: 107 114 128;
+    --color-bg-primary: 248 250 252;
+    --color-bg-secondary: 255 255 255;
+    --color-text-primary: 15 23 42;
+    --color-text-secondary: 100 116 139;
   }
 
   body {
     @apply bg-bg-primary text-text-primary transition-colors duration-200;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    background:
+      radial-gradient(circle at top left, rgb(var(--color-primary) / 0.08), transparent 34rem),
+      linear-gradient(180deg, rgb(var(--color-bg-primary)), rgb(var(--color-bg-primary)));
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -41,69 +46,98 @@
 
 @layer components {
   .btn {
-    @apply px-4 py-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60 disabled:cursor-not-allowed;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.08);
+  }
+
+  .btn:hover {
+    transform: translateY(-1px);
+  }
+
+  .btn:active {
+    transform: translateY(0);
+  }
+
+  .btn-sm {
+    @apply px-3 py-1.5 text-sm;
   }
 
   .btn-primary {
-    @apply btn bg-primary text-white hover:bg-primary-dark focus:ring-primary;
+    @apply btn bg-primary text-white hover:bg-primary-dark;
   }
 
   .btn-secondary {
-    @apply btn bg-secondary text-white hover:bg-secondary-dark focus:ring-secondary;
+    @apply btn bg-secondary text-white hover:bg-secondary-dark;
   }
 
   .btn-accent {
-    @apply btn bg-accent text-white hover:bg-accent-dark focus:ring-accent;
+    @apply btn bg-accent text-white hover:bg-accent-dark;
   }
 
   .btn-outline {
-    @apply btn border border-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800;
+    @apply btn border border-slate-200/80 bg-bg-secondary/70 text-text-primary hover:border-primary/40 hover:bg-primary/5 dark:border-slate-700/80 dark:hover:bg-primary/10;
   }
 
   .card {
-    @apply bg-bg-secondary rounded-xl shadow-md p-6 transition-all duration-200;
+    @apply bg-bg-secondary/95 rounded-lg border border-slate-200/80 p-5 transition-all duration-200 dark:border-slate-800/90;
+    box-shadow: 0 18px 45px rgb(15 23 42 / 0.07);
+    backdrop-filter: blur(16px);
+  }
+
+  .card:hover {
+    border-color: rgb(var(--color-primary) / 0.22);
   }
 
   .number-bubble {
-    @apply flex items-center justify-center font-medium text-white bg-primary shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl;
-    border-radius: 10px;
+    @apply flex items-center justify-center font-semibold text-white bg-primary shadow-md transition-all duration-200 hover:scale-105 hover:shadow-lg;
+    border-radius: 8px;
   }
 
   .number-bubble-selected {
-    @apply flex items-center justify-center font-medium text-white bg-accent shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl;
-    border-radius: 10px;
+    @apply flex items-center justify-center font-semibold text-white bg-accent shadow-md transition-all duration-200 hover:scale-105 hover:shadow-lg;
+    border-radius: 8px;
   }
 
   .number-bubble-hot {
-    @apply flex items-center justify-center font-medium text-white bg-secondary shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl;
-    border-radius: 10px;
+    @apply flex items-center justify-center font-semibold text-white bg-secondary shadow-md transition-all duration-200 hover:scale-105 hover:shadow-lg;
+    border-radius: 8px;
   }
 
   .number-bubble-cold {
-    @apply flex items-center justify-center font-medium text-white bg-blue-500 shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl;
-    border-radius: 10px;
+    @apply flex items-center justify-center font-semibold text-white bg-sky-500 shadow-md transition-all duration-200 hover:scale-105 hover:shadow-lg;
+    border-radius: 8px;
   }
 
   .number-bubble-due {
-    @apply flex items-center justify-center font-medium text-gray-900 bg-warning shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl;
-    border-radius: 10px;
+    @apply flex items-center justify-center font-semibold text-white bg-warning shadow-md transition-all duration-200 hover:scale-105 hover:shadow-lg;
+    border-radius: 8px;
   }
 
   .number-bubble-jolly {
-    @apply flex items-center justify-center font-medium text-gray-900 bg-yellow-500 shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl;
-    border-radius: 10px;
+    @apply flex items-center justify-center font-semibold text-slate-900 bg-amber-400 shadow-md transition-all duration-200 hover:scale-105 hover:shadow-lg;
+    border-radius: 8px;
   }
 
   .number-bubble-superstar {
-    @apply flex items-center justify-center font-medium text-white bg-purple-500 shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl;
-    border-radius: 10px;
+    @apply flex items-center justify-center font-semibold text-white bg-violet-500 shadow-md transition-all duration-200 hover:scale-105 hover:shadow-lg;
+    border-radius: 8px;
   }
 
   .game-card {
-    @apply card cursor-pointer hover:shadow-lg;
+    @apply card cursor-pointer border-2 hover:-translate-y-0.5 hover:shadow-lg;
   }
 
   .game-card-selected {
-    @apply border-4 border-accent;
+    @apply border-primary bg-primary/5 ring-4 ring-primary/10;
+  }
+
+  .surface-muted {
+    @apply rounded-lg border border-slate-200/80 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/35;
+  }
+
+  input,
+  select,
+  textarea {
+    @apply transition-colors duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20;
   }
 }

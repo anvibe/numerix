@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shuffle, Save, Info, ChevronDown, ChevronUp, Zap, Filter, Target } from 'lucide-react';
+import { Shuffle, Save, Info, ChevronDown, ChevronUp, Zap, Filter, Target, CheckCircle2, AlertTriangle } from 'lucide-react';
 import NumberDisplay from './NumberDisplay';
 import { useGame } from '../../context/GameContext';
 import { LottoWheel } from '../../types';
@@ -244,7 +244,7 @@ const GeneratorPanel: React.FC = () => {
                       </div>
                     </div>
                     <p className="text-xs text-text-secondary mt-2">
-                      ⚠️ Utilizza solo i <strong>top 10</strong> numeri di ogni categoria, non tutti i 90 numeri disponibili.
+                      Utilizza solo i <strong>top 10</strong> numeri di ogni categoria, non tutti i 90 numeri disponibili.
                     </p>
                   </div>
                   
@@ -257,15 +257,15 @@ const GeneratorPanel: React.FC = () => {
                         <div className="space-y-1 text-xs">
                           <div className="flex items-center gap-2">
                             {generatedNumbers.metadata.filtersApplied.avoidedConsecutive ? (
-                              <span className="text-success">✓</span>
+                              <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
                             ) : (
-                              <span className="text-warning">⚠</span>
+                              <AlertTriangle className="h-4 w-4 text-warning" aria-hidden="true" />
                             )}
                             <span>Sequenze consecutive evitate</span>
                           </div>
                           {generatedNumbers.metadata.filtersApplied.avoidedUnluckyNumbers > 0 && (
                             <div className="flex items-center gap-2">
-                              <span className="text-success">✓</span>
+                              <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
                               <span>
                                 {generatedNumbers.metadata.filtersApplied.avoidedUnluckyNumbers} numeri "sfortunati" evitati
                               </span>
@@ -273,7 +273,7 @@ const GeneratorPanel: React.FC = () => {
                           )}
                           {generatedNumbers.metadata.filtersApplied.avoidedUnluckyPairs > 0 && (
                             <div className="flex items-center gap-2">
-                              <span className="text-success">✓</span>
+                              <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
                               <span>
                                 {generatedNumbers.metadata.filtersApplied.avoidedUnluckyPairs} coppie "sfortunate" evitate
                               </span>
@@ -281,7 +281,7 @@ const GeneratorPanel: React.FC = () => {
                           )}
                           {generatedNumbers.metadata.filtersApplied.balanceCriteria && (
                             <div className="flex items-center gap-2">
-                              <span className="text-success">✓</span>
+                              <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
                               <span>Bilanciamento parità/dispari, decadi, distribuzione</span>
                             </div>
                           )}
@@ -292,7 +292,7 @@ const GeneratorPanel: React.FC = () => {
                   
                   {/* Important Note */}
                   <div className="bg-warning/10 border border-warning/30 rounded-lg p-3">
-                    <p className="font-semibold text-warning mb-1 text-xs">⚠️ Trasparenza Algoritmica</p>
+                    <p className="font-semibold text-warning mb-1 text-xs">Trasparenza Algoritmica</p>
                     <p className="text-xs text-text-secondary">
                       {generatedNumbers.metadata.note}
                     </p>

@@ -35,11 +35,11 @@ const Header: React.FC = () => {
 
   return (
     <>
-      <header className="bg-bg-primary border-b border-gray-200 dark:border-gray-800 py-4">
+      <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-bg-primary/85 py-3 backdrop-blur-xl dark:border-slate-800/90">
         <div className="container mx-auto px-4 flex justify-between items-center">
           {/* Logo and Numerix text */}
-          <div className="flex items-center space-x-2">
-            <svg width="40" height="40" viewBox="0 0 64 64">
+          <div className="flex items-center space-x-3">
+            <svg width="38" height="38" viewBox="0 0 64 64" aria-hidden="true">
               <defs>
                 <radialGradient id="headerLogoGradient" cx="0.3" cy="0.35">
                   <stop offset="0%" stopColor="#60a5fa" />
@@ -71,19 +71,22 @@ const Header: React.FC = () => {
               {/* Letter N */}
               <text x="32" y="42" fontFamily="system-ui, -apple-system, sans-serif" fontSize="32" fontWeight="bold" fill="#ffffff" textAnchor="middle" filter="url(#headerLogoShadow)">N</text>
             </svg>
-            <h1 className="text-2xl font-bold text-primary">Numerix</h1>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight text-text-primary">Numerix</h1>
+              <p className="hidden text-xs font-medium text-text-secondary sm:block">Analisi numerica responsabile</p>
+            </div>
           </div>
           
           {/* Actions on the right */}
           <div className="flex items-center space-x-2">
             {showProviderSwitch && (
-              <div className="flex rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden" role="group" aria-label="AI provider">
+              <div className="flex overflow-hidden rounded-md border border-slate-200 bg-bg-secondary shadow-sm dark:border-slate-700" role="group" aria-label="AI provider">
                 <button
                   type="button"
                   onClick={() => handleProviderChange('openai')}
                   disabled={!openAIAvailable}
                   title="Use OpenAI for AI recommendations"
-                  className={`px-2.5 py-1.5 text-xs font-medium transition-colors ${provider === 'openai' ? 'bg-primary text-white' : 'bg-bg-primary text-text-secondary hover:bg-bg-secondary'} ${!openAIAvailable ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`px-2.5 py-1.5 text-xs font-semibold transition-colors ${provider === 'openai' ? 'bg-primary text-white' : 'bg-bg-secondary text-text-secondary hover:bg-primary/10'} ${!openAIAvailable ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   OpenAI
                 </button>
@@ -92,7 +95,7 @@ const Header: React.FC = () => {
                   onClick={() => handleProviderChange('anthropic')}
                   disabled={!anthropicAvailable}
                   title="Use Anthropic for AI recommendations"
-                  className={`px-2.5 py-1.5 text-xs font-medium transition-colors border-l border-gray-300 dark:border-gray-600 ${provider === 'anthropic' ? 'bg-primary text-white' : 'bg-bg-primary text-text-secondary hover:bg-bg-secondary'} ${!anthropicAvailable ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`border-l border-slate-200 px-2.5 py-1.5 text-xs font-semibold transition-colors dark:border-slate-700 ${provider === 'anthropic' ? 'bg-primary text-white' : 'bg-bg-secondary text-text-secondary hover:bg-primary/10'} ${!anthropicAvailable ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   Anthropic
                 </button>
@@ -100,7 +103,7 @@ const Header: React.FC = () => {
             )}
             <button
               onClick={() => setShowRules(true)}
-              className="p-2 rounded-full hover:bg-bg-secondary transition-colors"
+              className="rounded-md border border-transparent p-2 transition-colors hover:border-slate-200 hover:bg-bg-secondary dark:hover:border-slate-700"
               aria-label="Regole del gioco"
               title="Regole del gioco"
             >

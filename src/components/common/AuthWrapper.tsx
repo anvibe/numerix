@@ -290,13 +290,13 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
       if (data.user) {
         // Check if email was already confirmed (means email confirmation is disabled in Supabase)
         if (data.user.email_confirmed_at) {
-          console.warn('⚠️ Email confirmation is DISABLED in Supabase. User was auto-confirmed.');
-          setError('⚠️ Email confirmation non è abilitata in Supabase. Controlla le impostazioni di autenticazione.');
+          console.warn('Email confirmation is DISABLED in Supabase. User was auto-confirmed.');
+          setError('Email confirmation non è abilitata in Supabase. Controlla le impostazioni di autenticazione.');
           // Still show confirmation message but warn user
           setEmailConfirmationSent(true);
         } else {
           // Email confirmation is enabled - normal flow
-          console.log('✅ Email confirmation enabled. User must confirm email.');
+          console.log('Email confirmation enabled. User must confirm email.');
           setEmailConfirmationSent(true);
           showToast.success('Registrazione completata! Controlla la tua casella email per confermare il tuo account.');
         }
@@ -459,7 +459,7 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
                   
                   {emailConfirmationSent && (
                     <div className="bg-primary/10 border border-primary/30 rounded-md p-4 text-sm">
-                      <div className="font-semibold text-primary mb-2">📧 Email di conferma inviata!</div>
+                      <div className="font-semibold text-primary mb-2">Email di conferma inviata!</div>
                       <div className="text-text-secondary mb-3">
                         Abbiamo inviato un'email di conferma a <strong>{email}</strong>.
                         <br />

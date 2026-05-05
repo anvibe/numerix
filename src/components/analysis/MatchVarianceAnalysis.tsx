@@ -203,11 +203,11 @@ const MatchVarianceAnalysis: React.FC<MatchVarianceAnalysisProps> = ({
   const getPeriodLabel = (type: string): string => {
     switch (type) {
       case 'lucky':
-        return '🍀 Periodo Fortunato';
+        return 'Periodo Fortunato';
       case 'unlucky':
-        return '⚠️ Periodo Sfortunato';
+        return 'Periodo Sfortunato';
       default:
-        return '📊 Periodo Normale';
+        return 'Periodo Normale';
     }
   };
 
@@ -320,7 +320,7 @@ const MatchVarianceAnalysis: React.FC<MatchVarianceAnalysisProps> = ({
             </div>
             {stats.recentDeviation < -0.1 && (
               <div className="text-xs text-warning mt-2 p-2 bg-warning/10 rounded">
-                ⚠️ Performance recente sotto la media attesa. Questo è normale - la varianza statistica causa fluttuazioni.
+                Performance recente sotto la media attesa. Questo è normale - la varianza statistica causa fluttuazioni.
               </div>
             )}
           </div>
@@ -386,7 +386,7 @@ const MatchVarianceAnalysis: React.FC<MatchVarianceAnalysisProps> = ({
                     <td className="py-3 px-2">
                       <div className="flex items-center gap-2">
                         {k === gameConfig.numbersToSelect ? (
-                          <span className="text-success font-bold">🎉 {k}/{gameConfig.numbersToSelect}</span>
+                          <span className="text-success font-bold">{k}/{gameConfig.numbersToSelect}</span>
                         ) : (
                           <span>{k}/{gameConfig.numbersToSelect}</span>
                         )}
@@ -433,7 +433,7 @@ const MatchVarianceAnalysis: React.FC<MatchVarianceAnalysisProps> = ({
               <div key={k} className="space-y-1">
                 <div className="flex items-center justify-between text-xs mb-1">
                   <span className="font-medium">
-                    {k} match{k === gameConfig.numbersToSelect ? ' 🎉' : ''}
+                    {k} match{k === gameConfig.numbersToSelect ? ' (Jackpot)' : ''}
                   </span>
                   <span className="text-text-secondary">
                     Atteso: {expected.toFixed(1)} | Reale: {actual}
@@ -488,7 +488,7 @@ const MatchVarianceAnalysis: React.FC<MatchVarianceAnalysisProps> = ({
             
             {stats.periodType === 'lucky' && (
               <div className="mb-3 p-3 bg-success/10 border border-success/30 rounded">
-                <p className="text-sm font-medium text-success mb-1">🍀 Periodo Fortunato</p>
+                <p className="text-sm font-medium text-success mb-1">Periodo Fortunato</p>
                 <p className="text-xs text-text-secondary">
                   La tua media di {stats.averageMatches.toFixed(2)} match/giocata è superiore all'atteso di {stats.expectedAverage.toFixed(2)}.
                   Questo è statisticamente insolito ma possibile. <strong>Non significa che il sistema funziona meglio</strong> - 
@@ -499,7 +499,7 @@ const MatchVarianceAnalysis: React.FC<MatchVarianceAnalysisProps> = ({
 
             {stats.periodType === 'unlucky' && (
               <div className="mb-3 p-3 bg-error/10 border border-error/30 rounded">
-                <p className="text-sm font-medium text-error mb-1">⚠️ Periodo Sfortunato</p>
+                <p className="text-sm font-medium text-error mb-1">Periodo Sfortunato</p>
                 <p className="text-xs text-text-secondary">
                   La tua media di {stats.averageMatches.toFixed(2)} match/giocata è inferiore all'atteso di {stats.expectedAverage.toFixed(2)}.
                   Questo è normale - la varianza statistica causa fluttuazioni. <strong>Non significa che il sistema funziona peggio</strong> - 
@@ -510,7 +510,7 @@ const MatchVarianceAnalysis: React.FC<MatchVarianceAnalysisProps> = ({
 
             {stats.periodType === 'normal' && (
               <div className="mb-3 p-3 bg-warning/10 border border-warning/30 rounded">
-                <p className="text-sm font-medium text-warning mb-1">📊 Periodo Normale</p>
+                <p className="text-sm font-medium text-warning mb-1">Periodo Normale</p>
                 <p className="text-xs text-text-secondary">
                   La tua media di {stats.averageMatches.toFixed(2)} match/giocata è vicina all'atteso di {stats.expectedAverage.toFixed(2)}.
                   Questo è il comportamento statistico normale. Il sistema sta funzionando come previsto.

@@ -20,12 +20,17 @@ const Dashboard: React.FC = () => {
     selectedGame, 
     savedCombinations, 
     extractionsData,
-    gameConfig 
   } = useGame();
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Dashboard Numerix</h1>
+      <section className="mb-8">
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Dashboard</p>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight md:text-4xl">Numerix</h1>
+        <p className="mt-3 max-w-2xl text-text-secondary">
+          Genera combinazioni, confronta i tuoi risultati e controlla le probabilità con un'interfaccia più chiara e moderna.
+        </p>
+      </section>
       
       <GameSelector />
       

@@ -149,7 +149,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
       });
       
       if (relevantUniqueSet.size < relevantCombinations.length) {
-        console.warn('⚠️ WARNING: Still have duplicates after deduplication!', {
+        console.warn('WARNING: Still have duplicates after deduplication!', {
           total: relevantCombinations.length,
           unique: relevantUniqueSet.size,
           duplicates: relevantCombinations.length - relevantUniqueSet.size
@@ -381,9 +381,9 @@ const SavedCombinationsAnalysis: React.FC = () => {
           // Provide specific suggestions based on how close they were
           let reason = '';
           if (difference === 1) {
-            reason = `🎯 Quasi perfetto! Mancava solo 1 numero: ${missingNumbers[0]}. Considera di sostituire uno dei numeri non vincenti.`;
+            reason = `Quasi perfetto! Mancava solo 1 numero: ${missingNumbers[0]}. Considera di sostituire uno dei numeri non vincenti.`;
           } else if (difference === 2) {
-            reason = `🔥 Quasi vincita! Mancavano solo 2 numeri. Ecco come potresti modificare la combinazione per essere più vicino alla vincita.`;
+            reason = `Quasi vincita! Mancavano solo 2 numeri. Ecco come potresti modificare la combinazione per essere più vicino alla vincita.`;
           } else {
             reason = `Per migliorare questa combinazione, considera di sostituire alcuni numeri con frequenza di vincita più alta.`;
           }
@@ -804,7 +804,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
       {relevantExtractions.length > 0 && (
         <div className="mb-4 p-3 bg-bg-secondary border border-gray-200 dark:border-gray-700 rounded-md">
           <div className="text-sm text-text-secondary">
-            📅 Ultima estrazione in archivio: {formatDateKeyForDisplay(toLocalDateKey(relevantExtractions[0].date))} ({relevantExtractions.length} estrazioni)
+            Ultima estrazione in archivio: {formatDateKeyForDisplay(toLocalDateKey(relevantExtractions[0].date))} ({relevantExtractions.length} estrazioni)
             {selectedCombinationId === null && (
               <span className="block mt-1 text-xs">
                 Con «Tutte le combinazioni» viene mostrato solo il miglior match per ogni combinazione. Seleziona una combinazione dal menu sopra per vedere tutte le estrazioni (es. 06/03 e 07/03).
@@ -823,18 +823,18 @@ const SavedCombinationsAnalysis: React.FC = () => {
           return (
             <div className="mb-4 p-3 bg-info/10 border border-info/20 rounded-md">
               <div className="font-medium text-info mb-1">
-                🔍 Combinazione selezionata: Analisi completa
+                Combinazione selezionata: Analisi completa
               </div>
               <div className="text-sm text-text-secondary">
                 Mostrate tutte le estrazioni per questa combinazione ({filteredResults.length} risultati)
                 {selectedCombo && (
                   <span className="block mt-1 text-xs">
-                    📅 Combinazione salvata il: {comboDate} | 
+                    Combinazione salvata il: {comboDate} | 
                     Mostrate solo estrazioni dal {comboDate} in poi
                   </span>
                 )}
                 <span className="block mt-1 text-xs text-info">
-                  ℹ️ Tutti i risultati sono mostrati (inclusi 0 match) per vedere il confronto completo
+                  Tutti i risultati sono mostrati (inclusi 0 match) per vedere il confronto completo
                 </span>
               </div>
             </div>
@@ -844,7 +844,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
         {filterDifference !== null && selectedCombinationId === null && filteredResults.length > 0 && (
           <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-md">
             <div className="font-medium text-primary mb-1">
-              ℹ️ Filtro attivo: Mostrate {filteredResults.length} combinazioni uniche (miglior match per combinazione)
+              Filtro attivo: Mostrate {filteredResults.length} combinazioni uniche (miglior match per combinazione)
             </div>
             <div className="text-sm text-text-secondary">
               Totale combinazioni salvate: {relevantCombinations.length} | 
@@ -934,9 +934,9 @@ const SavedCombinationsAnalysis: React.FC = () => {
                       )}
                       <span className="font-semibold">
                         {matchCount === gameConfig?.numbersToSelect 
-                          ? '🎉 VINCITA!' 
+                          ? 'VINCITA!' 
                           : difference === 0 
-                          ? '✅ Quasi vincita perfetta!' 
+                          ? 'Quasi vincita perfetta!' 
                           : `Mancavano ${difference} ${difference === 1 ? 'numero' : 'numeri'}`}
                       </span>
                     </div>
@@ -1119,7 +1119,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
                     <div className="flex items-start mb-2">
                       <Lightbulb className="h-5 w-5 text-primary mr-2 mt-0.5" />
                       <div className="flex-1">
-                        <div className="font-medium text-primary mb-2">💡 Suggerimenti per migliorare:</div>
+                        <div className="font-medium text-primary mb-2">Suggerimenti per migliorare:</div>
                         <div className="text-sm text-text-secondary mb-3">{suggestions.reason}</div>
                         
                         {suggestions.remove.length > 0 && (

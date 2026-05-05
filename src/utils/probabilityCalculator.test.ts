@@ -146,15 +146,15 @@ describe('Probability Calculator - Mathematical Reality of Lotteries', () => {
   describe('What Your App Actually Does', () => {
     it('generates aesthetically "nice" combinations with equal winning probability', () => {
       // Your app:
-      // ✅ Generates valid combinations
-      // ✅ Uses historical data for entertainment
-      // ✅ Avoids "ugly" patterns (consecutive numbers, all low, etc.)
-      // ✅ Provides interesting statistics
+      // Generates valid combinations
+      // Uses historical data for entertainment
+      // Avoids "ugly" patterns (consecutive numbers, all low, etc.)
+      // Provides interesting statistics
       // 
       // But CANNOT:
-      // ❌ Increase winning probability
-      // ❌ Predict future draws
-      // ❌ Find "better" combinations
+      // Increase winning probability
+      // Predict future draws
+      // Find "better" combinations
       
       // Any "pattern analysis" is purely for entertainment
       // The probability remains: 1 in 622,614,630
@@ -192,4 +192,3 @@ describe('Reality Check: What You Should Expect', () => {
     // You'd need to play for ~230+ years to expect a 4-match
   });
 });
-

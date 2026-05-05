@@ -68,7 +68,7 @@ const ProbabilityRealityCheck: React.FC = () => {
         <div className="flex items-center gap-3">
           <AlertTriangle className="h-6 w-6 text-warning" aria-hidden="true" />
           <div>
-            <h2 className="text-lg font-semibold">🎲 Probabilità Reali - {probs.game}</h2>
+            <h2 className="text-lg font-semibold">Probabilità Reali - {probs.game}</h2>
             <p className="text-sm text-text-secondary">
               Media match per giocata: <span className="font-bold text-warning">{probs.expectedMatchesPerPlay.toFixed(2)}</span> numeri
             </p>
@@ -94,7 +94,7 @@ const ProbabilityRealityCheck: React.FC = () => {
             <div className="flex items-start gap-3">
               <Info className="h-5 w-5 text-warning mt-0.5 flex-shrink-0" aria-hidden="true" />
               <div className="text-sm">
-                <p className="font-semibold text-warning mb-1">⚠️ Verità Matematica</p>
+                <p className="font-semibold text-warning mb-1">Verità Matematica</p>
                 <p className="text-text-secondary">
                   Ogni combinazione ha la <strong>stessa identica probabilità</strong> di vincere.
                   [1,2,3,4,5,6] ha le stesse probabilità di qualsiasi altra combinazione.
@@ -126,7 +126,7 @@ const ProbabilityRealityCheck: React.FC = () => {
                         <Target className="h-4 w-4 text-primary" aria-hidden="true" />
                         <span className="font-medium">
                           {mp.matches === probs.yourPicks ? (
-                            <span className="text-success">🎉 {mp.matches}/{probs.yourPicks} (Jackpot)</span>
+                            <span className="text-success">{mp.matches}/{probs.yourPicks} (Jackpot)</span>
                           ) : (
                             `${mp.matches}/${probs.yourPicks}`
                           )}
@@ -182,9 +182,10 @@ const ProbabilityRealityCheck: React.FC = () => {
           </div>
 
           {/* Reality check simulation */}
-          <div className="p-4 bg-bg-secondary rounded-lg">
+          <div className="surface-muted">
             <h3 className="font-semibold mb-3 flex items-center gap-2">
-              <span>📊</span> Simulazione: 10 anni di gioco (3 volte/settimana)
+              <Percent className="h-5 w-5 text-primary" aria-hidden="true" />
+              Simulazione: 10 anni di gioco (3 volte/settimana)
             </h3>
             <p className="text-sm text-text-secondary mb-3">
               Se giochi {probs.game} 3 volte a settimana per 10 anni (1.560 giocate):
@@ -204,7 +205,7 @@ const ProbabilityRealityCheck: React.FC = () => {
             </div>
             {probs.yourPicks >= 4 && (
               <p className="text-xs text-text-secondary mt-3">
-                ⚠️ Per {probs.yourPicks - 1}+ match: statisticamente improbabile in 10 anni. 
+                Per {probs.yourPicks - 1}+ match: statisticamente improbabile in 10 anni. 
                 Servirebbero centinaia di anni di gioco.
               </p>
             )}
@@ -218,7 +219,7 @@ const ProbabilityRealityCheck: React.FC = () => {
               non influenzano le probabilità future.
             </p>
             <p className="mt-2">
-              🎰 Gioca responsabilmente. Se il gioco diventa un problema, chiedi aiuto.
+              Gioca responsabilmente. Se il gioco diventa un problema, chiedi aiuto.
             </p>
           </div>
         </div>
@@ -228,4 +229,3 @@ const ProbabilityRealityCheck: React.FC = () => {
 };
 
 export default ProbabilityRealityCheck;
-

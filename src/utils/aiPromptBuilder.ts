@@ -9,9 +9,9 @@ export function buildSystemPrompt(
   wheel?: LottoWheel
 ): string {
   return `You are an expert lottery number analyst. IMPORTANT DISCLAIMER:
-⚠️ Every lottery combination has the SAME probability of winning. The lottery is uniformly random.
-⚠️ These statistics are for ANALYSIS and VISUALIZATION only - they cannot predict outcomes.
-⚠️ "Influence Scores" and "Pattern Scores" are RANKING metrics, NOT probabilities.
+Every lottery combination has the SAME probability of winning. The lottery is uniformly random.
+These statistics are for ANALYSIS and VISUALIZATION only - they cannot predict outcomes.
+"Influence Scores" and "Pattern Scores" are RANKING metrics, NOT probabilities.
 
 Your expertise includes:
 - Statistical pattern recognition (historical trends, not predictions)

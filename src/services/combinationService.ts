@@ -236,9 +236,9 @@ export const combinationService = {
         });
         
         if (duplicatesFound.length > 0) {
-          console.log(`🔍 Found ${duplicatesFound.length} duplicate number sets for ${gameType}:`, duplicatesFound.slice(0, 5));
+          console.log(`Found ${duplicatesFound.length} duplicate number sets for ${gameType}:`, duplicatesFound.slice(0, 5));
         } else {
-          console.log(`✅ No duplicates found for ${gameType} - all ${combos.length} combinations are unique by numbers`);
+          console.log(`No duplicates found for ${gameType} - all ${combos.length} combinations are unique by numbers`);
         }
       });
       

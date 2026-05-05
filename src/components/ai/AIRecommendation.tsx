@@ -209,9 +209,9 @@ const AIRecommendation: React.FC = () => {
           </div>
           <p className="text-xs text-text-secondary mt-2">
             {useOpenAI ? (
-              <>✨ L'AI avanzata utilizza {providerLabel === 'anthropic' ? 'Anthropic (Claude)' : 'OpenAI (GPT-4o)'} con analisi distribuzionale, probabilità bayesiane e co-occorrenze. Controlla la console per il debug del provider.</>
+              <>L'AI avanzata utilizza {providerLabel === 'anthropic' ? 'Anthropic (Claude)' : 'OpenAI (GPT-4o)'} con analisi distribuzionale, probabilità bayesiane e co-occorrenze. Controlla la console per il debug del provider.</>
             ) : (
-              <>🧠 L'AI locale utilizza algoritmi di apprendimento locale con statistiche avanzate per generare combinazioni ottimizzate.</>
+              <>L'AI locale utilizza algoritmi di apprendimento locale con statistiche avanzate per generare combinazioni ottimizzate.</>
             )}
           </p>
         </div>
@@ -318,7 +318,7 @@ const AIRecommendation: React.FC = () => {
           
           {aiResult.isOpenAI && (
             <div className="mt-3 p-2 bg-primary/10 border border-primary/20 rounded text-xs text-primary">
-              ✨ Questa raccomandazione è stata generata utilizzando l'AI avanzata ({aiResult.provider === 'anthropic' ? 'Anthropic' : 'OpenAI'})
+              Questa raccomandazione è stata generata utilizzando l'AI avanzata ({aiResult.provider === 'anthropic' ? 'Anthropic' : 'OpenAI'})
             </div>
           )}
         </div>

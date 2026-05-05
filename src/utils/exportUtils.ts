@@ -74,7 +74,7 @@ export const exportToPDF = async (combinations: GeneratedCombination[]): Promise
   });
   
   // Add disclaimer at the bottom
-  const disclaimer = "⚠️ Questo strumento fornisce solo suggerimenti basati su dati statistici. Non garantisce vincite.";
+  const disclaimer = "Questo strumento fornisce solo suggerimenti basati su dati statistici. Non garantisce vincite.";
   doc.setFontSize(10);
   doc.text(disclaimer, 15, 280);
   

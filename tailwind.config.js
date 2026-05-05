@@ -14,6 +14,7 @@ export default {
         warning: 'rgb(var(--color-warning) / <alpha-value>)',
         error: 'rgb(var(--color-error) / <alpha-value>)',
         success: 'rgb(var(--color-success) / <alpha-value>)',
+        info: 'rgb(var(--color-info) / <alpha-value>)',
         'bg-primary': 'rgb(var(--color-bg-primary) / <alpha-value>)',
         'bg-secondary': 'rgb(var(--color-bg-secondary) / <alpha-value>)',
         'text-primary': 'rgb(var(--color-text-primary) / <alpha-value>)',
