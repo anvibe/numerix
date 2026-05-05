@@ -178,7 +178,7 @@ function parseSingleLottoExtractionFromAltHtml(html: string): ExtractedNumbers |
   });
 
   // Fallback parse: resilient text regex if DOM structure changes.
-  const plain = $.root().text().replace(/\s+/g, ' ');
+  const plain = $.text().replace(/\s+/g, ' ');
   for (const wheel of LOTTO_WHEELS) {
     if (wheels[wheel]) continue;
     const re = new RegExp(`${wheel}\\s+(\\d{1,2})\\s+(\\d{1,2})\\s+(\\d{1,2})\\s+(\\d{1,2})\\s+(\\d{1,2})`, 'i');
