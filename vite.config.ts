@@ -11,14 +11,26 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          // Split vendor libraries into separate chunks
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'chart-vendor': ['chart.js', 'react-chartjs-2'],
-          'supabase-vendor': ['@supabase/supabase-js'],
-          'openai-vendor': ['openai'],
-          'anthropic-vendor': ['@anthropic-ai/sdk'],
-          'export-vendor': ['jspdf', 'file-saver'],
+        manualChunks(id) {
+          // Split vendor libraries into separate chunks.
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router-dom')) {
+            return 'react-vendor';
+          }
+          if (id.includes('node_modules/chart.js') || id.includes('node_modules/react-chartjs-2')) {
+            return 'chart-vendor';
+          }
+          if (id.includes('node_modules/@supabase/supabase-js')) {
+            return 'supabase-vendor';
+          }
+          if (id.includes('node_modules/openai')) {
+            return 'openai-vendor';
+          }
+          if (id.includes('node_modules/@anthropic-ai/sdk')) {
+            return 'anthropic-vendor';
+          }
+          if (id.includes('node_modules/jspdf') || id.includes('node_modules/file-saver')) {
+            return 'export-vendor';
+          }
         },
       },
     },
