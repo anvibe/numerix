@@ -1,6 +1,7 @@
-import { supabase, requireAuth } from '../utils/supabaseClient';
+import { getAuthHeaders, supabase, requireAuth } from '../utils/supabaseClient';
 import { GeneratedCombination, UnsuccessfulCombination, GameType } from '../types';
 import { Database } from '../types/supabase';
+import { ApiService } from '../utils/apiService';
 
 type SavedCombinationsRow = Database['public']['Tables']['saved_combinations']['Row'];
 type SavedCombinationsInsert = Database['public']['Tables']['saved_combinations']['Insert'];
@@ -47,20 +48,14 @@ export const combinationService = {
   // Saved Combinations
   async getSavedCombinations(): Promise<GeneratedCombination[]> {
     try {
-      const user = await requireAuth();
-      
-      const { data, error } = await supabase
-        .from('saved_combinations')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+      // Read via server-side endpoint so the base table can stay locked down.
+      await requireAuth();
+      const headers = await getAuthHeaders();
+      const resp = await ApiService.get('/combinations/saved', headers);
+      const json = await resp.json();
+      const rows: Array<SavedCombinationsRow & { ai_provider?: string | null }> = (json?.data ?? []) as any;
 
-      if (error) {
-        console.error('Error fetching saved combinations:', error);
-        throw error;
-      }
-
-      const allCombinations = data.map(convertRowToGeneratedCombination);
+      const allCombinations = rows.map(convertRowToGeneratedCombination);
       if (process.env.NODE_ENV === 'development' && allCombinations.length > 0) {
         const withAdvanced = allCombinations.filter(c => c.isAdvancedAI);
         if (withAdvanced.length > 0) {
@@ -148,13 +143,11 @@ export const combinationService = {
       const sortedNumbers = [...combination.numbers].sort((a, b) => a - b);
       const numbersKey = sortedNumbers.join(',');
       
-      const { data: existing } = await supabase
-        .from('saved_combinations')
-        .select('id, numbers')
-        .eq('user_id', user.id)
-        .eq('game_type', combination.gameType);
-      
-      if (existing && existing.length > 0) {
+      // Duplicate check via API (SELECT is not allowed from client).
+      const existingCombos = await this.getSavedCombinations();
+      const existing = existingCombos.filter(c => c.gameType === combination.gameType);
+
+      if (existing.length > 0) {
         // Check if this exact combination already exists
         const duplicate = existing.find(existingCombo => {
           const existingSorted = [...existingCombo.numbers].sort((a, b) => a - b);
@@ -168,7 +161,6 @@ export const combinationService = {
       }
       
       const insertData: SavedCombinationsInsert = {
-        user_id: user.id,
         game_type: combination.gameType,
         numbers: combination.numbers,
         strategy: combination.strategy,
@@ -180,14 +172,8 @@ export const combinationService = {
         ai_provider: combination.isAdvancedAI && (combination.aiProvider === 'openai' || combination.aiProvider === 'anthropic') ? combination.aiProvider : null,
       };
 
-      const { error } = await supabase
-        .from('saved_combinations')
-        .insert(insertData);
-
-      if (error) {
-        console.error('Error saving combination:', error);
-        throw error;
-      }
+      const headers = await getAuthHeaders();
+      await ApiService.post('/combinations/saved', insertData, headers);
     } catch (error) {
       console.error('Error in saveCombination:', error);
       throw error;
@@ -197,22 +183,14 @@ export const combinationService = {
   // Cleanup function to remove duplicate combinations
   async removeDuplicateCombinations(): Promise<{ removed: number }> {
     try {
-      const user = await requireAuth();
-      
-      // Get all combinations for this user
-      const { data: allCombinations, error: fetchError } = await supabase
-        .from('saved_combinations')
-        .select('id, game_type, numbers, created_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-      
-      if (fetchError) throw fetchError;
+      await requireAuth();
+      const allCombinations = await this.getSavedCombinations();
       if (!allCombinations) return { removed: 0 };
       
       // Group by game type and find duplicates
       const groups = new Map<string, typeof allCombinations>();
       allCombinations.forEach(combo => {
-        const key = combo.game_type;
+        const key = combo.gameType;
         if (!groups.has(key)) {
           groups.set(key, []);
         }
@@ -246,7 +224,7 @@ export const combinationService = {
             }
             
             // Keep the most recent one
-            if (existingCombo && new Date(existingCombo.created_at) < new Date(currentCombo.created_at)) {
+            if (existingCombo && new Date(existingCombo.date) < new Date(currentCombo.date)) {
               idsToDelete.push(existingId);
               seen.set(numbersKey, currentCombo.id);
             } else {
@@ -264,15 +242,12 @@ export const combinationService = {
         }
       });
       
-      // Delete duplicates
+      // Delete duplicates via API (no client SELECT required)
       if (idsToDelete.length > 0) {
-        const { error: deleteError } = await supabase
-          .from('saved_combinations')
-          .delete()
-          .eq('user_id', user.id)
-          .in('id', idsToDelete);
-        
-        if (deleteError) throw deleteError;
+        const headers = await getAuthHeaders();
+        for (const id of idsToDelete) {
+          await ApiService.delete(`/combinations/saved?id=${encodeURIComponent(id)}`, headers);
+        }
         removedCount = idsToDelete.length;
       }
       
@@ -325,20 +300,12 @@ export const combinationService = {
   // Unsuccessful Combinations
   async getUnsuccessfulCombinations(): Promise<UnsuccessfulCombination[]> {
     try {
-      const user = await requireAuth();
-      
-      const { data, error } = await supabase
-        .from('unsuccessful_combinations')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching unsuccessful combinations:', error);
-        throw error;
-      }
-
-      return data.map(convertRowToUnsuccessfulCombination);
+      await requireAuth();
+      const headers = await getAuthHeaders();
+      const resp = await ApiService.get('/combinations/unsuccessful', headers);
+      const json = await resp.json();
+      const rows: UnsuccessfulCombinationsRow[] = (json?.data ?? []) as any;
+      return rows.map(convertRowToUnsuccessfulCombination);
     } catch (error) {
       console.error('Error in getUnsuccessfulCombinations:', error);
       return [];
@@ -347,10 +314,9 @@ export const combinationService = {
 
   async addUnsuccessfulCombination(combination: Omit<UnsuccessfulCombination, 'id' | 'dateAdded'>): Promise<void> {
     try {
-      const user = await requireAuth();
+      await requireAuth();
       
       const insertData: UnsuccessfulCombinationsInsert = {
-        user_id: user.id,
         game_type: combination.gameType,
         numbers: combination.numbers,
         draw_date: combination.drawDate || null,
@@ -361,14 +327,8 @@ export const combinationService = {
         notes: combination.notes || null,
       };
 
-      const { error } = await supabase
-        .from('unsuccessful_combinations')
-        .insert(insertData);
-
-      if (error) {
-        console.error('Error adding unsuccessful combination:', error);
-        throw error;
-      }
+      const headers = await getAuthHeaders();
+      await ApiService.post('/combinations/unsuccessful', insertData, headers);
     } catch (error) {
       console.error('Error in addUnsuccessfulCombination:', error);
       throw error;

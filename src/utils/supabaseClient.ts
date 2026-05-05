@@ -10,6 +10,20 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
 
+export const getAccessToken = async (): Promise<string | null> => {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) {
+    console.error('Error getting session:', error);
+    return null;
+  }
+  return data.session?.access_token ?? null;
+};
+
+export const getAuthHeaders = async (): Promise<Record<string, string>> => {
+  const token = await getAccessToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 // Helper function to get current user
 export const getCurrentUser = async () => {
   try {

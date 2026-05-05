@@ -1,6 +1,7 @@
-import { supabase, requireAuth } from '../utils/supabaseClient';
+import { getAuthHeaders, supabase, requireAuth } from '../utils/supabaseClient';
 import { ExtractedNumbers, GameType, LottoWheel } from '../types';
 import { Database } from '../types/supabase';
+import { ApiService } from '../utils/apiService';
 
 type ExtractionsRow = Database['public']['Tables']['extractions']['Row'];
 type ExtractionsInsert = Database['public']['Tables']['extractions']['Insert'];
@@ -45,61 +46,13 @@ export const extractionService = {
   // IMPORTANT: Uses pagination to load ALL extractions (overcomes Supabase 1000 row limit)
   async getExtractions(gameType: GameType): Promise<ExtractedNumbers[]> {
     try {
-      // First, get the total count
-      const { count: totalCount, error: countError } = await supabase
-        .from('extractions')
-        .select('*', { count: 'exact', head: true })
-        .eq('game_type', gameType);
+      // Read via server-side endpoint so the base table can stay locked down.
+      const headers = await getAuthHeaders();
+      const response = await ApiService.get(`/extractions?gameType=${encodeURIComponent(gameType)}`, headers);
+      const json = await response.json();
+      const allData: ExtractionsRow[] = (json?.data ?? []) as ExtractionsRow[];
 
-      if (countError) {
-        console.error('Error getting extraction count:', countError);
-        // Continue anyway, we'll paginate until we get no more data
-      }
-
-      // Supabase has a default limit of 1000 rows, so we need to paginate to get all
-      let allData: ExtractionsRow[] = [];
-      let from = 0;
-      const pageSize = 1000;
-      let hasMore = true;
-
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from('extractions')
-          .select('*')
-          .eq('game_type', gameType)
-          .order('extraction_date', { ascending: false })
-          .range(from, from + pageSize - 1);
-
-        if (error) {
-          console.error('Error fetching extractions:', error);
-          throw error;
-        }
-
-        if (data && data.length > 0) {
-          allData = allData.concat(data);
-        }
-
-        // Check if we got all the data
-        const receivedCount = data?.length || 0;
-        if (receivedCount < pageSize) {
-          // Got less than a full page, we're done
-          hasMore = false;
-        } else if (totalCount !== null && allData.length >= totalCount) {
-          // Reached the total count
-          hasMore = false;
-        } else {
-          // Continue to next page
-          from += pageSize;
-        }
-      }
-
-      const finalCount = totalCount || allData.length;
-      console.log(`[ExtractionService] Loaded ${allData.length} extractions for ${gameType} (total in DB: ${finalCount})`);
-      
-      // Verify we got all the data
-      if (totalCount !== null && allData.length !== totalCount) {
-        console.warn(`[ExtractionService] WARNING: Expected ${totalCount} extractions but loaded ${allData.length} for ${gameType}`);
-      }
+      console.log(`[ExtractionService] Loaded ${allData.length} extractions for ${gameType} (via /api)`);
 
       const mapped = allData.map(convertRowToExtraction);
       // Deduplicate by (date, numbers, wheels, jolly, superstar) - keep first occurrence (order already by extraction_date desc)
@@ -189,17 +142,8 @@ export const extractionService = {
   // Check if extractions exist for a game type
   async hasExtractions(gameType: GameType): Promise<boolean> {
     try {
-      const { count, error } = await supabase
-        .from('extractions')
-        .select('*', { count: 'exact', head: true })
-        .eq('game_type', gameType);
-
-      if (error) {
-        console.error('Error checking extractions:', error);
-        return false;
-      }
-
-      return (count || 0) > 0;
+      const rows = await this.getExtractions(gameType);
+      return rows.length > 0;
     } catch (error) {
       console.error('Error in hasExtractions:', error);
       return false;
@@ -209,17 +153,8 @@ export const extractionService = {
   // Get total count of extractions for a game type (for diagnostics)
   async getExtractionCount(gameType: GameType): Promise<number> {
     try {
-      const { count, error } = await supabase
-        .from('extractions')
-        .select('*', { count: 'exact', head: true })
-        .eq('game_type', gameType);
-
-      if (error) {
-        console.error('Error getting extraction count:', error);
-        return 0;
-      }
-
-      return count || 0;
+      const rows = await this.getExtractions(gameType);
+      return rows.length;
     } catch (error) {
       console.error('Error in getExtractionCount:', error);
       return 0;
