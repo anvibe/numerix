@@ -244,6 +244,7 @@ const MatchVarianceAnalysis: React.FC<MatchVarianceAnalysisProps> = ({
         </button>
         {!isCollapsed && selectedGame === 'lotto' && gameConfig.wheels && (
           <select
+            aria-label="Seleziona ruota per analisi varianza"
             value={currentWheel}
             onChange={(e) => setCurrentWheel(e.target.value as LottoWheel)}
             className="px-3 py-1 border border-gray-300 dark:border-gray-700 rounded-md bg-bg-primary text-sm"

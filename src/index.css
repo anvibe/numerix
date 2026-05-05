@@ -6,13 +6,13 @@
   :root {
     --color-primary: 37 99 235;
     --color-primary-dark: 29 78 216;
-    --color-secondary: 225 29 72;
-    --color-secondary-dark: 190 18 60;
-    --color-accent: 5 150 105;
-    --color-accent-dark: 4 120 87;
-    --color-warning: 217 119 6;
+    --color-secondary: 190 18 60;
+    --color-secondary-dark: 159 18 57;
+    --color-accent: 4 120 87;
+    --color-accent-dark: 6 95 70;
+    --color-warning: 180 83 9;
     --color-error: 220 38 38;
-    --color-success: 22 163 74;
+    --color-success: 21 128 61;
     --color-info: 14 165 233;
   }
 
@@ -139,5 +139,27 @@
   select,
   textarea {
     @apply transition-colors duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20;
+  }
+}
+
+@layer utilities {
+  .dark .text-primary {
+    color: rgb(147 197 253);
+  }
+
+  .dark .text-warning {
+    color: rgb(251 191 36);
+  }
+
+  .dark .text-success {
+    color: rgb(74 222 128);
+  }
+
+  .dark .text-accent {
+    color: rgb(52 211 153);
+  }
+
+  .dark .text-error {
+    color: rgb(248 113 113);
   }
 }

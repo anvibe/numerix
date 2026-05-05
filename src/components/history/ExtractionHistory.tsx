@@ -167,10 +167,11 @@ const ExtractionHistory: React.FC = () => {
       <div className="mb-4 flex flex-wrap items-center gap-4">
         <div className="flex items-center">
           <Filter className="h-5 w-5 text-text-secondary mr-2" />
-          <label className="text-sm font-medium text-text-secondary mr-3">
+          <label htmlFor="extraction-limit" className="text-sm font-medium text-text-secondary mr-3">
             Mostra ultime:
           </label>
           <select
+            id="extraction-limit"
             className="bg-bg-primary border border-gray-300 dark:border-gray-700 rounded px-3 py-1.5"
             value={limit}
             onChange={(e) => setLimit(Number(e.target.value))}
@@ -184,10 +185,11 @@ const ExtractionHistory: React.FC = () => {
 
         {selectedGame === 'lotto' && (
           <div className="flex items-center">
-            <label className="text-sm font-medium text-text-secondary mr-3">
+            <label htmlFor="history-wheel" className="text-sm font-medium text-text-secondary mr-3">
               Ruota:
             </label>
             <select
+              id="history-wheel"
               className="bg-bg-primary border border-gray-300 dark:border-gray-700 rounded px-3 py-1.5"
               value={selectedWheel}
               onChange={(e) => setSelectedWheel(e.target.value as LottoWheel)}

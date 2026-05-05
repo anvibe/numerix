@@ -36,7 +36,7 @@ const Header: React.FC = () => {
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-bg-primary/85 py-3 backdrop-blur-xl dark:border-slate-800/90">
-        <div className="container mx-auto px-4 flex justify-between items-center">
+        <div className="container mx-auto flex flex-wrap items-center gap-3 px-4">
           {/* Logo and Numerix text */}
           <div className="flex items-center space-x-3">
             <svg width="38" height="38" viewBox="0 0 64 64" aria-hidden="true">
@@ -72,13 +72,13 @@ const Header: React.FC = () => {
               <text x="32" y="42" fontFamily="system-ui, -apple-system, sans-serif" fontSize="32" fontWeight="bold" fill="#ffffff" textAnchor="middle" filter="url(#headerLogoShadow)">N</text>
             </svg>
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-text-primary">Numerix</h1>
+              <div className="text-xl font-bold tracking-tight text-text-primary">Numerix</div>
               <p className="hidden text-xs font-medium text-text-secondary sm:block">Analisi numerica responsabile</p>
             </div>
           </div>
           
           {/* Actions on the right */}
-          <div className="flex items-center space-x-2">
+          <div className="ml-auto flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
             {showProviderSwitch && (
               <div className="flex overflow-hidden rounded-md border border-slate-200 bg-bg-secondary shadow-sm dark:border-slate-700" role="group" aria-label="AI provider">
                 <button

@@ -87,10 +87,11 @@ const GeneratorPanel: React.FC = () => {
       
       {selectedGame === 'lotto' && gameConfig.wheels && (
         <div className="mb-6">
-          <label className="block text-sm font-medium text-text-secondary mb-2">
+          <label htmlFor="generator-wheel" className="block text-sm font-medium text-text-secondary mb-2">
             Seleziona Ruota
           </label>
           <select
+            id="generator-wheel"
             value={selectedWheel}
             onChange={(e) => setSelectedWheel(e.target.value as LottoWheel)}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-bg-primary"

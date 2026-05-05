@@ -119,10 +119,11 @@ const AddExtractionForm: React.FC = () => {
           <div className="space-y-4">
             {LOTTO_WHEELS.map(wheel => (
               <div key={wheel}>
-                <label className="block text-sm font-medium text-text-secondary mb-1">
+                <label htmlFor={`wheel-numbers-${wheel}`} className="block text-sm font-medium text-text-secondary mb-1">
                   Ruota di {wheel}
                 </label>
                 <input
+                  id={`wheel-numbers-${wheel}`}
                   type="text"
                   required
                   value={wheelNumbers[wheel]}

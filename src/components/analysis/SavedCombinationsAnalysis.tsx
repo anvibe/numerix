@@ -657,10 +657,11 @@ const SavedCombinationsAnalysis: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         {selectedGame === 'lotto' && gameConfig?.wheels && (
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">
+            <label htmlFor="analysis-wheel" className="block text-sm font-medium text-text-secondary mb-2">
               Filtra per Ruota
             </label>
             <select
+              id="analysis-wheel"
               value={selectedWheel}
               onChange={(e) => setSelectedWheel(e.target.value as LottoWheel)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-bg-primary"
@@ -677,10 +678,11 @@ const SavedCombinationsAnalysis: React.FC = () => {
         {/* Filter by combination dropdown */}
         {relevantCombinations.length > 0 && (
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">
+            <label htmlFor="saved-combination-filter" className="block text-sm font-medium text-text-secondary mb-2">
               Filtra per Combinazione Salvata
             </label>
             <select
+              id="saved-combination-filter"
               value={selectedCombinationId || ''}
               onChange={(e) => setSelectedCombinationId(e.target.value === '' ? null : e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-bg-primary"
@@ -708,10 +710,11 @@ const SavedCombinationsAnalysis: React.FC = () => {
         </label>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
           <div>
-            <label className="block text-xs text-text-secondary mb-1">
+            <label htmlFor="date-filter-from" className="block text-xs text-text-secondary mb-1">
               Da (data inizio)
             </label>
             <input
+              id="date-filter-from"
               type="date"
               value={dateFilterFrom}
               onChange={(e) => setDateFilterFrom(e.target.value)}
@@ -719,10 +722,11 @@ const SavedCombinationsAnalysis: React.FC = () => {
             />
           </div>
           <div>
-            <label className="block text-xs text-text-secondary mb-1">
+            <label htmlFor="date-filter-to" className="block text-xs text-text-secondary mb-1">
               A (data fine)
             </label>
             <input
+              id="date-filter-to"
               type="date"
               value={dateFilterTo}
               onChange={(e) => setDateFilterTo(e.target.value)}
@@ -1175,8 +1179,9 @@ const SavedCombinationsAnalysis: React.FC = () => {
             Mostrati {Math.min(resultsLimit, filteredResults.length)} risultati su {filteredResults.length} totali
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-sm text-text-secondary">Mostra:</label>
+            <label htmlFor="analysis-results-limit" className="text-sm text-text-secondary">Mostra:</label>
             <select
+              id="analysis-results-limit"
               value={resultsLimit}
               onChange={(e) => setResultsLimit(Number(e.target.value))}
               className="px-3 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-bg-primary text-sm focus:outline-none focus:ring-2 focus:ring-primary"

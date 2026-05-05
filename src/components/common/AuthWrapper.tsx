@@ -531,10 +531,10 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
     <div className="min-h-screen flex flex-col">
       {/* Auth status bar */}
       <div className="bg-bg-secondary border-b border-gray-200 dark:border-gray-800 px-4 py-2">
-        <div className="container mx-auto flex justify-between items-center">
-          <div className="flex items-center text-sm text-text-secondary">
-            <User className="h-4 w-4 mr-2" />
-            <span>Connesso come: {user.email}</span>
+        <div className="container mx-auto flex flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center text-sm text-text-secondary">
+            <User className="h-4 w-4 mr-2 flex-shrink-0" />
+            <span className="min-w-0 break-all">Connesso come: {user.email}</span>
           </div>
           
           <button
