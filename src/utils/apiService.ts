@@ -1,3 +1,5 @@
+import { getAuthHeaders } from './supabaseClient';
+
 // Extraction sync service
 export class ExtractionSyncService {
   static async syncExtractions(gameType?: 'superenalotto' | 'lotto' | '10elotto' | 'millionday' | 'all') {
@@ -145,12 +147,14 @@ export class ApiService {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
         
+        const authHeaders = await getAuthHeaders();
         const response = await fetch(url, {
           ...options,
           signal: controller.signal,
           cache: 'no-store',
           headers: {
             'Content-Type': 'application/json',
+            ...authHeaders,
             ...options.headers,
           },
         });

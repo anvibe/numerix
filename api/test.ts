@@ -1,15 +1,18 @@
-import { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from './types.js';
+import { getSupabaseServerClient, requireUserIdFromAuthHeader } from './_supabaseServer.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
   
   try {
+    await requireUserIdFromAuthHeader(getSupabaseServerClient(), req.headers.authorization);
+
     // Test if fetch is available
     const hasNativeFetch = typeof globalThis.fetch === 'function';
     
@@ -67,4 +70,3 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 }
-

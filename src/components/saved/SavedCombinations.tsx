@@ -196,7 +196,7 @@ const SavedCombinations: React.FC = () => {
               {latestCombination.jolly && (
                 <div>
                   <div className="text-sm text-text-secondary mb-2">Jolly:</div>
-                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 text-white text-sm font-medium">
+                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-info text-white text-sm font-medium">
                     {latestCombination.jolly}
                   </span>
                 </div>

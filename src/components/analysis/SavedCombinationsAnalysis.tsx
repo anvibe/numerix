@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { Target, AlertCircle, Lightbulb, CheckCircle2, XCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Target, AlertCircle, Lightbulb, CheckCircle2, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { useGame } from '../../context/GameContext';
 import { GeneratedCombination, ExtractedNumbers, LottoWheel } from '../../types';
 import NumberBubble from '../common/NumberBubble';
@@ -76,6 +76,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
   const [resultsLimit, setResultsLimit] = useState<number>(10);
   const [dateFilterFrom, setDateFilterFrom] = useState<string>('');
   const [dateFilterTo, setDateFilterTo] = useState<string>('');
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Calculate combinations and extractions directly (no memoization to avoid React error #310)
   // Start with savedCombinations which should already be deduplicated, but apply additional safety checks
@@ -639,20 +640,47 @@ const SavedCombinationsAnalysis: React.FC = () => {
 
   return (
     <div className="card mb-8">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center">
-          <Target className="h-6 w-6 text-primary mr-3" />
+      <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <Target className="h-6 w-6 text-primary flex-shrink-0" />
           <h2 className="text-xl font-semibold">Analisi Combinazioni vs Estrazioni</h2>
         </div>
-        <button
-          onClick={() => setShowSuggestions(!showSuggestions)}
-          className="btn btn-outline text-sm"
-        >
-          <Lightbulb className="h-4 w-4 mr-1" />
-          {showSuggestions ? 'Nascondi' : 'Mostra'} Suggerimenti
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {!isCollapsed && (
+            <button
+              type="button"
+              onClick={() => setShowSuggestions(!showSuggestions)}
+              className="btn btn-outline text-sm"
+            >
+              <Lightbulb className="h-4 w-4 mr-1" />
+              {showSuggestions ? 'Nascondi' : 'Mostra'} Suggerimenti
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="btn btn-outline text-sm"
+            aria-expanded={!isCollapsed}
+            aria-controls="saved-combinations-analysis-content"
+          >
+          {isCollapsed ? (
+              <>
+                <ChevronDown className="h-4 w-4 mr-1" />
+                Espandi
+              </>
+          ) : (
+              <>
+                <ChevronUp className="h-4 w-4 mr-1" />
+                Comprimi
+              </>
+          )}
+          </button>
+        </div>
       </div>
-      <p className="text-xs text-text-secondary mb-6">{PRIZE_DISCLAIMER}</p>
+
+      {!isCollapsed && (
+        <div id="saved-combinations-analysis-content">
+          <p className="text-xs text-text-secondary mb-6">{PRIZE_DISCLAIMER}</p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         {selectedGame === 'lotto' && gameConfig?.wheels && (
@@ -922,7 +950,7 @@ const SavedCombinationsAnalysis: React.FC = () => {
               >
                 {isRecent && difference <= 2 && (
                   <div className="mb-3 p-2 bg-warning/20 border border-warning/30 rounded text-sm font-medium text-warning">
-                    🆕 Estrazione recente ({daysAgo === 0 ? 'oggi' : `${daysAgo} ${daysAgo === 1 ? 'giorno' : 'giorni'} fa`}) - Quasi vincita!
+                    Estrazione recente ({daysAgo === 0 ? 'oggi' : `${daysAgo} ${daysAgo === 1 ? 'giorno' : 'giorni'} fa`}) - Quasi vincita!
                   </div>
                 )}
                 
@@ -1196,6 +1224,8 @@ const SavedCombinationsAnalysis: React.FC = () => {
               <option value={filteredResults.length}>Tutti ({filteredResults.length})</option>
             </select>
           </div>
+        </div>
+      )}
         </div>
       )}
     </div>

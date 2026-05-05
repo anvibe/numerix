@@ -1,7 +1,8 @@
-import { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from '../types.js';
 import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
 import { scrapeSuperEnalottoExtractions } from '../scrape/superenalotto.js';
+import { getSupabaseServerClient, requireUserIdFromAuthHeader } from '../_supabaseServer.js';
 
 // Define types locally to avoid import issues
 interface ExtractedNumbers {
@@ -1169,11 +1170,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     
     if (req.method === 'OPTIONS') {
       return res.status(200).end();
     }
+
+    await requireUserIdFromAuthHeader(getSupabaseServerClient(), req.headers.authorization);
     
     console.log('[sync-all] Handler called', { 
       method: req.method, 
@@ -1197,7 +1200,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     try {
     // Validate input
-    const gameType = (req.query.gameType as string) || req.body?.gameType || 'all';
+    const body = typeof req.body === 'object' && req.body !== null ? req.body : {};
+    const bodyGameType = typeof body.gameType === 'string' ? body.gameType : undefined;
+    const gameType = (req.query.gameType as string) || bodyGameType || 'all';
     
     if (!gameType || (gameType !== 'all' && !VALID_GAME_TYPES.includes(gameType as GameType))) {
       return toApiError(res, 400, `Invalid or missing 'gameType'. Must be one of: ${VALID_GAME_TYPES.join(', ')}, or 'all'`);
@@ -1337,4 +1342,3 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 }
-

@@ -1,5 +1,6 @@
-import { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from './types.js';
 import { createClient } from '@supabase/supabase-js';
+import { getSupabaseServerClient, requireUserIdFromAuthHeader } from './_supabaseServer.js';
 
 // Get Supabase client (lazy initialization)
 function getSupabaseClient() {
@@ -42,14 +43,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
   try {
-    const gameType = (req.query.gameType as string) || req.body?.gameType || 'superenalotto';
+    await requireUserIdFromAuthHeader(getSupabaseServerClient(), req.headers.authorization);
+
+    const body = typeof req.body === 'object' && req.body !== null ? req.body : {};
+    const bodyGameType = typeof body.gameType === 'string' ? body.gameType : undefined;
+    const gameType = (req.query.gameType as string) || bodyGameType || 'superenalotto';
     
     if (!['superenalotto', 'lotto', '10elotto', 'millionday'].includes(gameType)) {
       return res.status(400).json({
@@ -178,4 +183,3 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 }
-

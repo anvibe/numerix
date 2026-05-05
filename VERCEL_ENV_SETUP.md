@@ -15,13 +15,13 @@ Your app needs these environment variables to work. Follow these steps:
    ### Required:
    ```
    Name: VITE_SUPABASE_URL
-   Value: https://kmndhvzjyhyiwwdmgyqg.supabase.co
+   Value: https://your-project-ref.supabase.co
    Environment: Production, Preview, Development (select all)
    ```
 
    ```
    Name: VITE_SUPABASE_ANON_KEY
-   Value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImttbmRodnpqeWh5aXd3ZG1neXFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxODkwNjcsImV4cCI6MjA2OTc2NTA2N30.QwINYrl38noHpxsfTbv-89hD9xdQIULgKvlnV6XdxM4
+   Value: your-supabase-anon-key-here
    Environment: Production, Preview, Development (select all)
    ```
 
@@ -57,11 +57,11 @@ vercel login
 
 # Set environment variables
 vercel env add VITE_SUPABASE_URL
-# Enter: https://kmndhvzjyhyiwwdmgyqg.supabase.co
+# Enter: https://your-project-ref.supabase.co
 # Select: Production, Preview, Development
 
 vercel env add VITE_SUPABASE_ANON_KEY
-# Enter: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImttbmRodnpqeWh5aXd3ZG1neXFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxODkwNjcsImV4cCI6MjA2OTc2NTA2N30.QwINYrl38noHpxsfTbv-89hD9xdQIULgKvlnV6XdxM4
+# Enter: your-supabase-anon-key-here
 # Select: Production, Preview, Development
 
 vercel env add VITE_OPENAI_API_KEY

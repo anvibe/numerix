@@ -4,16 +4,16 @@
 
 @layer base {
   :root {
-    --color-primary: 37 99 235;
-    --color-primary-dark: 29 78 216;
+    --color-primary: 29 78 216;
+    --color-primary-dark: 30 64 175;
     --color-secondary: 190 18 60;
     --color-secondary-dark: 159 18 57;
     --color-accent: 4 120 87;
     --color-accent-dark: 6 95 70;
-    --color-warning: 180 83 9;
-    --color-error: 220 38 38;
-    --color-success: 21 128 61;
-    --color-info: 14 165 233;
+    --color-warning: 146 64 14;
+    --color-error: 185 28 28;
+    --color-success: 22 101 52;
+    --color-info: 3 105 161;
   }
 
   .dark {
@@ -104,7 +104,7 @@
   }
 
   .number-bubble-cold {
-    @apply flex items-center justify-center font-semibold text-white bg-sky-500 shadow-md transition-all duration-200 hover:scale-105 hover:shadow-lg;
+    @apply flex items-center justify-center font-semibold text-white bg-info shadow-md transition-all duration-200 hover:scale-105 hover:shadow-lg;
     border-radius: 8px;
   }
 
@@ -119,7 +119,7 @@
   }
 
   .number-bubble-superstar {
-    @apply flex items-center justify-center font-semibold text-white bg-violet-500 shadow-md transition-all duration-200 hover:scale-105 hover:shadow-lg;
+    @apply flex items-center justify-center font-semibold text-white bg-violet-700 shadow-md transition-all duration-200 hover:scale-105 hover:shadow-lg;
     border-radius: 8px;
   }
 

@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from './types.js';
 import { getSupabaseServerClient, requireUserIdFromAuthHeader } from './_supabaseServer.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -39,4 +39,3 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(status).json({ error: message });
   }
 }
-
