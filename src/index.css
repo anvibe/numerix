@@ -124,11 +124,11 @@
   }
 
   .game-card {
-    @apply card cursor-pointer border-2 hover:-translate-y-0.5 hover:shadow-lg;
+    @apply card cursor-pointer border-slate-200/90 hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-lg dark:border-slate-800/90;
   }
 
   .game-card-selected {
-    @apply border-primary bg-primary/5 ring-4 ring-primary/10;
+    @apply border-primary bg-primary/5 shadow-lg ring-2 ring-primary/15;
   }
 
   .surface-muted {

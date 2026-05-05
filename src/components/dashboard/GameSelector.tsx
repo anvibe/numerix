@@ -16,7 +16,7 @@ const GameSelector: React.FC = () => {
             key={game.id}
             className={`game-card ${
               selectedGame === game.id ? 'game-card-selected' : ''
-            } ${game.color}`}
+            }`}
             onClick={() => setSelectedGame(game.id)}
             aria-pressed={selectedGame === game.id}
           >
