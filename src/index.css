@@ -128,7 +128,7 @@
   }
 
   .game-card-selected {
-    @apply border-primary bg-primary/5 shadow-lg ring-2 ring-primary/15;
+    @apply border-primary bg-primary/5 shadow-lg ring-2 ring-primary/15 dark:border-primary dark:bg-primary/10 dark:ring-primary/25;
   }
 
   .surface-muted {
